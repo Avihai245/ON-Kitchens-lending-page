@@ -1,0 +1,71 @@
+# AWS Amplify Hosting custom response headers.
+# Must live at the repository root. Amplify applies this file on the branch it is
+# deployed on, and it overrides anything set under Custom headers in the console.
+
+customHeaders:
+  # ---- Security, all responses -------------------------------------------------
+  - pattern: '**'
+    headers:
+      - key: 'Strict-Transport-Security'
+        value: 'max-age=31536000'
+      - key: 'X-Content-Type-Options'
+        value: 'nosniff'
+      # SAMEORIGIN, not DENY: the landing page embeds map.html in an iframe from
+      # this same origin for the two location maps. DENY would blank both of them.
+      - key: 'X-Frame-Options'
+        value: 'SAMEORIGIN'
+      - key: 'Referrer-Policy'
+        value: 'strict-origin-when-cross-origin'
+      - key: 'Permissions-Policy'
+        value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()'
+
+  # A Content-Security-Policy is deliberately not set. The design export styles
+  # every element with inline style attributes and ships its logic in an inline
+  # script, so any workable policy needs 'unsafe-inline' for both script-src and
+  # style-src, which removes most of the benefit. If you want one anyway, this is
+  # the accurate origin list for the page as it stands:
+  #
+  #   default-src 'self';
+  #   script-src 'self' 'unsafe-inline';
+  #   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  #   font-src 'self' https://fonts.gstatic.com;
+  #   img-src 'self' data: https://*.tile.openstreetmap.org;
+  #   connect-src 'self' https://nominatim.openstreetmap.org;
+  #   frame-src 'self' https://player.vimeo.com;
+
+  # ---- Caching -----------------------------------------------------------------
+  # Nothing in the design export has a content hash in its filename, so cache
+  # lifetimes are kept short enough that a redeploy is picked up promptly. Raise
+  # these once filenames are fingerprinted.
+
+  # Images, support.js and the design-system CSS: one day.
+  - pattern: '/assets/**'
+    headers:
+      - key: 'Cache-Control'
+        value: 'public, max-age=86400'
+  - pattern: '/_ds/**'
+    headers:
+      - key: 'Cache-Control'
+        value: 'public, max-age=86400'
+  - pattern: '/support.js'
+    headers:
+      - key: 'Cache-Control'
+        value: 'public, max-age=86400'
+
+  # Vendored libraries carry their version in the path, so they are immutable.
+  - pattern: '/vendor/**'
+    headers:
+      - key: 'Cache-Control'
+        value: 'public, max-age=31536000, immutable'
+
+  # HTML always revalidates, so a new deploy is live immediately. support.js also
+  # re-fetches the page's own URL at boot to re-read its template, which makes a
+  # stale cached index.html especially confusing.
+  - pattern: '**/*.html'
+    headers:
+      - key: 'Cache-Control'
+        value: 'public, max-age=0, must-revalidate'
+  - pattern: '/index.html'
+    headers:
+      - key: 'Cache-Control'
+        value: 'public, max-age=0, must-revalidate'

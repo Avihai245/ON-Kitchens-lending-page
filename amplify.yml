@@ -1,0 +1,18 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        # No dependencies to install — scripts/build.mjs uses only the Node stdlib.
+        - node --version
+    build:
+      commands:
+        - node scripts/build.mjs
+  artifacts:
+    # Everything Amplify publishes comes from dist/, assembled by scripts/build.mjs.
+    baseDirectory: dist
+    files:
+      - '**/*'
+  cache:
+    # Nothing to cache between builds: no package manager, no compiler.
+    paths: []

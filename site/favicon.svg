@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="ŌN Kitchens">
+  <!-- The blueprint registration mark used throughout the page: crosshair + amber
+       centre square, on the design system's near-black ground. -->
+  <rect width="32" height="32" fill="#141414"/>
+  <g stroke="#FAF8F5" stroke-opacity="0.55" stroke-width="1">
+    <path d="M16 3v26M3 16h26"/>
+  </g>
+  <rect x="10" y="10" width="12" height="12" fill="#B07A1C"/>
+</svg>
