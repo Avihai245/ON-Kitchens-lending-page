@@ -56,6 +56,73 @@ const VENUE_PHOTOS = [
 const THANK_YOU_PATH = '/thank-you';
 const THANK_YOU_FILE = 'thank-you.html';
 
+/** The web fonts the design system asks for. Declared here as a <link> in <head>
+ *  and stripped from the stylesheet's @import — see the head comment in buildIndex(). */
+const FONT_CSS =
+  'https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700' +
+  '&family=Barlow+Condensed:wght@400;600&display=swap';
+
+/**
+ * Where a submitted lead is POSTed, read from the environment at build time and
+ * baked into the page. Set it in the Amplify console under
+ * App settings -> Environment variables as LEAD_WEBHOOK_URL, then redeploy.
+ *
+ * Unset (the default) the page behaves exactly as before: validate, store the name
+ * and phone for the thank-you page, redirect. Nothing is sent and nothing errors.
+ *
+ * This is a static site, so the POST is made by the visitor's browser. Two things
+ * follow from that and neither can be engineered away client-side:
+ *   - The URL is visible in the page source. Anyone who views source can post
+ *     fabricated leads to it, so the receiver needs its own spam handling.
+ *   - The response is opaque. The browser cannot read a cross-origin reply without
+ *     CORS headers, so delivery is fire-and-forget: a rejected lead is not retried
+ *     and not reported.
+ * A server-side relay (an Amplify function, or a receiver that accepts a shared
+ * secret) is the fix for both; the README says so.
+ */
+const LEAD_WEBHOOK_URL = process.env.LEAD_WEBHOOK_URL || '';
+
+/**
+ * Inline sender, injected into <head>.
+ *
+ * sendBeacon is the primary path: the browser takes ownership of the request, so it
+ * completes even though the page navigates to /thank-you a moment later. The body
+ * goes as text/plain rather than application/json deliberately — application/json
+ * makes it a preflighted cross-origin request, and sendBeacon cannot preflight.
+ * text/plain keeps it a simple request that any origin will accept, and every common
+ * receiver (Zapier, Make, n8n) parses a JSON body regardless of the stated type.
+ * fetch with keepalive is the fallback for browsers where sendBeacon is unavailable
+ * or refuses the payload.
+ */
+function leadSenderScript(url) {
+  if (!url) {
+    return `<script>window.__onSendLead=function(){};/* LEAD_WEBHOOK_URL unset at build time */</script>`;
+  }
+  return `<script>
+window.__onSendLead = function (lead) {
+  try {
+    var q = new URLSearchParams(location.search);
+    var payload = JSON.stringify({
+      name: lead.name, phone: lead.phone, email: lead.email,
+      business: lead.business, form: lead.form,
+      submittedAt: new Date().toISOString(),
+      pageUrl: location.href, referrer: document.referrer || null,
+      utm: {
+        source: q.get('utm_source'), medium: q.get('utm_medium'),
+        campaign: q.get('utm_campaign'), term: q.get('utm_term'),
+        content: q.get('utm_content'), gclid: q.get('gclid'), fbclid: q.get('fbclid')
+      }
+    });
+    var url = ${JSON.stringify(url)};
+    var type = 'text/plain;charset=UTF-8';
+    if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([payload], { type: type }))) return;
+    fetch(url, { method: 'POST', mode: 'no-cors', keepalive: true,
+                 headers: { 'Content-Type': type }, body: payload }).catch(function () {});
+  } catch (err) { /* never let delivery block the redirect */ }
+};
+</script>`;
+}
+
 const PAGE_TITLE = 'ŌN Kitchens — Commercial Kitchen Rental, Los Angeles';
 const PAGE_DESCRIPTION =
   'Private, fully certified commercial kitchen space in Van Nuys and Los Angeles ' +
@@ -104,10 +171,42 @@ function stripCornerMarkup(html, label) {
   return { html: out, removed };
 }
 
-/** Drops the corner decoration's own rules from the design-system stylesheet, so
- *  no `.corner` selector survives into the published CSS. `.blueprint`'s border
- *  rule is deliberately left in place. */
+/**
+ * Guards the export's grid minimums against very narrow viewports.
+ *
+ * The layout is built from `repeat(auto-fit, minmax(<N>px, 1fr))` tracks. A bare
+ * pixel minimum is a floor the track cannot go below, so on a 320px phone — where
+ * the content box is 280px after the 20px `--edge` padding either side — every
+ * track wider than that (300, 320, 330) pushed the document 30px wider than the
+ * viewport and the whole page scrolled sideways.
+ *
+ * `minmax(min(100%, <N>px), 1fr)` is the standard fix, and the export already uses
+ * it in one place, so this just applies its own pattern consistently. It is a no-op
+ * wherever the container is at least <N> wide, which means every tablet and desktop
+ * layout is byte-for-byte unchanged; it only engages on the widths that were broken.
+ */
+function guardGridMinimums(html, label) {
+  const BARE = /minmax\((\d+)px, 1fr\)/g;
+  const found = [...html.matchAll(BARE)].length;
+  const out = html.replace(BARE, 'minmax(min(100%, $1px), 1fr)');
+  if (/minmax\(\d+px, 1fr\)/.test(out)) {
+    throw new Error(`[build] ${label}: a bare grid minimum survived guarding.`);
+  }
+  return { html: out, guarded: found };
+}
+
+/** Rewrites the design-system stylesheet for publication: drops the corner
+ *  decoration's own rules so no `.corner` selector survives, and lifts out the
+ *  Google Fonts @import, which the built page declares as a <link> in <head>
+ *  instead. `.blueprint`'s border rule is deliberately left in place. */
 function stripCornerStyles(css) {
+  css = replaceExactly(
+    css,
+    `@import url('${FONT_CSS}');\n`,
+    '',
+    1,
+    'font @import'
+  );
   const RULES = `.blueprint > .corner {
   position: absolute; width: 11px; height: 11px;
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
@@ -188,22 +287,45 @@ async function buildIndex() {
   html = replaceExactly(html, '<html>', '<html lang="en">', 1, 'html lang');
 
   // Everything the document needs before support.js runs, in the real <head>.
-  // React is pre-loaded so loadReactUmd() sees window.React/window.ReactDOM
-  // already set and short-circuits its unpkg.com fetch entirely.
+  //
+  // React is pre-loaded so loadReactUmd() sees window.React/window.ReactDOM already
+  // set and short-circuits its unpkg.com fetch entirely.
+  //
+  // All three scripts are deferred. Loaded synchronously they blocked the parser on
+  // ~210 KB before it reached <body>, which delayed discovery of the hero image and
+  // every other asset. Deferred scripts still execute in order, still run before
+  // DOMContentLoaded, and support.js boots either way — it checks document.readyState
+  // and calls __dcBoot() directly when parsing has already finished.
+  //
+  // Deferring means support.js's own hideRawTemplate() no longer runs during head
+  // parsing, so the raw <x-dc> template would flash before being hidden. The inline
+  // style below closes that window from the first byte of <body>.
+  //
+  // The font stylesheet is linked here rather than left as the @import on line 2 of
+  // the design-system CSS. An @import cannot start until its parent sheet has been
+  // fetched and parsed, so the fonts sat behind a three-hop chain
+  // (html -> styles.css -> css2 -> woff2); as a <link> it starts in parallel with
+  // styles.css, and the preconnects warm both font origins ahead of it.
   const head = [
     `<title>${PAGE_TITLE}</title>`,
     `<meta name="description" content="${PAGE_DESCRIPTION}">`,
     `<link rel="icon" href="favicon.svg" type="image/svg+xml">`,
+    `<style>x-dc{display:none!important}</style>`,
+    `<link rel="preconnect" href="https://fonts.googleapis.com">`,
+    `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`,
+    `<link rel="stylesheet" href="${FONT_CSS}">`,
     `<!-- Hoisted out of <helmet> so the browser actually applies it. See buildIndex(). -->`,
     `<link rel="stylesheet" href="${dsHref[1]}">`,
-    `<script src="${REACT}"></script>`,
-    `<script src="${REACT_DOM}"></script>`,
+    `<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high">`,
+    leadSenderScript(LEAD_WEBHOOK_URL),
+    `<script defer src="${REACT}"></script>`,
+    `<script defer src="${REACT_DOM}"></script>`,
   ].join('\n');
 
   html = replaceExactly(
     html,
     '<script src="./support.js"></script>',
-    head + '\n<script src="./support.js"></script>',
+    head + '\n<script defer src="./support.js"></script>',
     1,
     'head injection'
   );
@@ -224,12 +346,17 @@ async function buildIndex() {
         this.patchForm(id, () => ({ status: 'error' }));
         return;
       }
+      var lead = {
+        name: cur.f.fullName.trim(),
+        phone: cur.f.phone.trim(),
+        email: cur.f.email.trim(),
+        business: (cur.f.business || '').trim(),
+        form: id === 'mid' ? 'mid-page' : 'end-of-page'
+      };
       try {
-        sessionStorage.setItem('on-lead', JSON.stringify({
-          name: cur.f.fullName.trim(),
-          phone: cur.f.phone.trim()
-        }));
+        sessionStorage.setItem('on-lead', JSON.stringify({ name: lead.name, phone: lead.phone }));
       } catch (err) { /* private mode — the thank-you page falls back to generic copy */ }
+      window.__onSendLead(lead);
       window.location.assign('${THANK_YOU_PATH}');
     }, 1500);`,
     1,
@@ -237,10 +364,11 @@ async function buildIndex() {
   );
 
   const stripped = stripCornerMarkup(html, 'index.html');
-  await writeFile(join(OUT, 'index.html'), stripped.html);
+  const guarded = guardGridMinimums(stripped.html, 'index.html');
+  await writeFile(join(OUT, 'index.html'), guarded.html);
   console.log(
     `  index.html      <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect, ` +
-      `${stripped.removed} corner marks removed)`
+      `${stripped.removed} corner marks removed, ${guarded.guarded} grid minimums guarded)`
   );
 }
 
@@ -388,7 +516,12 @@ async function main() {
   await buildMap();
   await buildThankYou();
 
-  console.log(`\n[build] dist/ ready — publish this directory (amplify.yml baseDirectory).`);
+  console.log(
+    LEAD_WEBHOOK_URL
+      ? `\n[build] lead webhook: ${LEAD_WEBHOOK_URL.replace(/^(https?:\/\/[^/]+).*$/, '$1/…')}`
+      : `\n[build] lead webhook: not configured (set LEAD_WEBHOOK_URL to enable)`
+  );
+  console.log(`[build] dist/ ready — publish this directory (amplify.yml baseDirectory).`);
 }
 
 main().catch((err) => {
