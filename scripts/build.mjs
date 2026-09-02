@@ -62,6 +62,92 @@ const PAGE_DESCRIPTION =
   '— already built, already equipped. You bring the menu. We handle zoning, ' +
   'permitting and the city.';
 
+/**
+ * Strips the blueprint corner decoration — the "+" crosshair registration marks
+ * drawn just outside each corner of a `.blueprint` box.
+ *
+ * The marks are `<i class="corner tl|tr|bl|br">` elements; the design system turns
+ * each into an 11x11 box offset -6px outside the corner with crossing 1px
+ * ::before/::after rules. They are `position: absolute`, so removing them cannot
+ * move anything: absolutely positioned children sit outside normal flow and are
+ * excluded from flex and grid layout, contributing nothing to their parent's size
+ * or gaps. The `.blueprint` class itself is untouched, so every card, section and
+ * button keeps its plain 1px border.
+ *
+ * Applied to the design export at build time rather than edited into it, so a
+ * re-export from Claude Design cannot bring the decoration back.
+ */
+function stripCornerMarkup(html, label) {
+  const TAG = /<i class="corner (?:tl|tr|bl|br)"[^>]*><\/i>/g;
+  const kept = [];
+  let removed = 0;
+
+  for (const line of html.split('\n')) {
+    if (!line.includes('class="corner')) {
+      kept.push(line);
+      continue;
+    }
+    removed += (line.match(TAG) || []).length;
+    const rest = line.replace(TAG, '');
+    // A line that held nothing but corner marks is dropped outright, rather than
+    // left behind as stray indentation.
+    if (rest.trim() !== '') kept.push(rest);
+  }
+
+  const out = kept.join('\n');
+  if (out.includes('class="corner')) {
+    throw new Error(
+      `[build] ${label}: a corner element survived stripping — its markup no longer ` +
+        `matches the expected <i class="corner tl|tr|bl|br"> shape. Update stripCornerMarkup().`
+    );
+  }
+  return { html: out, removed };
+}
+
+/** Drops the corner decoration's own rules from the design-system stylesheet, so
+ *  no `.corner` selector survives into the published CSS. `.blueprint`'s border
+ *  rule is deliberately left in place. */
+function stripCornerStyles(css) {
+  const RULES = `.blueprint > .corner {
+  position: absolute; width: 11px; height: 11px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.blueprint > .corner::before, .blueprint > .corner::after {
+  content: ""; position: absolute; background: currentColor;
+}
+.blueprint > .corner::before { left: 5px; top: 0; width: 1px; height: 100%; }
+.blueprint > .corner::after  { top: 5px; left: 0; width: 100%; height: 1px; }
+.blueprint > .corner.tl { top: -6px; left: -6px; }
+.blueprint > .corner.tr { top: -6px; right: -6px; }
+.blueprint > .corner.bl { bottom: -6px; left: -6px; }
+.blueprint > .corner.br { bottom: -6px; right: -6px; }
+`;
+  let out = replaceExactly(css, RULES, '', 1, 'corner style rules');
+  // Two comments elsewhere in the file describe the marks; leaving them would keep
+  // `.corner` greppable in the shipped CSS for a feature that no longer exists.
+  out = replaceExactly(
+    out,
+    `/* The overlay image treatments (halftone, duotone) clip their overlay
+   (overflow:hidden); a blueprint wrapper draws its registration marks
+   outside the box, so when both classes share a wrapper the frame must
+   win. */
+`,
+    '',
+    1,
+    'corner overflow comment'
+  );
+  out = replaceExactly(
+    out,
+    `/* — blueprint frame: components are wireframe objects (see .blueprint
+     and .corner above) — square, transparent, hairline-bordered — */`,
+    `/* — blueprint frame: components are wireframe objects (see .blueprint
+     above) — square, transparent, hairline-bordered — */`,
+    1,
+    'corner reference comment'
+  );
+  return out;
+}
+
 /** Replace `find` in `text` exactly `expected` times, or throw. Guards against a
  *  future re-export silently changing the markup out from under a rewrite. */
 function replaceExactly(text, find, replacement, expected, label) {
@@ -150,8 +236,12 @@ async function buildIndex() {
     'lead form redirect'
   );
 
-  await writeFile(join(OUT, 'index.html'), html);
-  console.log(`  index.html      <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect)`);
+  const stripped = stripCornerMarkup(html, 'index.html');
+  await writeFile(join(OUT, 'index.html'), stripped.html);
+  console.log(
+    `  index.html      <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect, ` +
+      `${stripped.removed} corner marks removed)`
+  );
 }
 
 /**
@@ -200,7 +290,7 @@ async function buildThankYou() {
       shots
         .map(
           ([s, alt]) =>
-            `\n        <figure class="blueprint"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>` +
+            `\n        <figure class="blueprint">` +
             `<img src="/${s}" alt="${alt}" loading="lazy"></figure>`
         )
         .join('') + '\n      '
@@ -211,7 +301,6 @@ async function buildThankYou() {
         .map(
           (q) =>
             `\n        <figure class="blueprint">` +
-            `<i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>` +
             `<div role="img" aria-label="Rated 5 out of 5" class="stars">${star(14).repeat(5)}</div>` +
             `<blockquote>&ldquo;${q.quote}&rdquo;</blockquote>` +
             `<figcaption><b>${q.name}</b><span>${q.date}</span></figcaption></figure>`
@@ -222,7 +311,7 @@ async function buildThankYou() {
       '{{VENUE_PHOTOS}}',
       VENUE_PHOTOS.map(
         ([file, alt]) =>
-          `\n        <figure class="blueprint"><i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>` +
+          `\n        <figure class="blueprint">` +
           `<img src="/assets/${file}" alt="${alt}" loading="lazy"></figure>`
       ).join('') + '\n      '
     );
@@ -269,6 +358,22 @@ async function main() {
     if (entry === 'map.html') continue; // rewritten below
     await cp(join(SRC, entry), join(OUT, entry), { recursive: true });
     console.log(`  ${entry.padEnd(15)} <- copied verbatim`);
+  }
+
+  // _ds/ ships only what the page loads. The rest of the directory is Claude Design's
+  // own tooling metadata — the system's readme, its component manifest and an oxlint
+  // config — which has no business on a public origin and still documents the corner
+  // decoration. The stylesheet is then rewritten in place to drop the corner rules.
+  for (const dir of await readdir(join(OUT, '_ds'))) {
+    for (const file of await readdir(join(OUT, '_ds', dir))) {
+      if (file !== 'styles.css' && file !== '_ds_bundle.js') {
+        await rm(join(OUT, '_ds', dir, file), { recursive: true, force: true });
+        console.log(`  _ds/${file.padEnd(11)} <- dropped (design-tool metadata)`);
+      }
+    }
+    const css = join(OUT, '_ds', dir, 'styles.css');
+    await writeFile(css, stripCornerStyles(await readFile(css, 'utf8')));
+    console.log('  _ds styles.css  <- corner rules stripped');
   }
 
   await cp(join(ROOT, 'vendor'), join(OUT, 'vendor'), { recursive: true });

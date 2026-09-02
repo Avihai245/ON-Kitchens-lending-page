@@ -63,8 +63,8 @@ The export cannot be published as-is:
   subtree and React re-inserts the `<link>` into `<head>`, where the browser fetches
   it and populates `link.sheet` (98 rules) but never adds it to
   `document.styleSheets` — so none of its rules take effect. In that state the page
-  renders with all 33 `.btn`, 58 `.blueprint` wrappers, 232 `.corner` registration
-  marks and 8 `.field`/`.input` completely unstyled, and with `--font-heading`,
+  renders with all 33 `.btn`, 58 `.blueprint` wrappers and 8 `.field`/`.input`
+  completely unstyled, and with `--font-heading`,
   `--font-body`, `--shadow-lg`, `--color-neutral-*`, `--space-*` and `--radius-*`
   undefined, which drops every heading to Times New Roman. The build emits the same
   `<link>` in the real `<head>`, where it is parsed normally.
@@ -78,10 +78,12 @@ instead of publishing a silently broken page.
 ## The thank-you page
 
 A completed lead form sends the visitor to `/thank-you` instead of swapping in the
-export's inline success state. The page opens with the logo, then a confirmation
-addressed to the lead by name, then every review from the landing page — the six
-Google screenshots and all twelve testimonials, including the six normally hidden
-behind "show more" — and finally five photographs of the premises.
+export's inline success state. The page runs: logo, then a centred confirmation
+addressed to the lead by name with a panel echoing back the phone number they typed,
+then the video (click-to-play, so the Vimeo player is only fetched when asked for),
+then every review from the landing page — the six Google screenshots and all twelve
+testimonials, including the six normally hidden behind "show more" — and finally five
+photographs of the premises.
 
 **Clean URL.** Built as a flat `dist/thank-you.html`, not `thank-you/index.html`.
 Amplify resolves an extensionless request by looking for `<path>.html` first and
@@ -107,6 +109,24 @@ count.
 
 The page is `noindex, follow` — a post-conversion page has nothing to gain from
 indexing and would compete with the landing page in search.
+
+## The blueprint corner decoration is stripped
+
+The design system draws "+" crosshair registration marks just outside each corner of
+every `.blueprint` box — `<i class="corner tl|tr|bl|br">` elements that the stylesheet
+turns into an 11x11 box offset -6px with crossing 1px `::before`/`::after` rules. They
+are removed at build time: 232 elements out of the landing page, the corresponding
+`.blueprint > .corner` rules out of the design-system stylesheet, and none are emitted
+by `templates/` or `site/`.
+
+`.blueprint` itself is untouched, so every card, section and button keeps its plain
+1px border. The marks were `position: absolute`, so removing them cannot shift
+anything — verified by measuring 150 bounding boxes at 1440 / 768 / 390 px before and
+after: page height, document width, text content and every box identical.
+
+Doing this in the build rather than in the export means a re-export from Claude Design
+cannot bring the decoration back. `stripCornerMarkup()` throws if a corner element
+survives in a shape its pattern does not recognise.
 
 ## Vendored libraries
 
@@ -194,7 +214,7 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
 
 - All 25 local references resolve; 34 images load, 0 broken; no 4xx or 5xx.
 - Design-system stylesheet applied, `--font-heading` resolving, `.btn-primary` at
-  `#B07A1C`, blueprint corner marks drawn.
+  `#B07A1C`.
 - No requests to `unpkg.com`. Leaflet 1.9.4 initialises from `vendor/`.
 - No template leakage — zero `x-dc`, `sc-if` or `{{ }}` left in the DOM.
 - No horizontal overflow at any breakpoint. No duplicate IDs. All 10 in-page anchor
@@ -202,8 +222,11 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
 - Interactivity: 5 equipment tabs, 8 FAQ accordions, form validation and submit
   states, sticky CTA, reviews expand, accessibility panel (text size / contrast /
   underline links / stop motion), in-place video player.
-- Thank-you flow: both forms redirect to `/thank-you` with no trailing slash; the
-  headline and callback line carry the submitted name and phone; 6 screenshots, 12
-  testimonials and 5 photos render with no broken images; a refresh, a direct visit
-  and a private-mode visit all fall back to the generic copy; the back button
-  returns to the landing page.
+- Thank-you flow: both forms redirect to `/thank-you` with no trailing slash; hero
+  centred; the headline carries the submitted name and the panel the formatted phone;
+  click-to-play swaps in the Vimeo player; 6 screenshots, 12 testimonials and 5 photos
+  render with no broken images; a refresh, a direct visit and a private-mode visit all
+  fall back to generic copy with the panel hidden; the back button returns to the
+  landing page.
+- Corner removal: 0 `.corner` nodes on every page, `.blueprint` border intact, and
+  150 bounding boxes byte-identical to the previous build at all three widths.
