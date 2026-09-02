@@ -17,6 +17,8 @@ site/                              Files added on top of the design export
   404.html                           custom not-found page, brand-matched
   favicon.svg
   robots.txt
+templates/
+  thank-you.html                   post-submission page; reviews injected at build
 vendor/                            Pinned libraries, served from our own origin
   react-18.3.1.production.min.js
   react-dom-18.3.1.production.min.js
@@ -30,14 +32,18 @@ palette-and-photography-decisions/ The Claude Design export — treat as read-on
     assets/                          21 WebP images used by the page
     uploads/                         23 MB of design-tool source material, unused
 dist/                              Build output (gitignored)
+  index.html  thank-you.html  404.html  map.html  assets/  _ds/  vendor/  …
 ```
 
 ## Build and preview
 
 ```bash
 node scripts/build.mjs
-npx http-server dist -p 8080 -c-1
+npx http-server dist -p 8080 -c-1 --ext html
 ```
+
+`--ext html` makes the dev server resolve `/thank-you` to `thank-you.html` the way
+Amplify does; without it that URL 404s locally while working fine in production.
 
 No dependencies to install. `scripts/build.mjs` copies the export into `dist/`,
 renames the entry file to `index.html`, applies the head fixes described below,
@@ -68,6 +74,39 @@ Keeping this in the build rather than editing the export means re-exporting from
 Claude Design will not clobber any of it. `scripts/build.mjs` asserts on the exact
 markup it rewrites, so if a future export changes shape the build fails loudly
 instead of publishing a silently broken page.
+
+## The thank-you page
+
+A completed lead form sends the visitor to `/thank-you` instead of swapping in the
+export's inline success state. The page opens with the logo, then a confirmation
+addressed to the lead by name, then every review from the landing page — the six
+Google screenshots and all twelve testimonials, including the six normally hidden
+behind "show more" — and finally five photographs of the premises.
+
+**Clean URL.** Built as a flat `dist/thank-you.html`, not `thank-you/index.html`.
+Amplify resolves an extensionless request by looking for `<path>.html` first and
+serving it at the clean URL with a 200; only when that file is missing does it 404,
+redirect to `<path>/`, and serve the directory index. The flat file therefore lands
+on `/thank-you` exactly, with no redirect hop, no trailing slash, and no console
+rule to maintain.
+
+**How the name and phone get there.** `sessionStorage`, not the query string. A
+phone number in the URL would end up in browser history, in the `Referer` header of
+every outbound link, and in any analytics that logs page paths. The page reads the
+entry, renders it with `textContent` so a name can never inject markup, formats
+10-digit US numbers as `(310) 555-1234` and shows anything else exactly as typed,
+then clears the entry. A refresh or a direct visit to `/thank-you` therefore falls
+back to generic copy rather than resurfacing someone's details — and the page still
+reads correctly for a visitor who arrives with no data at all, including in private
+mode where `sessionStorage` throws.
+
+**Reviews are extracted from the design export at build time**, not copied by hand,
+so the page cannot drift from the landing page it mirrors. The build asserts on
+exactly 12 testimonials and 6 screenshots and fails if a re-export changes either
+count.
+
+The page is `noindex, follow` — a post-conversion page has nothing to gain from
+indexing and would compete with the landing page in search.
 
 ## Vendored libraries
 
@@ -127,10 +166,12 @@ Nothing here provisions AWS resources or sets environment variables.
 
 These are behaviours of the design prototype, left alone deliberately:
 
-- **Both lead forms are simulated.** `submit()` in the page's script runs
-  `setTimeout(…, 1500)` and then shows the success state. Nothing is sent anywhere
-  and nothing is stored. The forms look like they work and drop every lead — wire
-  them to a real endpoint before driving traffic here.
+- **Both lead forms are still simulated.** `submit()` validates, waits 1.5s, and
+  redirects to `/thank-you`. Nothing is sent anywhere and nothing is stored — the
+  name and phone live only in that visitor's own `sessionStorage` and are cleared on
+  render. The funnel now *looks* complete end to end, which makes this more
+  dangerous than before, not less: every lead is still dropped. Wire the submit to a
+  real endpoint before driving traffic here.
 - **The header phone CTA is commented out** in the export, in 10 places
   (`(844) 435-1255`). The number is still live on 14 other `tel:` links.
 - **Maps use OpenStreetMap's public infrastructure** — `tile.openstreetmap.org` for
@@ -160,4 +201,9 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   targets exist.
 - Interactivity: 5 equipment tabs, 8 FAQ accordions, form validation and submit
   states, sticky CTA, reviews expand, accessibility panel (text size / contrast /
-  underline links / stop motion), video modal.
+  underline links / stop motion), in-place video player.
+- Thank-you flow: both forms redirect to `/thank-you` with no trailing slash; the
+  headline and callback line carry the submitted name and phone; 6 screenshots, 12
+  testimonials and 5 photos render with no broken images; a refresh, a direct visit
+  and a private-mode visit all fall back to the generic copy; the back button
+  returns to the landing page.
