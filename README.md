@@ -128,6 +128,46 @@ Doing this in the build rather than in the export means a re-export from Claude 
 cannot bring the decoration back. `stripCornerMarkup()` throws if a corner element
 survives in a shape its pattern does not recognise.
 
+## Desktop width
+
+The export pins all 18 content wrappers to a flat `max-width: 1240px`. On a 1920px
+monitor that left 340px of dead space either side — 35% of the screen, 52% at 2560px
+— while the hero photograph behind it ran edge to edge, so the page read as a narrow
+column floating on a wide background.
+
+`CONTENT_MAX` in `scripts/build.mjs` replaces it:
+
+```js
+const CONTENT_MAX = 'clamp(1240px, 90vw, 1760px)';
+```
+
+| viewport | content before | after | dead margin per side |
+| --- | --- | --- | --- |
+| ≤1366 | 1240 | **1240 (unchanged)** | unchanged |
+| 1440 | 1240 | 1296 | 100px → 72px |
+| 1600 | 1240 | 1440 | 180px → 80px |
+| 1920 | 1240 | 1728 | **340px → 96px** |
+| 2560 | 1240 | 1760 | 660px → 400px |
+
+`clamp` pins to the original 1240px at 1378px viewport and below, so every laptop,
+tablet and phone layout is untouched — 390px and 768px measure byte-for-byte
+identical to the previous build — and there is no snap while resizing. Readability is
+unaffected because every paragraph and heading already carries its own `ch` cap in
+the export (60ch, 46ch, 24ch and so on); only grids, images and the nav grow.
+
+**One wrapper is deliberately excluded: the testimonial grid.** Its tracks are
+`auto-fit` over a 280px minimum, so a wider container fits five columns — and the
+section holds 6 quotes, or 12 once "show more" is open. Five columns leaves a single
+orphan on the last row in both cases, where three divides both evenly. No `auto-fit`
+minimum can hold three columns at both 1096px and 1616px of usable width (three at
+1096 needs a minimum of 344px or less; only-three at 1616 needs more than 380px), so
+that container keeps the width the design was drawn at and centres.
+
+The closing lead form was 760px inside a 1096px panel, sitting hard left with 291px
+of empty panel to its right. Widening the page would have made that worse, so
+`margin-inline: auto` centres it in the same pass — block-centred, text still
+left-aligned.
+
 ## Lead webhook
 
 Every validated submission from either form is POSTed to `LEAD_WEBHOOK_URL`, then the

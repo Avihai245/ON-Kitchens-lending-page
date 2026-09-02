@@ -123,6 +123,11 @@ window.__onSendLead = function (lead) {
 </script>`;
 }
 
+/** Desktop content width. `clamp` pins to the export's original 1240px at 1378px
+ *  viewport and below, so nothing changes on laptops, tablets or phones; above that
+ *  it tracks 90vw to a 1760px ceiling. */
+const CONTENT_MAX = 'clamp(1240px, 90vw, 1760px)';
+
 const PAGE_TITLE = 'ŌN Kitchens — Commercial Kitchen Rental, Los Angeles';
 const PAGE_DESCRIPTION =
   'Private, fully certified commercial kitchen space in Van Nuys and Los Angeles ' +
@@ -169,6 +174,57 @@ function stripCornerMarkup(html, label) {
     );
   }
   return { html: out, removed };
+}
+
+/**
+ * Widens the page on large desktop screens and centres the closing lead form.
+ *
+ * The export pins all 18 content wrappers to a flat `max-width: 1240px`. On a 1920px
+ * monitor that leaves 340px of dead space either side — 35% of the screen — and 52%
+ * at 2560px, while the hero photograph behind it runs edge to edge. The result reads
+ * as a narrow column floating on a wide background.
+ *
+ * The replacement ramps instead of jumping: at 1378px and below `clamp` pins to the
+ * old 1240px, so every laptop, tablet and phone layout is untouched and there is no
+ * snap while resizing. Above that it tracks 90vw up to a 1760px ceiling — wide
+ * enough to use the screen, capped so line lengths stay sane. Body copy is
+ * unaffected either way: every paragraph and heading already carries its own `ch`
+ * cap (60ch, 46ch, 24ch and so on), so only grids, images and the nav actually grow.
+ *
+ * The closing form is 760px inside a 1096px panel, sitting hard left with 291px of
+ * empty panel to its right. Widening the page would have made that worse, so it is
+ * centred in the same pass.
+ */
+function widenDesktopLayout(html, label) {
+  const before = (html.match(/max-width: 1240px/g) || []).length;
+  if (before !== 18) {
+    throw new Error(`[build] ${label}: expected 18 content wrappers at 1240px, found ${before}.`);
+  }
+  let out = html.split('max-width: 1240px').join(`max-width: ${CONTENT_MAX}`);
+
+  // The testimonial grid is the one wrapper that must not widen. Its tracks are
+  // `auto-fit` over a 280px minimum, so a wider container fits five columns — and
+  // the section holds 6 quotes, or 12 once "show more" is open. Five columns leaves
+  // a single orphan on the last row in both cases, where three divides both evenly.
+  // No `auto-fit` minimum can hold three columns at both 1096px and 1616px of usable
+  // width, so the container keeps the width the design was drawn at and centres.
+  out = replaceExactly(
+    out,
+    `max-width: ${CONTENT_MAX}; margin: clamp(40px, 5vw, 64px) auto 0; padding: 0 var(--edge);`,
+    `max-width: 1240px; margin: clamp(40px, 5vw, 64px) auto 0; padding: 0 var(--edge);`,
+    1,
+    'testimonial grid width'
+  );
+
+  // The closing form: block-centre it in its panel. Text stays left-aligned.
+  out = replaceExactly(
+    out,
+    `gap: 20px 24px; align-items: start; max-width: 760px;`,
+    `gap: 20px 24px; align-items: start; max-width: 760px; margin-inline: auto;`,
+    1,
+    'closing form centring'
+  );
+  return { html: out, widened: before };
 }
 
 /**
@@ -365,10 +421,12 @@ async function buildIndex() {
 
   const stripped = stripCornerMarkup(html, 'index.html');
   const guarded = guardGridMinimums(stripped.html, 'index.html');
-  await writeFile(join(OUT, 'index.html'), guarded.html);
+  const widened = widenDesktopLayout(guarded.html, 'index.html');
+  await writeFile(join(OUT, 'index.html'), widened.html);
   console.log(
     `  index.html      <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect, ` +
-      `${stripped.removed} corner marks removed, ${guarded.guarded} grid minimums guarded)`
+      `${stripped.removed} corner marks removed, ${guarded.guarded} grid minimums guarded, ` +
+      `${widened.widened} wrappers widened)`
   );
 }
 
