@@ -1,0 +1,5 @@
+# Build output — regenerate with `node scripts/build.mjs`
+dist/
+
+node_modules/
+.DS_Store
