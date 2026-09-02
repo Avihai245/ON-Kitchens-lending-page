@@ -54,27 +54,61 @@
     white-space: nowrap; color: color-mix(in srgb, var(--color-text) 55%, transparent);
   }
 
-  /* ---- confirmation ---- */
-  .confirm { background: #141414; color: #FAF8F5; padding: clamp(56px, 8vw, 104px) 0; }
+  /* ---- confirmation: centred column ---- */
+  .confirm {
+    background: #141414; color: #FAF8F5;
+    padding: clamp(64px, 9vw, 120px) 0;
+    text-align: center;
+  }
   .kicker {
     display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em;
     text-transform: uppercase; font-weight: 600; color: var(--color-accent-400);
     margin-bottom: 14px;
   }
   .confirm hr {
-    height: 1px; border: 0; margin: 0 0 24px;
-    background: color-mix(in srgb, #FAF8F5 30%, transparent); max-width: 680px;
+    height: 1px; border: 0; margin: 0 auto 26px;
+    background: color-mix(in srgb, #FAF8F5 30%, transparent); max-width: 420px;
   }
   .confirm h1 {
     font-family: var(--font-heading); font-weight: 600;
     font-size: clamp(34px, 5.4vw, 68px); line-height: 1.04; letter-spacing: 0.01em;
-    text-transform: uppercase; margin: 0 0 22px -0.04em; max-width: 20ch;
+    text-transform: uppercase; margin: 0 auto 20px; max-width: 18ch;
   }
   .confirm p {
-    font-size: 18px; line-height: 28px; max-width: 52ch; margin: 0;
+    font-size: 18px; line-height: 28px; max-width: 46ch; margin: 0 auto;
     color: color-mix(in srgb, #FAF8F5 88%, transparent);
   }
-  .confirm p strong { color: #FAF8F5; font-weight: 500; white-space: nowrap; }
+
+  /* The detail panel: what the visitor typed, echoed back so they can check it
+     before they walk away from the page. */
+  .details {
+    display: inline-flex; flex-direction: column; gap: 10px; align-items: center;
+    margin-top: clamp(30px, 4vw, 44px);
+    padding: clamp(20px, 3vw, 30px) clamp(30px, 5vw, 56px);
+    border: 1px solid color-mix(in srgb, #FAF8F5 26%, transparent);
+    background: color-mix(in srgb, #FAF8F5 5%, transparent);
+    max-width: 100%;
+  }
+  .details[hidden] { display: none; }
+  .details dt {
+    font-size: 12px; line-height: 12px; letter-spacing: 0.16em; font-weight: 600;
+    text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 62%, transparent);
+    margin: 0;
+  }
+  .details dd {
+    margin: 0; font-family: var(--font-heading); font-weight: 600;
+    font-size: clamp(28px, 4.4vw, 44px); line-height: 1.1; letter-spacing: 0.02em;
+    color: var(--color-accent-400);
+    overflow-wrap: anywhere;
+  }
+  .details .name {
+    font-size: 15px; line-height: 22px; letter-spacing: 0.06em; text-transform: uppercase;
+    font-family: var(--font-heading); font-weight: 600;
+    color: color-mix(in srgb, #FAF8F5 78%, transparent);
+    padding-top: 12px; margin-top: 2px;
+    border-top: 1px solid color-mix(in srgb, #FAF8F5 20%, transparent);
+    align-self: stretch; text-align: center;
+  }
 
   /* ---- sections ---- */
   section.band { padding: clamp(48px, 6vw, 88px) 0; }
@@ -88,6 +122,36 @@
   .rating { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
   .rating b { font-family: var(--font-heading); font-weight: 600; font-size: 26px; line-height: 26px; letter-spacing: 0.02em; }
   .rating span { font-size: 17px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 62%, transparent); }
+
+  .lede {
+    font-size: 17px; line-height: 27px; max-width: 54ch; margin: 18px 0 0;
+    color: color-mix(in srgb, var(--color-text) 74%, transparent);
+  }
+
+  /* ---- video ---- */
+  .player {
+    position: relative; margin-top: clamp(28px, 4vw, 44px);
+    aspect-ratio: 16 / 9; width: 100%; max-width: 960px;
+    overflow: hidden; background: #141414;
+  }
+  .player button {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    padding: 0; border: 0; background: none; cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .player img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; display: block; opacity: 0.8;
+  }
+  .player .play {
+    position: relative; width: 84px; height: 84px; display: grid; place-items: center;
+    background: var(--color-accent); color: #FAF8F5;
+    border: 1px solid var(--color-accent-700);
+  }
+  .player button:hover .play { background: var(--color-accent-700); }
+  .player button:focus-visible { outline: 2px solid var(--color-accent-400); outline-offset: 3px; }
+  .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+  .vimeo-link { margin: 18px 0 0; font-size: 15px; }
 
   .shots {
     display: grid; gap: 20px; margin-top: clamp(28px, 4vw, 44px);
@@ -147,6 +211,32 @@
       <hr>
       <h1 id="headline">Thank you for getting in touch.</h1>
       <p id="callback">One of our team will call you shortly.</p>
+      <dl class="details" id="details" hidden>
+        <dt>We&rsquo;ll call you on</dt>
+        <dd id="phone"></dd>
+        <dd class="name" id="name"></dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <span class="kicker">While you wait</span>
+      <hr>
+      <h2>See the kitchens before you visit</h2>
+      <p class="lede">A short look inside — the line, the walk-ins, the loading area and
+        the people already cooking here.</p>
+      <!-- Click-to-play, matching the landing page: the Vimeo player is only fetched
+           once someone asks for it, so the page costs nothing to load. -->
+      <div class="player blueprint" id="player">
+        <button type="button" id="playBtn" aria-label="Play the ŌN Kitchens video">
+          <img src="/assets/prep-rail.webp" alt="" loading="lazy">
+          <span class="play" aria-hidden="true">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="7 4 20 12 7 20 7 4"></polygon></svg>
+          </span>
+        </button>
+      </div>
+      <p class="vimeo-link"><a href="https://vimeo.com/703398003" target="_blank" rel="noopener noreferrer">Open on Vimeo</a></p>
     </div>
   </section>
 
@@ -177,7 +267,6 @@
   <section class="tail">
     <div class="wrap">
       <a href="/" class="btn btn-secondary blueprint">
-        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
         Back to ŌN Kitchens
       </a>
     </div>
@@ -203,22 +292,35 @@
   }
 
   // textContent throughout — never innerHTML — so a name can never inject markup.
-  var h = document.getElementById('headline');
-  h.textContent = lead.name.trim() + ', thank you for getting in touch.';
+  var name = lead.name.trim();
+  document.getElementById('headline').textContent = name + ', thank you for getting in touch.';
 
+  // The panel echoes back exactly what was typed, so the visitor can see we have the
+  // right number before they leave the page.
   var phone = prettyPhone(lead.phone);
-  var p = document.getElementById('callback');
   if (phone) {
-    p.textContent = 'One of our team will call you shortly on ';
-    var b = document.createElement('strong');
-    b.textContent = phone;
-    p.appendChild(b);
-    p.appendChild(document.createTextNode('.'));
+    document.getElementById('phone').textContent = phone;
+    document.getElementById('name').textContent = name;
+    document.getElementById('details').hidden = false;
   }
 
   // One-shot: a refresh or a later visit falls back to the generic copy rather than
   // resurfacing someone's details.
   try { sessionStorage.removeItem('on-lead'); } catch (err) { /* ignore */ }
+})();
+
+// Click-to-play: swap the poster for the Vimeo player only when asked.
+(function () {
+  var btn = document.getElementById('playBtn');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var frame = document.createElement('iframe');
+    frame.src = 'https://player.vimeo.com/video/703398003?autoplay=1&title=0&byline=0&portrait=0';
+    frame.title = 'ŌN Kitchens video';
+    frame.allow = 'autoplay; fullscreen; picture-in-picture';
+    frame.allowFullscreen = true;
+    document.getElementById('player').replaceChild(frame, btn);
+  });
 })();
 </script>
 
