@@ -128,6 +128,51 @@ Doing this in the build rather than in the export means a re-export from Claude 
 cannot bring the decoration back. `stripCornerMarkup()` throws if a corner element
 survives in a shape its pattern does not recognise.
 
+## Lead webhook
+
+Every validated submission from either form is POSTed to `LEAD_WEBHOOK_URL`, then the
+visitor is sent to `/thank-you`. Unset — the default, and the state this repo ships in
+— nothing is sent, nothing errors, and the page behaves exactly as it did before.
+
+**To turn it on:** Amplify console -> App settings -> Environment variables ->
+`LEAD_WEBHOOK_URL` = your endpoint, then redeploy. The build prints which state it
+used. Locally: `LEAD_WEBHOOK_URL=https://… node scripts/build.mjs`.
+
+**Payload** (JSON):
+
+```json
+{
+  "name": "Sarah Mitchell", "phone": "(310) 555-1234",
+  "email": "sarah@bakery.example", "business": "Mitchell Bakehouse",
+  "form": "end-of-page",
+  "submittedAt": "2026-09-02T20:50:33.402Z",
+  "pageUrl": "https://…/?utm_source=google", "referrer": null,
+  "utm": { "source": "google", "medium": "cpc", "campaign": "kitchens_la",
+           "term": null, "content": null, "gclid": "XYZ123", "fbclid": null }
+}
+```
+
+`form` is `mid-page` or `end-of-page`, so the two forms can be told apart. UTM,
+`gclid` and `fbclid` are read off the landing URL for attribution.
+
+**Delivery.** `navigator.sendBeacon` first — the browser takes ownership of the
+request, so it completes even though the page navigates a moment later — with
+`fetch(keepalive)` as fallback. The body is sent as `text/plain` on purpose:
+`application/json` makes it a preflighted cross-origin request and sendBeacon cannot
+preflight, while `text/plain` stays a simple request that any origin accepts. Zapier,
+Make and n8n all parse a JSON body regardless of the stated type.
+
+**Two limits worth knowing**, both inherent to posting from a static page rather than
+a server, and neither fixable client-side:
+
+- **The URL is public.** It sits in the page source, so anyone can post fabricated
+  leads to it. The receiver needs its own spam handling — Zapier and Make both offer
+  filter steps.
+- **Delivery is fire-and-forget.** A cross-origin response is opaque, so the page
+  cannot tell whether the lead was accepted, and nothing is retried. If a lead must
+  never be lost, put a small server in front: an Amplify function that holds the real
+  endpoint plus a shared secret, with the page posting to that instead.
+
 ## Vendored libraries
 
 `support.js` fetches React and ReactDOM from `unpkg.com` at load, and `map.html`
@@ -141,6 +186,70 @@ short-circuits its own CDN fetch when `window.React` and `window.ReactDOM` are
 already set, so pre-loading them in `<head>` is all it takes.
 
 To revert, delete `vendor/` and drop the injected tags in `scripts/build.mjs`.
+
+## Performance
+
+Measured on the built `dist/`, before and after this pass:
+
+| | before | after |
+| --- | --- | --- |
+| First paint | 212 ms | **44 ms** |
+| First contentful paint | 836 ms | **468 ms** |
+| DOMContentLoaded | 374 ms | **142 ms** |
+| Load event | 378 ms | **146 ms** |
+
+Three changes did it:
+
+- **Scripts deferred.** React, ReactDOM and `support.js` were synchronous in `<head>`,
+  so the parser stopped on ~210 KB before it reached `<body>` and could not discover
+  a single image. They are `defer` now: still in order, still before
+  `DOMContentLoaded`, and `support.js` boots either way because it checks
+  `document.readyState`. Deferring means its own `hideRawTemplate()` no longer runs
+  during head parsing, so an inline `x-dc{display:none}` closes that window instead —
+  verified with no flash of the raw template even at 8x CPU throttling.
+- **Fonts unchained.** The design system loaded Google Fonts through an `@import` on
+  line 2 of its stylesheet, which cannot start until that sheet has been fetched and
+  parsed: html -> styles.css -> css2 -> woff2, four hops before text renders in the
+  right face. The build lifts it into a `<link>` in `<head>` with `preconnect` to both
+  font origins, so it starts in parallel with the stylesheet.
+- **Hero preloaded.** `<link rel="preload" as="image" fetchpriority="high">` on the
+  hero, the LCP element.
+
+Two things deliberately *not* done:
+
+- **Images were not re-encoded.** They look oversized — most are about twice their
+  displayed width — but that is exactly right for the 2x displays that phones and
+  modern laptops have. Shrinking them would trade 1 MB for a blurry page.
+- **The runtime's `fetch(location.href)` was not disabled.** Setting
+  `window.__resources` skips that second request for the page's own HTML, and the
+  page still *looks* identical — but the refetch is what recovers camelCase
+  attributes the HTML parser lowercases. Without it `noValidate` is lost, native
+  browser validation pre-empts the designed inline errors, and `onSubmit` never runs.
+  Tested and reverted. `customHttp.yml` already makes HTML revalidate, so in
+  production that request is a 304, not a second 152 KB download.
+
+## Responsiveness
+
+Audited at 320 / 360 / 390 / 414 / 430 / 768 / 820 / 1024 / 1280 / 1440 / 1920 /
+2560 px across all three pages: no horizontal overflow, no broken images, no JS
+errors, no 4xx.
+
+Getting there fixed a real bug. The export builds its layout from
+`repeat(auto-fit, minmax(<N>px, 1fr))` tracks, and 19 of the 20 used a bare pixel
+minimum. A bare minimum is a floor the track cannot go below, so at 320 px — where
+the content box is 280 px after `--edge` padding — every track of 300, 320 or 330 px
+pushed the document 30 px wider than the viewport and the whole page scrolled
+sideways in four separate sections. The build rewrites them to
+`minmax(min(100%, <N>px), 1fr)`, the guarded form the export already used in its one
+remaining place. It is a no-op wherever the container is at least `<N>` wide, so
+every tablet and desktop layout is unchanged — confirmed by measuring 150 bounding
+boxes at 390 / 768 / 1440 against an unguarded build: identical.
+
+Known, not fixed: two links on the landing page are under the 24x24 px WCAG 2.2
+SC 2.5.8 target size — the header logo (105x20) and the footer "Schedule a tour"
+(101x18). Both need padding on elements inside the design export, which would shift
+its layout, so they are left for a deliberate design decision rather than changed
+here.
 
 ## Connecting the app in the Amplify console
 
