@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ŌN Kitchens — location map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: #FAF8F5; }
+  #map { position: absolute; inset: 0; background: #FAF8F5; }
+  /* the tiles are washed into the page's warm ground and amber accent —
+     the design system's duotone treatment applied to real OSM geometry */
+  .leaflet-tile-pane { filter: grayscale(1) contrast(0.82) brightness(1.1) sepia(0.42) saturate(1.5) hue-rotate(-8deg); }
+  .leaflet-container { background: #FAF8F5; font-family: Barlow, system-ui, sans-serif; }
+  .leaflet-control-attribution { font-size: 9px; background: rgba(250,248,245,.82); color: #6b6459; }
+  .leaflet-control-attribution a { color: #7A5216; }
+  .leaflet-bar a { color: #141414; border-radius: 0 !important; }
+  .leaflet-bar { border-radius: 0 !important; border-color: rgba(20,20,20,.22) !important; }
+  .pin { width: 26px; height: 26px; }
+  .pin i { position: absolute; background: rgba(20,20,20,.55); }
+  .pin i.v { left: 12px; top: 0; width: 1px; height: 100%; }
+  .pin i.h { top: 12px; left: 0; height: 1px; width: 100%; }
+  .pin b { position: absolute; left: 7px; top: 7px; width: 11px; height: 11px; background: #B07A1C; border: 1px solid #141414; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="map" role="img" aria-label="Street map of the ŌN Kitchens location"></div>
+<script>
+(() => {
+  const LOCS = {
+    vannuys: { q: '15136 Stagg St, Van Nuys, CA 91405', fb: [34.2065, -118.4685], label: 'Van Nuys' },
+    la:      { q: '1870 W Washington Blvd, Los Angeles, CA 90007', fb: [34.0300, -118.2930], label: 'Los Angeles' }
+  };
+  const key = new URLSearchParams(location.search).get('loc') || 'vannuys';
+  const loc = LOCS[key] || LOCS.vannuys;
+
+  const map = L.map('map', {
+    center: loc.fb, zoom: 15, zoomControl: true,
+    scrollWheelZoom: false, attributionControl: true
+  });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors', maxZoom: 19
+  }).addTo(map);
+
+  const icon = L.divIcon({
+    className: '', iconSize: [26, 26], iconAnchor: [13, 13],
+    html: '<div class="pin"><i class="v"></i><i class="h"></i><b></b></div>'
+  });
+  const marker = L.marker(loc.fb, { icon, title: loc.q, alt: loc.q }).addTo(map);
+
+  // Refine the pinned point against real OSM geocoding when the network allows;
+  // the hard-coded fallback above keeps the map correct in the neighborhood either way.
+  fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(loc.q))
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(j => {
+      if (!j || !j.length) return;
+      const p = [parseFloat(j[0].lat), parseFloat(j[0].lon)];
+      if (!isFinite(p[0]) || !isFinite(p[1])) return;
+      marker.setLatLng(p);
+      map.setView(p, 16);
+    })
+    .catch(() => {});
+
+  map.on('focus', () => map.scrollWheelZoom.enable());
+  map.on('blur', () => map.scrollWheelZoom.disable());
+})();
+</script>
+</body>
+</html>

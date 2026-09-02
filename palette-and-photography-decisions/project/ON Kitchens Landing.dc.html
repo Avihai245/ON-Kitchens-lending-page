@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/industry-07e58652-c0e7-4e65-8b31-789011f5d1e5/styles.css">
+<script src="_ds/industry-07e58652-c0e7-4e65-8b31-789011f5d1e5/_ds_bundle.js"></script>
+<style>
+/* Industry retuned to the brief's ground: warm off-white paper, near-black
+   contrast blocks, one warm-amber accent in place of the steel. Structure,
+   type and the blueprint grammar are the system's, unchanged. */
+:root {
+  --color-bg: #FAF8F5;
+  --color-surface: #F2EEE8;
+  --color-text: #141414;
+  --color-accent: #B07A1C;
+  --color-accent-2: #B07A1C;
+  --color-divider: color-mix(in srgb, #141414 16%, transparent);
+  --color-accent-100: #FBF2E1;
+  --color-accent-200: #F5E2BE;
+  --color-accent-300: #E9CA8E;
+  --color-accent-400: #D9AB56;
+  --color-accent-500: #C48C2A;
+  --color-accent-600: #96661A;
+  --color-accent-700: #7A5216;
+  --color-accent-800: #5C3D12;
+  --color-accent-900: #3D280C;
+  --color-accent-2-100: #FBF2E1;
+  --color-accent-2-200: #F5E2BE;
+  --color-accent-2-300: #E9CA8E;
+  --color-accent-2-400: #D9AB56;
+  --color-accent-2-500: #C48C2A;
+  --color-accent-2-600: #96661A;
+  --color-accent-2-700: #7A5216;
+  --color-accent-2-800: #5C3D12;
+  --color-accent-2-900: #3D280C;
+  --leading: 24px;
+  --half: 12px;
+  --edge: clamp(20px, 5vw, 72px);
+}
+html { scroll-behavior: smooth; }
+body { margin: 0; text-wrap: pretty; -webkit-font-smoothing: antialiased; }
+a { color: var(--color-accent-700); text-underline-offset: 3px; }
+a:hover { color: var(--color-accent-900); }
+::placeholder { color: color-mix(in srgb, #141414 42%, transparent); }
+@keyframes on-spin { to { transform: rotate(360deg); } }
+@keyframes on-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+/* attribute-state selectors — the one thing an inline style cannot express */
+[data-tab] { transition: color .16s ease, border-color .16s ease; }
+[data-tab]:hover { color: var(--color-accent-700); }
+[data-tab][aria-selected="true"] { color: var(--color-bg); background: var(--color-text); border-color: var(--color-text); }
+[data-faq] svg { transition: transform .22s ease; }
+[data-faq][aria-expanded="true"] svg { transform: rotate(180deg); }
+[data-rev] { transition: opacity .5s ease, transform .5s ease; }
+[data-marquee] { animation: on-marquee 42s linear infinite; }
+[data-marquee-wrap]:hover [data-marquee] { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  [data-rev], [data-faq] svg, [data-tab] { transition: none !important; }
+  [data-marquee] { animation: none !important; }
+  [data-marquee-wrap] { overflow-x: auto !important; }
+}
+</style>
+</helmet>
+
+<div style="background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); font-size: 16px; line-height: 24px;">
+
+<a href="#top" class="btn btn-primary" style="position: absolute; left: -9999px; top: 8px; z-index: 200; text-transform: uppercase; letter-spacing: 0.06em;" style-focus="left: 8px;">Skip to content</a>
+
+<header style="position: sticky; top: 0; z-index: 60; background: var(--color-bg); border-bottom: 1px solid var(--color-divider);">
+  <div style="max-width: 1240px; margin: 0 auto; padding: 8px var(--edge); display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; min-height: 68px;">
+    <a href="#top" style="display: flex; align-items: baseline; gap: 8px; text-decoration: none; color: var(--color-text); margin-right: auto; min-width: 0;">
+      <span style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(20px, 5vw, 24px); letter-spacing: 0.06em; text-transform: uppercase; line-height: 1; white-space: nowrap;">ŌN Kitchens</span>
+      <sc-if value="{{ notPhone }}" hint-placeholder-val="{{ true }}">
+        <span style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; color: color-mix(in srgb, var(--color-text) 55%, transparent);">Los Angeles</span>
+      </sc-if>
+    </a>
+    <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+      <nav aria-label="Sections" style="display: flex; align-items: center; gap: 26px;">
+        <a href="#kitchens" style="font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; color: var(--color-text);">Kitchens</a>
+        <a href="#included" style="font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; color: var(--color-text);">What's Included</a>
+        <a href="#reviews" style="font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; color: var(--color-text);">What Clients Say</a>
+        <a href="#locations" style="font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; color: var(--color-text);">Locations</a>
+        <a href="#faq" style="font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; color: var(--color-text);">FAQ</a>
+        <!-- PHONE CTA (disabled — uncomment to restore) header
+<a href="tel:+18444351255" style="font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.04em; text-decoration: none; color: var(--color-accent-700); display: flex; align-items: center; gap: 7px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.8.7 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.27a2 2 0 0 1 2.11-.45c.85.34 1.75.57 2.65.7A2 2 0 0 1 22 16.92z"></path></svg>
+          (844) 435-1255
+        </a>
+-->
+      </nav>
+    </sc-if>
+    <a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 18px; font-size: 14px; white-space: nowrap;">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      Schedule a Tour
+    </a>
+  </div>
+</header>
+
+<main id="top">
+
+  <section style="position: relative; isolation: isolate; background: #141414; color: #FAF8F5; min-height: clamp(600px, 82vh, 880px); display: grid; align-items: end;">
+    <!-- first frame / mobile still: always painted, so the video can never flash blank
+         and the hero box is committed before anything loads (no layout shift) -->
+    <img src="assets/kitchen-hero.webp" alt="An operator plating meal-prep containers on a stainless steel workstation under a commercial exhaust hood" fetchPriority="high" style="position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; display: block;" />
+    <sc-if value="{{ showHeroVideo }}">
+      <div aria-hidden="true" style="position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none;">
+        <iframe src="https://player.vimeo.com/video/703398003?background=1&amp;autoplay=1&amp;loop=1&amp;muted=1&amp;volume=0&amp;controls=0&amp;autopause=0" title="" tabIndex="-1" allow="autoplay" frameBorder="0" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100vw; height: 56.25vw; min-width: 177.78vh; min-height: 100%; border: 0; display: block;"></iframe>
+      </div>
+    </sc-if>
+    <!-- contrast field for the headline: a flat near-black wash, no gradient -->
+    <div aria-hidden="true" style="position: absolute; inset: 0; z-index: 2; background: color-mix(in srgb, #141414 66%, transparent);"></div>
+    <div style="position: relative; z-index: 3; width: 100%; max-width: 1240px; margin: 0 auto; padding: clamp(88px, 11vh, 150px) var(--edge) clamp(44px, 6vw, 76px);">
+      <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-400); margin-bottom: 12px;">Commercial kitchen rental · Los Angeles</span>
+      <hr style="height: 1px; border: 0; margin: 0 0 20px; background: color-mix(in srgb, #FAF8F5 30%, transparent); max-width: 680px;" />
+      <h1 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(44px, 6.4vw, 88px); line-height: 1.03; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">
+        <span style="display: block;">A certified kitchen.</span>
+        <span style="display: block;">No construction.</span>
+        <span style="display: block; color: var(--color-accent-400);">No waiting.</span>
+      </h1>
+      <p style="font-size: 18px; line-height: 28px; max-width: 54ch; margin: 26px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">Private, fully certified commercial kitchen space in Van Nuys and Los Angeles — already built, already equipped. You bring the menu. We handle zoning, permitting and the city.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px;">
+        <a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 26px; min-height: 52px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          Schedule a Tour
+        </a>
+        <!-- PHONE CTA (disabled — uncomment to restore) hero
+<a href="tel:+18444351255" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 22px; min-height: 52px; gap: 9px; color: #FAF8F5; border-color: color-mix(in srgb, #FAF8F5 42%, transparent);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.8.7 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.27a2 2 0 0 1 2.11-.45c.85.34 1.75.57 2.65.7A2 2 0 0 1 22 16.92z"></path></svg>
+          (844) 435-1255
+        </a>
+-->
+      </div>
+      <ul style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 10px 26px; font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">
+        <li>24/7 Access</li>
+        <li aria-hidden="true" style="color: var(--color-accent-400);">·</li>
+        <li>Private Kitchens</li>
+        <li aria-hidden="true" style="color: var(--color-accent-400);">·</li>
+        <li>Monthly or Hourly</li>
+      </ul>
+    </div>
+  </section>
+
+  <section aria-label="Our partners" style="border-bottom: 1px solid var(--color-divider); background: var(--color-bg);">
+    <div style="max-width: 1240px; margin: 0 auto; padding: clamp(36px, 4.5vw, 60px) var(--edge) 8px;">
+      <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; line-height: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-accent-700);">Our Partners</span>
+      <p style="margin: 10px 0 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 72%, transparent);">Food businesses already cooking out of our kitchens.</p>
+      <hr style="height: 1px; border: 0; margin: 16px 0 0; background: var(--color-divider);" />
+    </div>
+    <div data-marquee-wrap style="overflow: hidden; padding: clamp(24px, 3.5vw, 40px) 0 clamp(32px, 4.5vw, 52px); -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent); mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);">
+      <div data-marquee style="display: flex; align-items: center; gap: 0; width: max-content;">
+<div style="display: flex; align-items: center; gap: clamp(40px, 6vw, 88px); padding-right: clamp(40px, 6vw, 88px); flex: none;">
+          <img src="assets/partners/polar-bear-kitchen.webp" alt="Polar Bear Kitchen" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/bondi.webp" alt="Bondi Empanadas &amp; More" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/pianta.webp" alt="Pianta" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/ebikas-kitchen.webp" alt="Ebika's Kitchen" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/canteen-34.webp" alt="Canteen 34" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/superyum.webp" alt="Superyum" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/rice-and-noodle.webp" alt="Rice &amp; Noodle" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/max-and-lucys.webp" alt="Max &amp; Lucy's" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+        </div>
+<div aria-hidden="true" style="display: flex; align-items: center; gap: clamp(40px, 6vw, 88px); padding-right: clamp(40px, 6vw, 88px); flex: none;">
+          <img src="assets/partners/polar-bear-kitchen.webp" alt="" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/bondi.webp" alt="" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/pianta.webp" alt="" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/ebikas-kitchen.webp" alt="" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/canteen-34.webp" alt="" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/superyum.webp" alt="" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/rice-and-noodle.webp" alt="" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+          <img src="assets/partners/max-and-lucys.webp" alt="" loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="How it works" style="border-bottom: 1px solid var(--color-divider);">
+    <div style="max-width: 1240px; margin: 0 auto; padding: clamp(36px, 4.5vw, 56px) var(--edge) clamp(40px, 5vw, 60px);">
+      <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; line-height: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: clamp(24px, 3vw, 34px);">From first tour to first service</span>
+      <ol style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: clamp(24px, 3vw, 40px);">
+        <li style="border-top: 1px solid var(--color-divider); padding-top: 16px; position: relative;">
+          <span aria-hidden="true" style="position: absolute; top: -4px; left: 0; width: 7px; height: 7px; background: var(--color-accent);"></span>
+          <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; color: var(--color-accent-700); margin-bottom: 8px;">01</span>
+          <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 21px; line-height: 24px; letter-spacing: 0.03em; text-transform: uppercase; margin: 0;">Book a tour</h3>
+          <p style="margin: 6px 0 0; font-size: 14px; line-height: 22px; color: color-mix(in srgb, var(--color-text) 70%, transparent);">Walk the space with your menu in hand.</p>
+        </li>
+        <li style="border-top: 1px solid var(--color-divider); padding-top: 16px; position: relative;">
+          <span aria-hidden="true" style="position: absolute; top: -4px; left: 0; width: 7px; height: 7px; background: var(--color-accent);"></span>
+          <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; color: var(--color-accent-700); margin-bottom: 8px;">02</span>
+          <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 21px; line-height: 24px; letter-spacing: 0.03em; text-transform: uppercase; margin: 0;">Choose your kitchen</h3>
+          <p style="margin: 6px 0 0; font-size: 14px; line-height: 22px; color: color-mix(in srgb, var(--color-text) 70%, transparent);">200–600 sq ft, private or hourly.</p>
+        </li>
+        <li style="border-top: 1px solid var(--color-divider); padding-top: 16px; position: relative;">
+          <span aria-hidden="true" style="position: absolute; top: -4px; left: 0; width: 7px; height: 7px; background: var(--color-accent);"></span>
+          <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; color: var(--color-accent-700); margin-bottom: 8px;">03</span>
+          <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 21px; line-height: 24px; letter-spacing: 0.03em; text-transform: uppercase; margin: 0;">Complete the setup</h3>
+          <p style="margin: 6px 0 0; font-size: 14px; line-height: 22px; color: color-mix(in srgb, var(--color-text) 70%, transparent);">Onboarding, permitting, Health Department support.</p>
+        </li>
+        <li style="border-top: 1px solid var(--color-divider); padding-top: 16px; position: relative;">
+          <span aria-hidden="true" style="position: absolute; top: -4px; left: 0; width: 7px; height: 7px; background: var(--color-accent);"></span>
+          <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; color: var(--color-accent-700); margin-bottom: 8px;">04</span>
+          <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 21px; line-height: 24px; letter-spacing: 0.03em; text-transform: uppercase; margin: 0;">Start cooking</h3>
+          <p style="margin: 6px 0 0; font-size: 14px; line-height: 22px; color: color-mix(in srgb, var(--color-text) 70%, transparent);">24/7 access from your first day.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- sticky-CTA trigger: once this passes above the viewport the visitor has
+       left the hero. An observer, not window.scrollY — the scroll container
+       on this page is not guaranteed to be the viewport. -->
+  <div id="hero-sentinel" aria-hidden="true" style="height: 1px;"></div>
+
+  <section data-rev style="max-width: 1240px; margin: 0 auto; padding: clamp(48px, 6vw, 96px) var(--edge);">
+    <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-700); margin-bottom: 12px;">01 · Why operators call us</span>
+    <hr style="height: 1px; border: 0; margin: 0 0 clamp(28px, 4vw, 44px); background: var(--color-divider);" />
+    <h2 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.06; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 clamp(32px, 4vw, 52px); max-width: 26ch;">One of these is usually the reason</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: clamp(24px, 3vw, 40px);">
+      <div class="blueprint" style="padding: 24px;">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; color: var(--color-accent-700); margin-bottom: 14px;">01</span>
+        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 21px; line-height: 24px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0;">Your home kitchen has hit its ceiling</h3>
+        <p style="font-size: 15px; line-height: 24px; margin: 14px 0 0; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Volume is outrunning your range and your fridge — and the accounts you want next won't take product from a residential address.</p>
+      </div>
+      <div class="blueprint" style="padding: 24px;">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; color: var(--color-accent-700); margin-bottom: 14px;">02</span>
+        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 21px; line-height: 24px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0;">You need real restaurant capacity</h3>
+        <p style="font-size: 15px; line-height: 24px; margin: 14px 0 0; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Hood, three-compartment sink, walk-in, dish pit, loading dock. Everything a production kitchen runs on, none of it on your balance sheet.</p>
+      </div>
+      <div class="blueprint" style="padding: 24px;">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; color: var(--color-accent-700); margin-bottom: 14px;">03</span>
+        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 21px; line-height: 24px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0;">Delivery is crowding out your dining room</h3>
+        <p style="font-size: 15px; line-height: 24px; margin: 14px 0 0; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Move delivery production into its own kitchen and give the line back to the guests sitting in front of you.</p>
+      </div>
+      <div class="blueprint" style="padding: 24px;">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; color: var(--color-accent-700); margin-bottom: 14px;">04</span>
+        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 21px; line-height: 24px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0;">You're launching, and building isn't an option</h3>
+        <p style="font-size: 15px; line-height: 24px; margin: 14px 0 0; color: color-mix(in srgb, var(--color-text) 78%, transparent);">No build-out, no contractor timeline, no construction capital. Start in a kitchen that is already standing and already certified.</p>
+      </div>
+    </div>
+  </section>
+
+  <section data-rev style="max-width: 1240px; margin: 0 auto; padding: clamp(24px, 3vw, 40px) var(--edge) clamp(48px, 6vw, 96px);">
+    <div class="blueprint" style="position: relative;">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <header style="display: flex; flex-wrap: wrap; align-items: stretch; border-bottom: 1px solid var(--color-divider);">
+        <span style="flex: 1; min-width: 18ch; padding: 12px 24px; font-family: var(--font-heading); font-weight: 600; font-size: 14px; line-height: 24px; letter-spacing: 0.1em; text-transform: uppercase;">ŌN Kitchens — The Easy Upgrade</span>
+        <span style="border-left: 1px solid var(--color-divider); white-space: nowrap; padding: 12px 24px; font-family: var(--font-heading); font-weight: 600; font-size: 14px; line-height: 24px; letter-spacing: 0.1em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 70%, transparent);">Sheet 02</span>
+        <span style="border-left: 1px solid var(--color-divider); white-space: nowrap; padding: 12px 24px; font-family: var(--font-heading); font-weight: 600; font-size: 14px; line-height: 24px; letter-spacing: 0.1em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 70%, transparent);">Van Nuys · Los Angeles</span>
+      </header>
+      <dl style="margin: 0;">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; padding: 18px 24px; border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);">
+          <dt style="display: flex; align-items: baseline; gap: 14px; flex: 1 1 240px; min-width: 0; font-family: var(--font-heading); font-weight: 600; font-size: 22px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase;">
+            <span aria-hidden="true" style="font-size: 15px; letter-spacing: 0.08em; color: var(--color-accent-700);">01</span>
+            Minimal startup costs
+          </dt>
+          <dd style="flex: 1 1 300px; min-width: 0; margin: 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 80%, transparent);">The kitchen is already built and equipped. Your capital goes into food, staff and getting orders out the door.</dd>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; padding: 18px 24px; border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);">
+          <dt style="display: flex; align-items: baseline; gap: 14px; flex: 1 1 240px; min-width: 0; font-family: var(--font-heading); font-weight: 600; font-size: 22px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase;">
+            <span aria-hidden="true" style="font-size: 15px; letter-spacing: 0.08em; color: var(--color-accent-700);">02</span>
+            No construction period
+          </dt>
+          <dd style="flex: 1 1 300px; min-width: 0; margin: 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 80%, transparent);">Nothing to demolish, draw, bid or build. The hood is hung, the sinks are plumbed, the walk-in is cold.</dd>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; padding: 18px 24px; border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);">
+          <dt style="display: flex; align-items: baseline; gap: 14px; flex: 1 1 240px; min-width: 0; font-family: var(--font-heading); font-weight: 600; font-size: 22px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase;">
+            <span aria-hidden="true" style="font-size: 15px; letter-spacing: 0.08em; color: var(--color-accent-700);">03</span>
+            Flexible commitment
+          </dt>
+          <dd style="flex: 1 1 300px; min-width: 0; margin: 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 80%, transparent);">Private space or hourly rental, sized to where the business actually is — not where a ten-year lease needs it to be.</dd>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; padding: 18px 24px; border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);">
+          <dt style="display: flex; align-items: baseline; gap: 14px; flex: 1 1 240px; min-width: 0; font-family: var(--font-heading); font-weight: 600; font-size: 22px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase;">
+            <span aria-hidden="true" style="font-size: 15px; letter-spacing: 0.08em; color: var(--color-accent-700);">04</span>
+            Permitting &amp; zoning support
+          </dt>
+          <dd style="flex: 1 1 300px; min-width: 0; margin: 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 80%, transparent);">Our team handles zoning, permitting and city regulations. You don't learn the municipal code to sell food.</dd>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; padding: 18px 24px;">
+          <dt style="display: flex; align-items: baseline; gap: 14px; flex: 1 1 240px; min-width: 0; font-family: var(--font-heading); font-weight: 600; font-size: 22px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase;">
+            <span aria-hidden="true" style="font-size: 15px; letter-spacing: 0.08em; color: var(--color-accent-700);">05</span>
+            Health Department assistance
+          </dt>
+          <dd style="flex: 1 1 300px; min-width: 0; margin: 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 80%, transparent);">A certified space and a team that has built these kitchens before makes Health Department approval a far shorter conversation.</dd>
+        </div>
+      </dl>
+      <p style="margin: 0; padding: 12px 24px; border-top: 1px solid var(--color-divider); font-size: 13px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 70%, transparent);">Terms and pricing depend on the space and the location — both are covered on the tour.</p>
+    </div>
+    <div style="margin-top: clamp(28px, 4vw, 44px); display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: center; justify-content: space-between;">
+      <p style="margin: 0; font-family: var(--font-heading); font-weight: 600; font-size: 22px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase; max-width: 30ch;">Skip the build-out. Start cooking in a kitchen that already exists.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+        <a href="#tour-mid" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 24px; min-height: 50px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          Schedule a Tour
+        </a>
+        <!-- PHONE CTA (disabled — uncomment to restore) easy upgrade row
+<a href="tel:+18444351255" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 20px; min-height: 50px;">(844) 435-1255</a>
+-->
+      </div>
+    </div>
+  </section>
+
+  <section id="kitchens" data-rev style="max-width: 1240px; margin: 0 auto; padding: clamp(48px, 6vw, 96px) var(--edge);">
+    <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-700); margin-bottom: 12px;">03 · The kitchens</span>
+    <hr style="height: 1px; border: 0; margin: 0 0 clamp(28px, 4vw, 44px); background: var(--color-divider);" />
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px clamp(32px, 5vw, 72px); align-items: end; margin-bottom: clamp(32px, 4vw, 48px);">
+      <h2 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(34px, 4.6vw, 62px); line-height: 1.04; letter-spacing: 0.01em; text-transform: uppercase; margin: 0;">Private kitchen space,<br />200–600 sq ft.</h2>
+      <p style="font-size: 17px; line-height: 27px; margin: 0; max-width: 46ch; color: color-mix(in srgb, var(--color-text) 80%, transparent);">Every kitchen is a self-contained certified unit — cooking, sanitation, cold chain, utilities and a loading area, behind your own door. Here is what is in it.</p>
+    </div>
+
+    <div role="tablist" aria-label="Kitchen equipment categories" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: clamp(24px, 3vw, 36px);">
+      <button type="button" data-tab role="tab" id="tab-0" aria-controls="panel-0" aria-selected="{{ isGal0 }}" onClick="{{ setGal0 }}" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.07em; font-size: 14px; padding: 12px 18px; min-height: 46px;">Cooking &amp; Ventilation</button>
+      <button type="button" data-tab role="tab" id="tab-1" aria-controls="panel-1" aria-selected="{{ isGal1 }}" onClick="{{ setGal1 }}" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.07em; font-size: 14px; padding: 12px 18px; min-height: 46px;">Sanitation</button>
+      <button type="button" data-tab role="tab" id="tab-2" aria-controls="panel-2" aria-selected="{{ isGal2 }}" onClick="{{ setGal2 }}" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.07em; font-size: 14px; padding: 12px 18px; min-height: 46px;">Storage &amp; Cold Chain</button>
+      <button type="button" data-tab role="tab" id="tab-3" aria-controls="panel-3" aria-selected="{{ isGal3 }}" onClick="{{ setGal3 }}" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.07em; font-size: 14px; padding: 12px 18px; min-height: 46px;">Utilities &amp; Safety</button>
+      <button type="button" data-tab role="tab" id="tab-4" aria-controls="panel-4" aria-selected="{{ isGal4 }}" onClick="{{ setGal4 }}" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.07em; font-size: 14px; padding: 12px 18px; min-height: 46px;">Logistics</button>
+    </div>
+
+    <sc-if value="{{ isGal0 }}" hint-placeholder-val="{{ true }}">
+      <div role="tabpanel" id="panel-0" aria-labelledby="tab-0" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(28px, 4vw, 56px); align-items: start;">
+        <figure class="blueprint" style="margin: 0; grid-column: span 1;">
+          <img src="assets/kitchen-hero.webp" alt="Commercial exhaust hood over a stainless line, with combi oven and prep table" loading="lazy" style="width: 100%; aspect-ratio: 16 / 11; object-fit: cover; display: block;" />
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        </figure>
+        <div>
+          <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 28px; line-height: 30px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0 0 8px;">Cooking &amp; Ventilation</h3>
+          <p style="font-size: 15px; line-height: 24px; margin: 0 0 20px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Hood capacity sized for real production, with the extraction and cooling to keep the room workable through a full service.</p>
+          <ul style="list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-divider);">
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">01</span>Commercial exhaust hood, 8 to 12 feet</li>
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">02</span>Extraction &amp; ventilation</li>
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">03</span>Commercial cooling system</li>
+          </ul>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isGal1 }}">
+      <div role="tabpanel" id="panel-1" aria-labelledby="tab-1" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(28px, 4vw, 56px); align-items: start;">
+        <figure class="blueprint" style="margin: 0;">
+          <img src="assets/prep-rail.webp" alt="Stainless refrigerated prep rail with pans, alongside a clean cutting surface" loading="lazy" style="width: 100%; aspect-ratio: 16 / 11; object-fit: cover; display: block;" />
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        </figure>
+        <div>
+          <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 28px; line-height: 30px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0 0 8px;">Sanitation</h3>
+          <p style="font-size: 15px; line-height: 24px; margin: 0 0 20px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">The part of the build-out that stops most projects, already done to code and already inspected.</p>
+          <ul style="list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-divider);">
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">01</span>Three compartment sink</li>
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">02</span>Hand wash sink</li>
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">03</span>Commercial dishwasher &amp; dishwashing area</li>
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">04</span>Hygienic walls &amp; skirting</li>
+          </ul>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isGal2 }}">
+      <div role="tabpanel" id="panel-2" aria-labelledby="tab-2" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(28px, 4vw, 56px); align-items: start;">
+        <figure class="blueprint" style="margin: 0;">
+          <img src="assets/walk-in.webp" alt="Walk-in cooler stocked with produce crates, dairy and pans on wire shelving" loading="lazy" style="width: 100%; aspect-ratio: 16 / 11; object-fit: cover; display: block;" />
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        </figure>
+        <div>
+          <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 28px; line-height: 30px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0 0 8px;">Storage &amp; Cold Chain</h3>
+          <p style="font-size: 15px; line-height: 24px; margin: 0 0 20px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Buy at volume and hold it properly. Cooler, freezer and dry storage on site, so your ordering isn't limited by your reach-in.</p>
+          <ul style="list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-divider);">
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">01</span>Walk-in cooler</li>
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">02</span>Walk-in freezer</li>
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">03</span>Dry storage</li>
+          </ul>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isGal3 }}">
+      <div role="tabpanel" id="panel-3" aria-labelledby="tab-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(28px, 4vw, 56px); align-items: start;">
+        <figure class="blueprint" style="margin: 0;">
+          <img src="assets/prep-overhead.webp" alt="Overhead view of a stainless prep table with produce, pans and packed containers" loading="lazy" style="width: 100%; aspect-ratio: 16 / 11; object-fit: cover; display: block;" />
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        </figure>
+        <div>
+          <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 28px; line-height: 30px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0 0 8px;">Utilities &amp; Safety</h3>
+          <p style="font-size: 15px; line-height: 24px; margin: 0 0 20px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Power for real equipment and the suppression system the city expects to see when it walks in.</p>
+          <ul style="list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-divider);">
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">01</span>3 phase electricity</li>
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">02</span>Fire suppression system</li>
+          </ul>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isGal4 }}">
+      <div role="tabpanel" id="panel-4" aria-labelledby="tab-4" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(28px, 4vw, 56px); align-items: start;">
+        <figure class="blueprint" style="margin: 0;">
+          <img src="assets/delivery-line.webp" alt="Packed delivery containers lined up on a stainless table with kraft bags ready for pickup" loading="lazy" style="width: 100%; aspect-ratio: 16 / 11; object-fit: cover; display: block;" />
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        </figure>
+        <div>
+          <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 28px; line-height: 30px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0 0 8px;">Logistics</h3>
+          <p style="font-size: 15px; line-height: 24px; margin: 0 0 20px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Deliveries in, orders out. Dock space for pallets and a dedicated area where drivers collect without walking your line.</p>
+          <ul style="list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-divider);">
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">01</span>Two loading docks / landing areas</li>
+            <li style="display: flex; gap: 14px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--color-divider); font-size: 16px; line-height: 24px;"><span aria-hidden="true" style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; color: var(--color-accent-700); min-width: 2ch;">02</span>Food delivery pickup area</li>
+          </ul>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="margin-top: clamp(32px, 4vw, 48px); padding-top: 24px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between;">
+      <p style="margin: 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 72%, transparent); max-width: 48ch;">Walk the space with your menu and your volume. We'll tell you which kitchen fits.</p>
+      <a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 24px; min-height: 50px;">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        Schedule a Tour
+      </a>
+    </div>
+  </section>
+
+  <section aria-label="Our mission" style="position: relative; background: #141414; color: #FAF8F5; overflow: hidden;">
+    <div class="duotone" style="position: absolute; inset: 0;">
+      <img src="assets/flour-hands.webp" alt="" loading="lazy" style="width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0.42;" />
+    </div>
+    <div style="position: relative; max-width: 1240px; margin: 0 auto; padding: clamp(72px, 10vw, 150px) var(--edge);">
+      <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-400); margin-bottom: 12px;">04 · Why we do this</span>
+      <hr style="height: 1px; border: 0; margin: 0 0 32px; background: color-mix(in srgb, #FAF8F5 24%, transparent); max-width: 640px;" />
+      <p style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 4.4vw, 58px); line-height: 1.08; letter-spacing: 0.01em; text-transform: uppercase; margin: 0; max-width: 24ch;">Focus on your craft.<br />We take care of the rest.</p>
+      <p style="font-size: 17px; line-height: 28px; max-width: 52ch; margin: 28px 0 0; color: color-mix(in srgb, #FAF8F5 82%, transparent);">We've spent years in restaurants and years building commercial kitchens. That experience exists so food entrepreneurs can set up, operate and grow without learning it the hard way.</p>
+    </div>
+  </section>
+
+  <section id="included" data-rev style="max-width: 1240px; margin: 0 auto; padding: clamp(48px, 6vw, 96px) var(--edge);">
+    <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-700); margin-bottom: 12px;">05 · The facility</span>
+    <hr style="height: 1px; border: 0; margin: 0 0 clamp(28px, 4vw, 44px); background: var(--color-divider);" />
+    <h2 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.06; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 clamp(32px, 4vw, 52px); max-width: 28ch;">More than a kitchen</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: clamp(24px, 3vw, 40px);">
+      <div class="blueprint" style="padding: 24px;">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 24px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px solid var(--color-divider);">Access &amp; Security</h3>
+        <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 16px; line-height: 24px;">
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Open 24/7/365</li>
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Free gated parking</li>
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Locker rooms</li>
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Bathrooms</li>
+        </ul>
+      </div>
+      <div class="blueprint" style="padding: 24px;">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 24px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px solid var(--color-divider);">Workspace</h3>
+        <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 16px; line-height: 24px;">
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Office space</li>
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Free WiFi</li>
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Cold storage</li>
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Frozen storage</li>
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Dry storage</li>
+        </ul>
+      </div>
+      <div class="blueprint" style="padding: 24px;">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 24px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px solid var(--color-divider);">Maintenance</h3>
+        <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 16px; line-height: 24px;">
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Daily cleaning services</li>
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Laundry room</li>
+        </ul>
+      </div>
+      <div class="blueprint" style="padding: 24px;">
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 24px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px solid var(--color-divider);">Business Support</h3>
+        <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 16px; line-height: 24px;">
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Onboarding support</li>
+          <li style="display: flex; gap: 10px; align-items: flex-start;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 4px; color: var(--color-accent);"><polyline points="20 6 9 17 4 12"></polyline></svg>Permitting support</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section data-rev style="max-width: 1240px; margin: 0 auto; padding: clamp(24px, 3vw, 40px) var(--edge) clamp(48px, 6vw, 96px); display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: clamp(32px, 5vw, 72px); align-items: center;">
+    <figure class="blueprint duotone" style="margin: 0;">
+      <img src="assets/prep-overhead.webp" alt="Two cooks portioning bowls and packing delivery containers across a stainless prep table" loading="lazy" style="width: 100%; aspect-ratio: 4 / 3.4; object-fit: cover; display: block;" />
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    </figure>
+    <div>
+      <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-700); margin-bottom: 12px;">06 · Who it's for</span>
+      <hr style="height: 1px; border: 0; margin: 0 0 28px; background: var(--color-divider);" />
+      <h2 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.06; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 28px;">Built for people already cooking</h2>
+      <dl style="margin: 0; border-top: 1px solid var(--color-divider);">
+        <div style="padding: 16px 0; border-bottom: 1px solid var(--color-divider);">
+          <dt style="font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 24px; letter-spacing: 0.03em; text-transform: uppercase;">Delivery-only restaurants</dt>
+          <dd style="margin: 6px 0 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">A production kitchen and a dedicated driver pickup area, with no dining room to pay for.</dd>
+        </div>
+        <div style="padding: 16px 0; border-bottom: 1px solid var(--color-divider);">
+          <dt style="font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 24px; letter-spacing: 0.03em; text-transform: uppercase;">Caterers</dt>
+          <dd style="margin: 6px 0 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Cold storage, dock access and 24-hour entry for the night before a 300-cover event.</dd>
+        </div>
+        <div style="padding: 16px 0; border-bottom: 1px solid var(--color-divider);">
+          <dt style="font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 24px; letter-spacing: 0.03em; text-transform: uppercase;">Food entrepreneurs</dt>
+          <dd style="margin: 6px 0 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">A certified address, onboarding and permitting support, and no construction between you and your first order.</dd>
+        </div>
+        <div style="padding: 16px 0; border-bottom: 1px solid var(--color-divider);">
+          <dt style="font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 24px; letter-spacing: 0.03em; text-transform: uppercase;">Meal-prep businesses</dt>
+          <dd style="margin: 6px 0 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Walk-in cooler and freezer, dishwashing area and the counter space a batch week actually needs.</dd>
+        </div>
+        <div style="padding: 16px 0; border-bottom: 1px solid var(--color-divider);">
+          <dt style="font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 24px; letter-spacing: 0.03em; text-transform: uppercase;">Growing restaurants</dt>
+          <dd style="margin: 6px 0 0; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 78%, transparent);">A second kitchen for prep, catering or delivery volume, without a second lease on a storefront.</dd>
+        </div>
+      </dl>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px;">
+        <a href="#tour-mid" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 24px; min-height: 50px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          Schedule a Tour
+        </a>
+        <a href="#film" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 20px; min-height: 50px;">Watch the video</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="film" aria-label="Watch the kitchens" style="background: #141414; color: #FAF8F5;">
+    <div style="max-width: 1240px; margin: 0 auto; padding: clamp(48px, 6vw, 88px) var(--edge); display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(28px, 4vw, 64px); align-items: center;">
+      <div>
+        <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-400); margin-bottom: 12px;">Watch</span>
+        <hr style="height: 1px; border: 0; margin: 0 0 20px; background: color-mix(in srgb, #FAF8F5 24%, transparent);" />
+        <h2 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.06; letter-spacing: 0.01em; text-transform: uppercase; margin: 0; max-width: 18ch;">See the kitchens before you visit</h2>
+        <p style="font-size: 16px; line-height: 26px; margin: 18px 0 0; max-width: 40ch; color: color-mix(in srgb, #FAF8F5 78%, transparent);">A short look inside — the line, the walk-ins, the loading area and the people already cooking here.</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px;">
+          <button type="button" onClick="{{ openVideo }}" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 13px 22px; min-height: 50px; gap: 10px;">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>
+            Play the video
+          </button>
+          <a href="https://vimeo.com/703398003" target="_blank" rel="noopener" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 13px 20px; min-height: 50px; color: #FAF8F5; border-color: color-mix(in srgb, #FAF8F5 34%, transparent);">Open on Vimeo</a>
+        </div>
+      </div>
+      <div class="blueprint" style="border-color: color-mix(in srgb, #FAF8F5 24%, transparent); aspect-ratio: 16 / 9; position: relative; background: #141414;">
+        <i class="corner tl" style="color: color-mix(in srgb, #FAF8F5 55%, transparent);"></i><i class="corner tr" style="color: color-mix(in srgb, #FAF8F5 55%, transparent);"></i><i class="corner bl" style="color: color-mix(in srgb, #FAF8F5 55%, transparent);"></i><i class="corner br" style="color: color-mix(in srgb, #FAF8F5 55%, transparent);"></i>
+        <sc-if value="{{ videoClosed }}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{ openVideo }}" aria-label="Play the ŌN Kitchens video" style="position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; display: grid; place-items: center;">
+            <img src="assets/prep-rail.webp" alt="" loading="lazy" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0.8;" />
+            <span aria-hidden="true" style="position: relative; width: 84px; height: 84px; display: grid; place-items: center; background: var(--color-accent); color: #FAF8F5; border: 1px solid var(--color-accent-700);">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="7 4 20 12 7 20 7 4"></polygon></svg>
+            </span>
+          </button>
+        </sc-if>
+        <sc-if value="{{ videoOpen }}">
+          <iframe src="https://player.vimeo.com/video/703398003?autoplay=1&amp;title=0&amp;byline=0&amp;portrait=0" title="ŌN Kitchens video" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen="{{ true }}" frameBorder="0" style="position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block;"></iframe>
+        </sc-if>
+      </div>
+    </div>
+  </section>
+
+  <section id="reviews" data-rev style="padding: clamp(48px, 6vw, 88px) 0 clamp(40px, 5vw, 64px);">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 0 var(--edge);">
+    <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-700); margin-bottom: 12px;">What our clients say</span>
+    <hr style="height: 1px; border: 0; margin: 0 0 clamp(28px, 4vw, 40px); background: var(--color-divider);" />
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px clamp(32px, 5vw, 72px); align-items: end;">
+      <h2 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.06; letter-spacing: 0.01em; text-transform: uppercase; margin: 0; max-width: 22ch;">The operators already cooking here</h2>
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div role="img" aria-label="Rated 4.9 out of 5" style="display: flex; gap: 4px;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        </div>
+        <span style="font-family: var(--font-heading); font-weight: 600; font-size: 26px; line-height: 26px; letter-spacing: 0.02em;">4.9</span>
+        <span style="font-size: 17px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 62%, transparent);">· 380+ reviews</span>
+      </div>
+    </div>
+    </div>
+    <div data-marquee-wrap style="margin-top: clamp(32px, 4vw, 48px); overflow: hidden; -webkit-mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);">
+      <div data-marquee style="display: flex; align-items: stretch; gap: 0; width: max-content; animation-duration: 72s;">
+<div style="display: flex; align-items: stretch; gap: clamp(20px, 2.4vw, 32px); padding-right: clamp(20px, 2.4vw, 32px); flex: none;">
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/sarah-kim.webp" alt="Five-star Google review from Sarah Kim" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/jason-martinez.webp" alt="Five-star Google review from Jason Martinez" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/daniel-lee.webp" alt="Five-star Google review from Daniel Lee" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/sophia-martinez.webp" alt="Five-star Google review from Sophia Martinez" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/james-patel.webp" alt="Five-star Google review from James Patel" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/maria-gomez.webp" alt="Five-star Google review from Maria Gomez" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+        </div>
+<div aria-hidden="true" style="display: flex; align-items: stretch; gap: clamp(20px, 2.4vw, 32px); padding-right: clamp(20px, 2.4vw, 32px); flex: none;">
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/sarah-kim.webp" alt="" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/jason-martinez.webp" alt="" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/daniel-lee.webp" alt="" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/sophia-martinez.webp" alt="" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/james-patel.webp" alt="" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+          <figure class="blueprint" style="width: clamp(296px, 28vw, 375px); flex: none; margin: 0; background: var(--color-bg);">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            <img src="assets/reviews/maria-gomez.webp" alt="" loading="lazy" style="width: 100%; height: auto; display: block;" />
+          </figure>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width: 1240px; margin: clamp(40px, 5vw, 64px) auto 0; padding: 0 var(--edge);">
+      <hr style="height: 1px; border: 0; margin: 0 0 clamp(28px, 4vw, 40px); background: var(--color-divider);" />
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: clamp(20px, 2.6vw, 32px);">
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;Great space and very easy to work with. The kitchen was clean, well equipped, and ready when we arrived.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">Michael Carter</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">January 14, 2026</span>
+          </figcaption>
+        </figure>
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;We needed a professional kitchen without committing to our own facility, and OnKitchens was exactly what we were looking for.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">Sarah Mitchell</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">February 8, 2026</span>
+          </figcaption>
+        </figure>
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;Really good experience. Everything was clean, the equipment worked perfectly, and the team was quick to help whenever we had a question.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">David Rodriguez</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">March 21, 2026</span>
+          </figcaption>
+        </figure>
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;I&rsquo;ve used the kitchen for several catering jobs now and it&rsquo;s been great every time. Plenty of space and professional equipment.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">Emily Johnson</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">April 5, 2026</span>
+          </figcaption>
+        </figure>
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;Clean kitchen, good equipment, and an easy process from start to finish. Would definitely use OnKitchens again.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">Chris Anderson</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">April 27, 2026</span>
+          </figcaption>
+        </figure>
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;OnKitchens gave us the space we needed to grow our meal prep business without taking on the cost of our own commercial kitchen.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">Jessica Williams</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">May 16, 2026</span>
+          </figcaption>
+        </figure>
+      </div>
+      <sc-if value="{{ moreReviews }}">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: clamp(20px, 2.6vw, 32px); margin-top: clamp(20px, 2.6vw, 32px);">
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;Exactly what a small food business needs. Professional setup, clean workspace, and everything was ready to go.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">Daniel Thompson</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">June 3, 2026</span>
+          </figcaption>
+        </figure>
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;Super convenient and very well maintained. The staff has always been friendly and responsive.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">Maria Lopez</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">June 24, 2026</span>
+          </figcaption>
+        </figure>
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;I was impressed with how clean and organized everything was. We were able to come in, get to work, and focus on production.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">Kevin Brown</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">July 9, 2026</span>
+          </figcaption>
+        </figure>
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;Great kitchen and great team. Booking was simple and the space had everything we needed for our production day.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">Ashley Davis</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">July 28, 2026</span>
+          </figcaption>
+        </figure>
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;We&rsquo;ve rented commercial kitchens before, and this has been one of the easiest experiences. Good equipment, clean facility, and no unnecessary hassle.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">Robert Wilson</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">August 11, 2026</span>
+          </figcaption>
+        </figure>
+        <figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <div role="img" aria-label="Rated 5 out of 5" style="display: flex; gap: 3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+          <blockquote style="margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 86%, transparent);">&ldquo;Perfect setup for our growing food business. Having access to a professional kitchen without the overhead of our own location has made a big difference.&rdquo;</blockquote>
+          <figcaption style="margin: 0; padding-top: 14px; border-top: 1px solid var(--color-divider); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px;">
+            <span style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text);">Nicole Martinez</span>
+            <span style="color: color-mix(in srgb, var(--color-text) 58%, transparent);">August 26, 2026</span>
+          </figcaption>
+        </figure>
+        </div>
+      </sc-if>
+      <div style="margin-top: clamp(28px, 3.5vw, 40px); display: flex; justify-content: center;">
+        <button type="button" onClick="{{ toggleReviews }}" aria-expanded="{{ moreReviews }}" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 28px; min-height: 50px; gap: 10px;">
+          <sc-if value="{{ lessReviews }}" hint-placeholder-val="{{ true }}">See more reviews</sc-if>
+          <sc-if value="{{ moreReviews }}">Show fewer reviews</sc-if>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tour-mid" aria-label="Schedule a tour" style="max-width: 1240px; margin: 0 auto; padding: clamp(48px, 6vw, 88px) var(--edge) clamp(16px, 2vw, 24px);">
+    <div class="blueprint" style="padding: clamp(24px, 3.5vw, 40px); display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(24px, 4vw, 56px); align-items: start;">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <div>
+        <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-700); margin-bottom: 12px;">Schedule a tour</span>
+        <hr style="height: 1px; border: 0; margin: 0 0 20px; background: var(--color-divider);" />
+        <h2 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.06; letter-spacing: 0.01em; text-transform: uppercase; margin: 0;">Seen enough? Come see it in person.</h2>
+        <p style="font-size: 16px; line-height: 26px; margin: 18px 0 0; max-width: 42ch; color: color-mix(in srgb, var(--color-text) 78%, transparent);">Leave your details and we'll call to set a time at Van Nuys or Washington Blvd. Sizes, terms and pricing are all covered on the tour.</p>
+        <figure class="blueprint" style="margin: 24px 0 0; max-width: 440px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <img src="assets/could-be-you.webp" alt="A cook plating bowls in a stainless commercial kitchen, annotated: this could be you, and this could be your kitchen, your logo could be here" loading="lazy" style="width: 100%; height: auto; display: block;" />
+        </figure>
+        <p style="font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 24px; letter-spacing: 0.02em; text-transform: uppercase; margin: 16px 0 0; max-width: 24ch;">Your line. Your labels. Your name on the bag.</p>
+        <!-- PHONE CTA (disabled — uncomment to restore) mid form
+<p style="margin: 22px 0 0; font-family: var(--font-heading); font-weight: 600; font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase;">Prefer to talk? <a href="tel:+18444351255">(844) 435-1255</a></p>
+-->
+      </div>
+
+      <div>
+        <sc-if value="{{ isSuccessM }}">
+          <div role="status" style="display: flex; flex-direction: column; gap: 14px; align-items: flex-start; padding: 8px 0;">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--color-accent);"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 28px; line-height: 30px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0;">Request received</h3>
+            <p style="margin: 0; font-size: 16px; line-height: 26px; color: color-mix(in srgb, var(--color-text) 80%, transparent); max-width: 40ch;">Thanks — we'll be in touch to set a time.<!-- restore with phone: If you'd rather not wait, call <a href="tel:+18444351255">(844) 435-1255</a>. --></p>
+            <button type="button" onClick="{{ resetMid }}" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 14px; padding: 12px 20px; min-height: 46px;">Send another request</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ showFormM }}" hint-placeholder-val="{{ true }}">
+          <form onSubmit="{{ onSubmitMid }}" noValidate="{{ true }}" style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="field">
+              <label for="m-name" style="font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Full name</label>
+              <input class="input" id="m-name" name="fullName" data-form="mid" type="text" autoComplete="name" required="{{ true }}" value="{{ fm.fullName }}" onChange="{{ onInput }}" aria-describedby="me-name" style="min-height: 48px;" />
+              <sc-if value="{{ em.fullName }}"><p id="me-name" style="margin: 6px 0 0; font-size: 13px; line-height: 18px; color: var(--color-accent-700);">{{ em.fullName }}</p></sc-if>
+            </div>
+            <div class="field">
+              <label for="m-phone" style="font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Phone</label>
+              <input class="input" id="m-phone" name="phone" data-form="mid" type="tel" autoComplete="tel" required="{{ true }}" value="{{ fm.phone }}" onChange="{{ onInput }}" aria-describedby="me-phone" style="min-height: 48px;" />
+              <sc-if value="{{ em.phone }}"><p id="me-phone" style="margin: 6px 0 0; font-size: 13px; line-height: 18px; color: var(--color-accent-700);">{{ em.phone }}</p></sc-if>
+            </div>
+            <div class="field">
+              <label for="m-email" style="font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Email</label>
+              <input class="input" id="m-email" name="email" data-form="mid" type="email" autoComplete="email" required="{{ true }}" value="{{ fm.email }}" onChange="{{ onInput }}" aria-describedby="me-email" style="min-height: 48px;" />
+              <sc-if value="{{ em.email }}"><p id="me-email" style="margin: 6px 0 0; font-size: 13px; line-height: 18px; color: var(--color-accent-700);">{{ em.email }}</p></sc-if>
+            </div>
+            <div class="field">
+              <label for="m-business" style="font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Business name <span style="text-transform: none; letter-spacing: 0; color: color-mix(in srgb, var(--color-text) 55%, transparent);">(optional)</span></label>
+              <input class="input" id="m-business" name="business" data-form="mid" type="text" autoComplete="organization" value="{{ fm.business }}" onChange="{{ onInput }}" style="min-height: 48px;" />
+            </div>
+            <sc-if value="{{ isErrorM }}">
+              <div role="alert" style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--color-accent); background: var(--color-accent-100);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 3px; color: var(--color-accent-700);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <p style="margin: 0; font-size: 15px; line-height: 23px;">We couldn't send that request. Please try again in a moment.<!-- restore with phone: or call <a href="tel:+18444351255">(844) 435-1255</a>. --></p>
+              </div>
+            </sc-if>
+            <button type="submit" class="btn btn-primary blueprint btn-block" disabled="{{ isLoadingM }}" style="margin: 4px 0 0; text-transform: uppercase; letter-spacing: 0.06em; font-size: 16px; padding: 16px 28px; min-height: 56px; gap: 10px;">
+              <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+              <sc-if value="{{ isLoadingM }}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" style="animation: on-spin .8s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+              </sc-if>
+              {{ submitLabelM }}
+            </button>
+            </form>
+        </sc-if>
+      </div>
+    </div>
+  </section>
+
+  <section id="locations" data-rev style="max-width: 1240px; margin: 0 auto; padding: clamp(48px, 6vw, 96px) var(--edge);">
+    <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-700); margin-bottom: 12px;">07 · Locations</span>
+    <hr style="height: 1px; border: 0; margin: 0 0 clamp(28px, 4vw, 44px); background: var(--color-divider);" />
+    <h2 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.06; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 clamp(32px, 4vw, 52px); max-width: 24ch;">Two facilities in Los Angeles</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: clamp(28px, 4vw, 56px);">
+      <div>
+        <div class="blueprint" style="margin-bottom: 22px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <iframe src="map.html?loc=vannuys" title="Street map of ŌN Kitchens Van Nuys, 15136 Stagg St" loading="lazy" style="display: block; width: 100%; height: 300px; border: 0;"></iframe>
+        </div>
+        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 30px; line-height: 32px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0 0 12px;">Van Nuys</h3>
+        <address style="font-style: normal; font-size: 17px; line-height: 27px; margin: 0 0 6px;">15136 Stagg St<br />Van Nuys, CA 91405</address>
+        <p style="margin: 0 0 20px; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 72%, transparent);">Open 24/7/365 · Free gated parking · Two loading docks</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+          <a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 13px 22px; min-height: 48px;">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            Tour Van Nuys
+          </a>
+          <!-- PHONE CTA (disabled — uncomment to restore) location
+<a href="tel:+18444351255" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 13px 20px; min-height: 48px;">Call</a>
+-->
+        </div>
+      </div>
+      <div>
+        <div class="blueprint" style="margin-bottom: 22px;">
+          <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          <iframe src="map.html?loc=la" title="Street map of ŌN Kitchens Los Angeles, 1870 W Washington Blvd" loading="lazy" style="display: block; width: 100%; height: 300px; border: 0;"></iframe>
+        </div>
+        <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 30px; line-height: 32px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0 0 12px;">Los Angeles</h3>
+        <address style="font-style: normal; font-size: 17px; line-height: 27px; margin: 0 0 6px;">1870 W Washington Blvd<br />Los Angeles, CA 90007</address>
+        <p style="margin: 0 0 20px; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 72%, transparent);">Open 24/7/365 · Free gated parking · Food delivery pickup area</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+          <a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 13px 22px; min-height: 48px;">
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+            Tour Los Angeles
+          </a>
+          <!-- PHONE CTA (disabled — uncomment to restore) location
+<a href="tel:+18444351255" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 13px 20px; min-height: 48px;">Call</a>
+-->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" data-rev style="max-width: 1240px; margin: 0 auto; padding: clamp(48px, 6vw, 96px) var(--edge);">
+    <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-700); margin-bottom: 12px;">08 · Questions</span>
+    <hr style="height: 1px; border: 0; margin: 0 0 clamp(28px, 4vw, 44px); background: var(--color-divider);" />
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(24px, 4vw, 64px); align-items: start;">
+      <h2 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 3.6vw, 46px); line-height: 1.06; letter-spacing: 0.01em; text-transform: uppercase; margin: 0; max-width: 18ch;">Answered before the tour</h2>
+      <div style="border-top: 1px solid var(--color-divider);">
+        <div style="border-bottom: 1px solid var(--color-divider);">
+          <h3 style="margin: 0;">
+            <button type="button" data-faq aria-expanded="{{ isFaq0 }}" aria-controls="faq-p-0" onClick="{{ toggleFaq0 }}" style="width: 100%; background: none; border: 0; cursor: pointer; display: flex; gap: 20px; align-items: center; justify-content: space-between; text-align: left; padding: 20px 0; font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-text); min-height: 48px;">
+              How big are the kitchens?
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; color: var(--color-accent);"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </h3>
+          <sc-if value="{{ isFaq0 }}">
+            <div id="faq-p-0" style="padding: 0 0 22px;">
+              <p style="margin: 0; font-size: 16px; line-height: 26px; max-width: 60ch; color: color-mix(in srgb, var(--color-text) 80%, transparent);">Private kitchen space runs between 200 and 600 square feet. Which one suits you depends on your menu and your volume, so we walk the options with you on the tour.</p>
+            </div>
+          </sc-if>
+        </div>
+        <div style="border-bottom: 1px solid var(--color-divider);">
+          <h3 style="margin: 0;">
+            <button type="button" data-faq aria-expanded="{{ isFaq1 }}" aria-controls="faq-p-1" onClick="{{ toggleFaq1 }}" style="width: 100%; background: none; border: 0; cursor: pointer; display: flex; gap: 20px; align-items: center; justify-content: space-between; text-align: left; padding: 20px 0; font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-text); min-height: 48px;">
+              What's the difference between private and hourly rental?
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; color: var(--color-accent);"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </h3>
+          <sc-if value="{{ isFaq1 }}">
+            <div id="faq-p-1" style="padding: 0 0 22px;">
+              <p style="margin: 0; font-size: 16px; line-height: 26px; max-width: 60ch; color: color-mix(in srgb, var(--color-text) 80%, transparent);">Private rental gives you your own kitchen space behind your own door. Hourly rental gives you kitchen time when you need it. Both are available — which makes sense usually comes down to how many hours a week you're actually cooking.</p>
+            </div>
+          </sc-if>
+        </div>
+        <div style="border-bottom: 1px solid var(--color-divider);">
+          <h3 style="margin: 0;">
+            <button type="button" data-faq aria-expanded="{{ isFaq2 }}" aria-controls="faq-p-2" onClick="{{ toggleFaq2 }}" style="width: 100%; background: none; border: 0; cursor: pointer; display: flex; gap: 20px; align-items: center; justify-content: space-between; text-align: left; padding: 20px 0; font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-text); min-height: 48px;">
+              Can I get in at night and on weekends?
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; color: var(--color-accent);"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </h3>
+          <sc-if value="{{ isFaq2 }}">
+            <div id="faq-p-2" style="padding: 0 0 22px;">
+              <p style="margin: 0; font-size: 16px; line-height: 26px; max-width: 60ch; color: color-mix(in srgb, var(--color-text) 80%, transparent);">Yes. Both facilities are open 24/7/365, with free gated parking and locker rooms, so overnight prep and early dispatch are normal here.</p>
+            </div>
+          </sc-if>
+        </div>
+        <div style="border-bottom: 1px solid var(--color-divider);">
+          <h3 style="margin: 0;">
+            <button type="button" data-faq aria-expanded="{{ isFaq3 }}" aria-controls="faq-p-3" onClick="{{ toggleFaq3 }}" style="width: 100%; background: none; border: 0; cursor: pointer; display: flex; gap: 20px; align-items: center; justify-content: space-between; text-align: left; padding: 20px 0; font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-text); min-height: 48px;">
+              What's included in the kitchen?
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; color: var(--color-accent);"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </h3>
+          <sc-if value="{{ isFaq3 }}">
+            <div id="faq-p-3" style="padding: 0 0 22px;">
+              <p style="margin: 0; font-size: 16px; line-height: 26px; max-width: 60ch; color: color-mix(in srgb, var(--color-text) 80%, transparent);">A commercial exhaust hood ranging 8 to 12 feet, commercial cooling, extraction and ventilation, three compartment sink, hand wash sink, commercial dishwasher and dishwashing area, hygienic walls and skirting, 3 phase electricity, fire suppression, walk-in cooler and freezer, dry storage, laundry room, two loading docks and a food delivery pickup area.</p>
+            </div>
+          </sc-if>
+        </div>
+        <div style="border-bottom: 1px solid var(--color-divider);">
+          <h3 style="margin: 0;">
+            <button type="button" data-faq aria-expanded="{{ isFaq4 }}" aria-controls="faq-p-4" onClick="{{ toggleFaq4 }}" style="width: 100%; background: none; border: 0; cursor: pointer; display: flex; gap: 20px; align-items: center; justify-content: space-between; text-align: left; padding: 20px 0; font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-text); min-height: 48px;">
+              Do you help with permitting?
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; color: var(--color-accent);"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </h3>
+          <sc-if value="{{ isFaq4 }}">
+            <div id="faq-p-4" style="padding: 0 0 22px;">
+              <p style="margin: 0; font-size: 16px; line-height: 26px; max-width: 60ch; color: color-mix(in srgb, var(--color-text) 80%, transparent);">Yes. Our team handles zoning, permitting and city regulations, and supports you through onboarding and the Health Department process.</p>
+            </div>
+          </sc-if>
+        </div>
+        <div style="border-bottom: 1px solid var(--color-divider);">
+          <h3 style="margin: 0;">
+            <button type="button" data-faq aria-expanded="{{ isFaq5 }}" aria-controls="faq-p-5" onClick="{{ toggleFaq5 }}" style="width: 100%; background: none; border: 0; cursor: pointer; display: flex; gap: 20px; align-items: center; justify-content: space-between; text-align: left; padding: 20px 0; font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-text); min-height: 48px;">
+              Where are you located?
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; color: var(--color-accent);"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </h3>
+          <sc-if value="{{ isFaq5 }}">
+            <div id="faq-p-5" style="padding: 0 0 22px;">
+              <p style="margin: 0; font-size: 16px; line-height: 26px; max-width: 60ch; color: color-mix(in srgb, var(--color-text) 80%, transparent);">Two facilities: Van Nuys at 15136 Stagg St, and Los Angeles at 1870 W Washington Blvd. Both are on the map above.</p>
+            </div>
+          </sc-if>
+        </div>
+        <div style="border-bottom: 1px solid var(--color-divider);">
+          <h3 style="margin: 0;">
+            <button type="button" data-faq aria-expanded="{{ isFaq6 }}" aria-controls="faq-p-6" onClick="{{ toggleFaq6 }}" style="width: 100%; background: none; border: 0; cursor: pointer; display: flex; gap: 20px; align-items: center; justify-content: space-between; text-align: left; padding: 20px 0; font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-text); min-height: 48px;">
+              What do I need before I can operate?
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; color: var(--color-accent);"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </h3>
+          <sc-if value="{{ isFaq6 }}">
+            <div id="faq-p-6" style="padding: 0 0 22px;">
+              <p style="margin: 0; font-size: 16px; line-height: 26px; max-width: 60ch; color: color-mix(in srgb, var(--color-text) 80%, transparent);">After you choose a kitchen there's a required setup step — onboarding, permitting and Health Department support. What applies depends on your business, and we go through it with you rather than handing you a checklist.</p>
+            </div>
+          </sc-if>
+        </div>
+        <div style="border-bottom: 1px solid var(--color-divider);">
+          <h3 style="margin: 0;">
+            <button type="button" data-faq aria-expanded="{{ isFaq7 }}" aria-controls="faq-p-7" onClick="{{ toggleFaq7 }}" style="width: 100%; background: none; border: 0; cursor: pointer; display: flex; gap: 20px; align-items: center; justify-content: space-between; text-align: left; padding: 20px 0; font-family: var(--font-heading); font-weight: 600; font-size: 20px; line-height: 26px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-text); min-height: 48px;">
+              What does it cost?
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; color: var(--color-accent);"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </h3>
+          <sc-if value="{{ isFaq7 }}">
+            <div id="faq-p-7" style="padding: 0 0 22px;">
+              <p style="margin: 0; font-size: 16px; line-height: 26px; max-width: 60ch; color: color-mix(in srgb, var(--color-text) 80%, transparent);">It depends on the location, the size of the space and whether you want private or hourly. <a href="#tour">Schedule a tour</a> and we'll put real numbers in front of you.</p>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tour" style="background: #141414; color: #FAF8F5;">
+    <div style="max-width: 1240px; margin: 0 auto; padding: clamp(56px, 7vw, 110px) var(--edge) clamp(64px, 8vw, 120px);">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px clamp(32px, 5vw, 72px); align-items: end; margin-bottom: clamp(32px, 4vw, 48px);">
+        <div>
+          <span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-400); margin-bottom: 12px;">09 · Schedule a tour</span>
+          <hr style="height: 1px; border: 0; margin: 0 0 28px; background: color-mix(in srgb, #FAF8F5 24%, transparent);" />
+          <h2 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(40px, 5.6vw, 80px); line-height: 1.02; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em;">Come see the kitchen you'd be cooking in.</h2>
+        </div>
+        <div>
+          <p style="font-size: 17px; line-height: 28px; max-width: 46ch; margin: 0; color: color-mix(in srgb, #FAF8F5 80%, transparent);">Tell us what you cook and how much of it. We'll show you the space that fits and walk you through what setup looks like — sizes, terms and pricing included.</p>
+          <!-- PHONE CTA (disabled — uncomment to restore) final CTA
+<p style="margin: 18px 0 0; font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.06em; text-transform: uppercase;">
+            Or call <a href="tel:+18444351255" style="color: var(--color-accent-400);">(844) 435-1255</a>
+          </p>
+-->
+        </div>
+      </div>
+
+      <div class="blueprint" style="padding: clamp(24px, 3.5vw, 44px); border-color: color-mix(in srgb, #FAF8F5 24%, transparent);">
+        <i class="corner tl" style="color: color-mix(in srgb, #FAF8F5 55%, transparent);"></i><i class="corner tr" style="color: color-mix(in srgb, #FAF8F5 55%, transparent);"></i><i class="corner bl" style="color: color-mix(in srgb, #FAF8F5 55%, transparent);"></i><i class="corner br" style="color: color-mix(in srgb, #FAF8F5 55%, transparent);"></i>
+
+        <sc-if value="{{ isSuccess }}">
+          <div role="status" style="display: flex; flex-direction: column; gap: 16px; align-items: flex-start; padding: 20px 0;">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--color-accent-400);"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 30px; line-height: 32px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0;">Request received</h3>
+            <p style="margin: 0; font-size: 16px; line-height: 26px; color: color-mix(in srgb, #FAF8F5 80%, transparent); max-width: 42ch;">Thanks — we have your details. Someone from the ŌN Kitchens team will be in touch to set a time at your preferred location.<!-- restore with phone: If you'd rather not wait, call <a href="tel:+18444351255" style="color: var(--color-accent-400);">(844) 435-1255</a>. --></p>
+            <button type="button" onClick="{{ resetEnd }}" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 14px; padding: 12px 20px; min-height: 46px; color: #FAF8F5; border-color: color-mix(in srgb, #FAF8F5 34%, transparent);">Send another request</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ showForm }}" hint-placeholder-val="{{ true }}">
+          <form onSubmit="{{ onSubmitEnd }}" noValidate="{{ true }}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 20px 24px; align-items: start; max-width: 760px;">
+            <h3 style="grid-column: 1 / -1; font-family: var(--font-heading); font-weight: 600; font-size: 28px; line-height: 30px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 4px;">Schedule my tour</h3>
+
+            <div class="field">
+              <label for="f-name" style="color: color-mix(in srgb, #FAF8F5 72%, transparent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Full name</label>
+              <input class="input" id="f-name" name="fullName" data-form="end" type="text" autoComplete="name" required="{{ true }}" value="{{ f.fullName }}" onChange="{{ onInput }}" aria-describedby="e-name" style="min-height: 52px; background: color-mix(in srgb, #FAF8F5 8%, transparent); color: #FAF8F5; border-color: color-mix(in srgb, #FAF8F5 28%, transparent);" />
+              <sc-if value="{{ e.fullName }}"><p id="e-name" style="margin: 6px 0 0; font-size: 13px; line-height: 18px; color: var(--color-accent-300);">{{ e.fullName }}</p></sc-if>
+            </div>
+            <div class="field">
+              <label for="f-phone" style="color: color-mix(in srgb, #FAF8F5 72%, transparent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Phone</label>
+              <input class="input" id="f-phone" name="phone" data-form="end" type="tel" autoComplete="tel" required="{{ true }}" value="{{ f.phone }}" onChange="{{ onInput }}" aria-describedby="e-phone" style="min-height: 52px; background: color-mix(in srgb, #FAF8F5 8%, transparent); color: #FAF8F5; border-color: color-mix(in srgb, #FAF8F5 28%, transparent);" />
+              <sc-if value="{{ e.phone }}"><p id="e-phone" style="margin: 6px 0 0; font-size: 13px; line-height: 18px; color: var(--color-accent-300);">{{ e.phone }}</p></sc-if>
+            </div>
+            <div class="field">
+              <label for="f-email" style="color: color-mix(in srgb, #FAF8F5 72%, transparent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Email</label>
+              <input class="input" id="f-email" name="email" data-form="end" type="email" autoComplete="email" required="{{ true }}" value="{{ f.email }}" onChange="{{ onInput }}" aria-describedby="e-email" style="min-height: 52px; background: color-mix(in srgb, #FAF8F5 8%, transparent); color: #FAF8F5; border-color: color-mix(in srgb, #FAF8F5 28%, transparent);" />
+              <sc-if value="{{ e.email }}"><p id="e-email" style="margin: 6px 0 0; font-size: 13px; line-height: 18px; color: var(--color-accent-300);">{{ e.email }}</p></sc-if>
+            </div>
+            <div class="field">
+              <label for="f-business" style="color: color-mix(in srgb, #FAF8F5 72%, transparent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Business name <span style="text-transform: none; letter-spacing: 0; color: color-mix(in srgb, #FAF8F5 55%, transparent);">(optional)</span></label>
+              <input class="input" id="f-business" name="business" data-form="end" type="text" autoComplete="organization" value="{{ f.business }}" onChange="{{ onInput }}" style="min-height: 52px; background: color-mix(in srgb, #FAF8F5 8%, transparent); color: #FAF8F5; border-color: color-mix(in srgb, #FAF8F5 28%, transparent);" />
+            </div>
+
+            <sc-if value="{{ isError }}">
+              <div role="alert" style="grid-column: 1 / -1; display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--color-accent-400); background: color-mix(in srgb, var(--color-accent-400) 14%, transparent);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 3px; color: var(--color-accent-300);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <p style="margin: 0; font-size: 15px; line-height: 23px; color: #FAF8F5;">We couldn't send that request. Please try again in a moment.<!-- restore with phone: or call <a href="tel:+18444351255" style="color: var(--color-accent-300);">(844) 435-1255</a> and we'll book the tour on the phone. --></p>
+              </div>
+            </sc-if>
+
+            <div style="grid-column: 1 / -1; margin-top: 4px;">
+              <button type="submit" class="btn btn-primary blueprint" disabled="{{ isLoading }}" style="width: 100%; text-transform: uppercase; letter-spacing: 0.06em; font-size: 17px; padding: 18px 40px; min-height: 62px; gap: 10px;">
+                <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+                <sc-if value="{{ isLoading }}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" style="animation: on-spin .8s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                </sc-if>
+                {{ submitLabel }}
+              </button>
+              </div>
+          </form>
+        </sc-if>
+      </div>
+    </div>
+  </section>
+
+  <footer style="border-top: 1px solid var(--color-divider);">
+    <div style="max-width: 1240px; margin: 0 auto; padding: clamp(40px, 5vw, 64px) var(--edge); display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px;">
+      <div>
+        <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 22px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px;">ŌN Kitchens</span>
+        <p style="margin: 0; font-size: 14px; line-height: 22px; color: color-mix(in srgb, var(--color-text) 70%, transparent); max-width: 34ch;">Fully certified commercial kitchens for rent in Los Angeles. Private and hourly.</p>
+      </div>
+      <div>
+        <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 60%, transparent); margin-bottom: 10px;">Van Nuys</span>
+        <address style="font-style: normal; font-size: 15px; line-height: 24px; margin: 0;">15136 Stagg St<br />Van Nuys, CA 91405</address>
+      </div>
+      <div>
+        <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 60%, transparent); margin-bottom: 10px;">Los Angeles</span>
+        <address style="font-style: normal; font-size: 15px; line-height: 24px; margin: 0;">1870 W Washington Blvd<br />Los Angeles, CA 90007</address>
+      </div>
+      <div>
+        <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 60%, transparent); margin-bottom: 10px;">Contact</span>
+        <!-- PHONE CTA (disabled — uncomment to restore) footer
+<p style="margin: 0 0 4px; font-size: 15px; line-height: 24px;"><a href="tel:+18444351255">(844) 435-1255</a></p>
+-->
+        <p style="margin: 0; font-size: 15px; line-height: 24px;"><a href="#tour">Schedule a tour</a></p>
+      </div>
+    </div>
+  </footer>
+
+  <sc-if value="{{ showSticky }}">
+    <div style="height: 76px;"></div>
+  </sc-if>
+</main>
+
+<div style="position: fixed; right: 16px; bottom: 96px; z-index: 90; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 12px;">
+  <button type="button" onClick="{{ toggleA11y }}" aria-expanded="{{ a11yOpen }}" aria-controls="a11y-panel" aria-label="Accessibility options" title="Accessibility options" class="btn btn-primary blueprint" style="width: 54px; height: 54px; padding: 0;">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.5" r="1.6"></circle><path d="M4.5 8.5h15"></path><path d="M12 8.5v5"></path><path d="M12 13.5l-3 7"></path><path d="M12 13.5l3 7"></path></svg>
+  </button>
+  <sc-if value="{{ a11yOpen }}">
+    <div id="a11y-panel" role="group" aria-label="Accessibility options" class="blueprint" style="width: min(268px, calc(100vw - 32px)); padding: 18px; background: var(--color-bg); box-shadow: var(--shadow-lg); max-height: calc(100dvh - 170px); overflow-y: auto; overscroll-behavior: contain;">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      <h2 style="font-family: var(--font-heading); font-weight: 600; font-size: 17px; line-height: 22px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--color-divider);">Accessibility</h2>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button type="button" onClick="{{ cycleText }}" class="btn btn-secondary btn-block" style="justify-content: flex-start; gap: 10px; margin: 0; min-height: 46px; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none;"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+          {{ a11yTextLabel }}
+        </button>
+        <button type="button" onClick="{{ toggleContrast }}" aria-pressed="{{ a11yContrast }}" class="btn btn-secondary btn-block" style="justify-content: flex-start; gap: 10px; margin: 0; min-height: 46px; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none;"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor"></path></svg>
+          High contrast
+        </button>
+        <button type="button" onClick="{{ toggleLinks }}" aria-pressed="{{ a11yLinks }}" class="btn btn-secondary btn-block" style="justify-content: flex-start; gap: 10px; margin: 0; min-height: 46px; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          Underline links
+        </button>
+        <button type="button" onClick="{{ toggleStill }}" aria-pressed="{{ a11yStill }}" class="btn btn-secondary btn-block" style="justify-content: flex-start; gap: 10px; margin: 0; min-height: 46px; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none;"><rect x="5" y="5" width="14" height="14"></rect></svg>
+          Stop motion
+        </button>
+        <button type="button" onClick="{{ resetA11y }}" class="btn btn-ghost btn-block" style="justify-content: flex-start; margin: 4px 0 0; min-height: 40px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Reset all</button>
+      </div>
+      <!-- PHONE CTA (disabled — uncomment to restore) a11y panel
+<p style="margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--color-divider); font-size: 12px; line-height: 18px; color: color-mix(in srgb, var(--color-text) 62%, transparent);">Trouble using this site? Call <a href="tel:+18444351255">(844) 435-1255</a>.</p>
+-->
+    </div>
+  </sc-if>
+</div>
+
+<sc-if value="{{ showSticky }}">
+  <div style="position: fixed; left: 0; right: 0; bottom: 0; z-index: 80; display: flex; gap: 10px; align-items: center; justify-content: center; padding: 12px 16px; background: #141414; border-top: 1px solid color-mix(in srgb, #FAF8F5 22%, transparent);">
+    <sc-if value="{{ isDesktop }}">
+      <p style="margin: 0 auto 0 0; font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: #FAF8F5;">Private kitchens in Van Nuys &amp; Los Angeles · <span style="color: var(--color-accent-400);">24/7 access</span></p>
+    </sc-if>
+    <a href="#tour" class="btn btn-primary blueprint" style="flex: 1; max-width: 420px; text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; min-height: 52px;">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      Schedule a Tour
+    </a>
+    <!-- PHONE CTA (disabled — uncomment to restore) sticky bar
+<a href="tel:+18444351255" aria-label="Call ŌN Kitchens at (844) 435-1255" class="btn btn-secondary" style="width: 56px; min-height: 52px; padding: 0; color: #FAF8F5; border-color: color-mix(in srgb, #FAF8F5 34%, transparent);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.8.7 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.27a2 2 0 0 1 2.11-.45c.85.34 1.75.57 2.65.7A2 2 0 0 1 22 16.92z"></path></svg>
+    </a>
+-->
+  </div>
+</sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;simulateError&quot;: {
+    &quot;editor&quot;: &quot;boolean&quot;,
+    &quot;default&quot;: false,
+    &quot;tsType&quot;: &quot;boolean&quot;,
+    &quot;section&quot;: &quot;Lead form&quot;,
+    &quot;label&quot;: &quot;Force the submit-error state&quot;
+  },
+  &quot;faqDefaultOpen&quot;: {
+    &quot;editor&quot;: &quot;int&quot;,
+    &quot;default&quot;: 0,
+    &quot;min&quot;: -1,
+    &quot;max&quot;: 7,
+    &quot;tsType&quot;: &quot;number&quot;,
+    &quot;section&quot;: &quot;FAQ&quot;,
+    &quot;label&quot;: &quot;FAQ open on load (-1 = all closed)&quot;
+  },
+  &quot;galleryAutoAdvance&quot;: {
+    &quot;editor&quot;: &quot;boolean&quot;,
+    &quot;default&quot;: false,
+    &quot;tsType&quot;: &quot;boolean&quot;,
+    &quot;section&quot;: &quot;Kitchen showcase&quot;,
+    &quot;label&quot;: &quot;Cycle equipment categories automatically&quot;
+  }
+}">
+const FIELDS = ['fullName', 'phone', 'email', 'business'];
+const FIELD_IDS = {
+  mid: { fullName: 'm-name', phone: 'm-phone', email: 'm-email' },
+  end: { fullName: 'f-name', phone: 'f-phone', email: 'f-email' }
+};
+function blankForm() {
+  const f = {};
+  FIELDS.forEach(k => { f[k] = ''; });
+  return { f, e: {}, status: 'idle' };
+}
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      gal: 0, faq: 0,
+      forms: { mid: blankForm(), end: blankForm() },
+      isPhone: false, isDesktop: true, reduced: false,
+      scrolled: false, tourVisible: false, videoOpen: false,
+      moreReviews: false,
+      a11yOpen: false, a11y: { text: 0, contrast: false, links: false, still: false }
+    };
+    this._timer = null;
+    this._io = null;
+    this._mq = null;
+    this._mqDesk = null;
+  }
+
+  componentDidMount() {
+    const open = this.props.faqDefaultOpen;
+    if (typeof open === 'number') this.setState({ faq: open });
+
+    try {
+      const saved = JSON.parse(localStorage.getItem('on-a11y') || 'null');
+      if (saved) { this.setState({ a11y: saved }); this.applyA11y(saved); }
+    } catch (err) { /* ignore */ }
+    this._onKey = (ev) => { if (ev.key === 'Escape' && this.state.a11yOpen) this.setState({ a11yOpen: false }); };
+    window.addEventListener('keydown', this._onKey);
+
+    this._mq = window.matchMedia('(max-width: 760px)');
+    this._mqDesk = window.matchMedia('(min-width: 1000px)');
+    this._mqMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const sync = () => this.setState({
+      isPhone: this._mq.matches,
+      isDesktop: this._mqDesk.matches,
+      reduced: this._mqMotion.matches
+    });
+    sync();
+    this._mq.addEventListener('change', sync);
+    this._mqDesk.addEventListener('change', sync);
+    this._mqMotion.addEventListener('change', sync);
+    this._sync = sync;
+
+    // sticky CTA: appears only once the visitor has scrolled past the hero,
+    // and steps aside while the final form itself is on screen
+    const sentinel = document.getElementById('hero-sentinel');
+    if (sentinel && 'IntersectionObserver' in window) {
+      this._ioHero = new IntersectionObserver(([en]) => {
+        const past = !en.isIntersecting && en.boundingClientRect.top < 0;
+        if (past !== this.state.scrolled) this.setState({ scrolled: past });
+      }, { threshold: 0 });
+      this._ioHero.observe(sentinel);
+    }
+    // belt and braces: the scroll container may be body rather than the viewport
+    this._onScroll = () => {
+      if (!sentinel) return;
+      const past = sentinel.getBoundingClientRect().top < 0;
+      if (past !== this.state.scrolled) this.setState({ scrolled: past });
+    };
+    document.addEventListener('scroll', this._onScroll, { capture: true, passive: true });
+    this._onScroll();
+    const tour = document.getElementById('tour');
+    if (tour && 'IntersectionObserver' in window) {
+      this._ioTour = new IntersectionObserver(([en]) => this.setState({ tourVisible: en.isIntersecting }), { threshold: 0.15 });
+      this._ioTour.observe(tour);
+    }
+
+    if (this.props.galleryAutoAdvance) {
+      this._timer = setInterval(() => this.setState(s => ({ gal: (s.gal + 1) % 5 })), 5000);
+    }
+
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || !('IntersectionObserver' in window)) return;
+    // Only hide what is already below the fold, so nothing visible ever flashes
+    // and the page reads fine with JS disabled.
+    const targets = Array.from(document.querySelectorAll('[data-rev]'))
+      .filter(el => el.getBoundingClientRect().top > window.innerHeight * 0.9);
+    if (!targets.length) return;
+    targets.forEach(el => { el.style.opacity = '0'; el.style.transform = 'translateY(16px)'; });
+    this._io = new IntersectionObserver((entries, obs) => {
+      entries.forEach(en => {
+        if (!en.isIntersecting) return;
+        en.target.style.opacity = '1';
+        en.target.style.transform = 'none';
+        obs.unobserve(en.target);
+      });
+    }, { rootMargin: '0px 0px -12% 0px', threshold: 0.05 });
+    targets.forEach(el => this._io.observe(el));
+  }
+
+  componentWillUnmount() {
+    if (this._timer) clearInterval(this._timer);
+    if (this._io) this._io.disconnect();
+    if (this._ioTour) this._ioTour.disconnect();
+    if (this._ioHero) this._ioHero.disconnect();
+    if (this._onScroll) document.removeEventListener('scroll', this._onScroll, { capture: true });
+    if (this._onKey) window.removeEventListener('keydown', this._onKey);
+    if (this._mq && this._sync) this._mq.removeEventListener('change', this._sync);
+    if (this._mqDesk && this._sync) this._mqDesk.removeEventListener('change', this._sync);
+    if (this._mqMotion && this._sync) this._mqMotion.removeEventListener('change', this._sync);
+  }
+
+  setGal(i) {
+    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    this.setState({ gal: i });
+  }
+
+  toggleFaq(i) {
+    this.setState(s => ({ faq: s.faq === i ? null : i }));
+  }
+
+  // — accessibility menu: writes one runtime style sheet, persisted per visitor —
+  applyA11y(a) {
+    let el = document.getElementById('on-a11y-sheet');
+    if (!el) {
+      el = document.createElement('style');
+      el.id = 'on-a11y-sheet';
+      document.head.appendChild(el);
+    }
+    const steps = [1, 1.15, 1.3];
+    const rules = [];
+    if (a.text) rules.push('html { font-size: ' + (16 * steps[a.text]).toFixed(2) + 'px; }');
+    if (a.contrast) rules.push(
+      ':root { --color-text: #000000; --color-bg: #ffffff; --color-accent: #6b4409; --color-accent-700: #4a2f06; --color-divider: #000000; }',
+      'p, li, dd, address, span, td, th, label { color: #000000 !important; }',
+      '[style*="#FAF8F5"] p, [style*="#141414"] p, [style*="#141414"] li { color: #ffffff !important; }'
+    );
+    if (a.links) rules.push('a { text-decoration: underline !important; text-decoration-thickness: 2px !important; }');
+    if (a.still) rules.push(
+      '*, *::before, *::after { animation: none !important; transition: none !important; }',
+      'html { scroll-behavior: auto !important; }',
+      '[data-rev] { opacity: 1 !important; transform: none !important; }'
+    );
+    el.textContent = rules.join('\n');
+    try { localStorage.setItem('on-a11y', JSON.stringify(a)); } catch (err) { /* private mode */ }
+  }
+
+  setA11y(patch) {
+    this.setState(s => {
+      const a = Object.assign({}, s.a11y, patch);
+      this.applyA11y(a);
+      return { a11y: a };
+    });
+  }
+
+  toggleReviews = () => this.setState(s => ({ moreReviews: !s.moreReviews }));
+  toggleA11y = () => this.setState(s => ({ a11yOpen: !s.a11yOpen }));
+  cycleText = () => this.setA11y({ text: (this.state.a11y.text + 1) % 3 });
+  toggleContrast = () => this.setA11y({ contrast: !this.state.a11y.contrast });
+  toggleLinks = () => this.setA11y({ links: !this.state.a11y.links });
+  toggleStill = () => this.setA11y({ still: !this.state.a11y.still });
+  resetA11y = () => this.setA11y({ text: 0, contrast: false, links: false, still: false });
+
+  patchForm(id, fn) {
+    this.setState(s => {
+      const cur = s.forms[id];
+      return { forms: Object.assign({}, s.forms, { [id]: Object.assign({}, cur, fn(cur)) }) };
+    });
+  }
+
+  onInput = (ev) => {
+    const { name, value } = ev.target;
+    const id = ev.target.dataset.form || 'end';
+    this.patchForm(id, cur => {
+      const e = Object.assign({}, cur.e);
+      delete e[name];
+      return { f: Object.assign({}, cur.f, { [name]: value }), e, status: cur.status === 'error' ? 'idle' : cur.status };
+    });
+  };
+
+  validate(f) {
+    const e = {};
+    if (!f.fullName.trim()) e.fullName = 'Please enter your full name.';
+    else if (f.fullName.trim().length < 2) e.fullName = 'Please enter your full name.';
+    const digits = f.phone.replace(/[^0-9]/g, '');
+    if (!f.phone.trim()) e.phone = 'Please enter a phone number.';
+    else if (digits.length < 10) e.phone = 'Please enter a 10-digit phone number.';
+    if (!f.email.trim()) e.email = 'Please enter your email.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';
+    return e;
+  }
+
+  submit(id, ev) {
+    ev.preventDefault();
+    const cur = this.state.forms[id];
+    if (cur.status === 'loading') return;
+    const e = this.validate(cur.f);
+    if (Object.keys(e).length) {
+      this.patchForm(id, () => ({ e, status: 'idle' }));
+      const first = document.getElementById(FIELD_IDS[id][Object.keys(e)[0]]);
+      if (first) first.focus();
+      return;
+    }
+    this.patchForm(id, () => ({ e: {}, status: 'loading' }));
+    setTimeout(() => {
+      this.patchForm(id, () => ({ status: this.props.simulateError ? 'error' : 'success' }));
+    }, 1500);
+  }
+
+  onSubmitMid = (ev) => this.submit('mid', ev);
+  onSubmitEnd = (ev) => this.submit('end', ev);
+  resetMid = () => this.patchForm('mid', () => blankForm());
+  resetEnd = () => this.patchForm('end', () => blankForm());
+  openVideo = () => this.setState({ videoOpen: true });
+
+  renderVals() {
+    const s = this.state;
+    const v = {
+      isPhone: s.isPhone,
+      notPhone: !s.isPhone,
+      isDesktop: s.isDesktop,
+      // phone → poster still only; reduced motion → static frame, no playback
+      showHeroVideo: !s.isPhone && !s.reduced,
+      showSticky: s.scrolled && !s.tourVisible,
+      videoOpen: s.videoOpen,
+      videoClosed: !s.videoOpen,
+      openVideo: this.openVideo,
+      moreReviews: s.moreReviews,
+      lessReviews: !s.moreReviews,
+      toggleReviews: this.toggleReviews,
+      a11yOpen: s.a11yOpen,
+      toggleA11y: this.toggleA11y,
+      cycleText: this.cycleText,
+      toggleContrast: this.toggleContrast,
+      toggleLinks: this.toggleLinks,
+      toggleStill: this.toggleStill,
+      resetA11y: this.resetA11y,
+      a11yTextLabel: ['Text size — normal', 'Text size — large', 'Text size — largest'][s.a11y.text],
+      a11yContrast: s.a11y.contrast,
+      a11yLinks: s.a11y.links,
+      a11yStill: s.a11y.still,
+      onInput: this.onInput,
+      onSubmitMid: this.onSubmitMid,
+      onSubmitEnd: this.onSubmitEnd,
+      resetMid: this.resetMid,
+      resetEnd: this.resetEnd
+    };
+    const end = s.forms.end, mid = s.forms.mid;
+    Object.assign(v, {
+      f: end.f, e: end.e,
+      isLoading: end.status === 'loading', isError: end.status === 'error',
+      isSuccess: end.status === 'success', showForm: end.status !== 'success',
+      submitLabel: end.status === 'loading' ? 'Sending…' : 'Schedule My Tour',
+      fm: mid.f, em: mid.e,
+      isLoadingM: mid.status === 'loading', isErrorM: mid.status === 'error',
+      isSuccessM: mid.status === 'success', showFormM: mid.status !== 'success',
+      submitLabelM: mid.status === 'loading' ? 'Sending…' : 'Schedule My Tour'
+    });
+    for (let i = 0; i < 5; i++) {
+      v['isGal' + i] = s.gal === i;
+      v['setGal' + i] = () => this.setGal(i);
+    }
+    for (let i = 0; i < 8; i++) {
+      v['isFaq' + i] = s.faq === i;
+      v['toggleFaq' + i] = () => this.toggleFaq(i);
+    }
+    return v;
+  }
+}
+
+</script>
+</body>
+</html>
