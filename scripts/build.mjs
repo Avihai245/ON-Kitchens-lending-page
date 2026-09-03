@@ -336,6 +336,21 @@ const READABILITY_CSS = `
 [data-tap="logo"] { padding-block: 2px; }
 [data-tap="footer"] { display: inline-block; }
 
+/* The sticky CTA bar's own dark fill, painted past its own bottom edge. Mobile Safari
+   can leave a sliver of the page's cream background showing below a bottom:0 fixed
+   element while its own chrome (the address bar / bottom toolbar) is mid-animation on
+   scroll — the layout viewport briefly lags the visual one. A box-shadow paints outside
+   the element's own box without adding to page height or scroll size, so a generous
+   80px of the same fill below the bar covers that gap with more of the bar, not the
+   page, whichever direction the lag goes; it sits off-screen the rest of the time.
+   The selector matches "0px", not "0": this bar only exists behind <sc-if value="{{
+   showSticky }}">, so its style is never the static export text but whatever React
+   writes on mount — and React's own style serialization always units a zero length,
+   the one case where this codebase's usual "lengths survive verbatim" does not hold. */
+[data-band="dark"][style*="position: fixed; left: 0px; right: 0px; bottom: 0px"] {
+  box-shadow: 0 80px 0 0 #141414;
+}
+
 @media (max-width: 900px) {
   /* The hero reserves 82vh and bottom-aligns ~510px of content inside it, so the
      leftover — 45px at 390x844, 108px at 430x932, 217px at 768x1024 — stacks on
