@@ -505,7 +505,7 @@ phone number." rather than a browser bubble.
 
 ### What /lp2 currently overrides
 
-Measured against `/` at 390px: **15,517px → 10,519px, −32.2%**, on 867 rendered words
+Measured against `/` at 390px: **15,517px → 10,557px, −32.0%**, on 867 rendered words
 instead of 1,084. The hero (617px) and the reviews section (1,371px) come out
 byte-identical — asserted, not assumed.
 
@@ -523,22 +523,52 @@ of the film section; the FAQ drops from eight questions to four, with "What does
 cost?" moving from last to first; and both location maps come out of the markup, which
 also drops two Leaflet iframes and their OpenStreetMap tile traffic.
 
+The reviews section moves from roughly 70% of the scroll to fifth block on the page,
+straight after the photograph below. On `/` six sections talk about the building before
+anyone else vouches for it; here the order is *this is your problem* -> *this is you, in
+the kitchen* -> *these are the 380 people who did exactly that*. The section itself is
+moved, not rebuilt: it still measures 1,371px and its text is byte-identical to `/`'s,
+which the build proves rather than assumes.
+
 `assets/could-be-you.webp` — the photograph with **THIS COULD BE YOU**, **AND THIS COULD
 BE YOUR KITCHEN** and **YOUR LOGO COULD BE HERE** burned into it — moves to the pivot.
 On `/` it sits inside the mid-page lead form, under a headline that already says "Seen
 enough?": by then the reader has decided, and the image is decoration beside a form rather
 than the thing that got them there. (Replacing that section for `/lp2` had also dropped
 the image off the page entirely, which is how the placement came up.) It now sits
-full-bleed between the pain section and "How it works", so the page reads *here is your
-problem* -> *here is the alternative, as a photograph rather than a claim* -> *here is how
-you get there*. No heading above it: the annotations are the headline. Capped at the
+full-bleed between the pain section and the reviews, so the page reads *here is your
+problem* -> *here is the alternative, as a photograph rather than a claim* -> *here are the
+people who took it*. No heading above it: the annotations are the headline. Capped at the
 file's own 1200px above that width, since stretched to the page's 1760px content width it
 visibly softens, and carrying `width`/`height` so the browser reserves the space.
 
 For interactivity, three stacked lists — the pain cards, the audience rows and the
-process steps — become horizontal scroll-snap tracks with a "Swipe for more" hint, and
-the five equipment tabs scroll in one row instead of wrapping to three. All CSS: no new
-runtime state, so nothing to go wrong when the DC runtime re-renders.
+process steps — become horizontal scroll-snap tracks, and the five equipment tabs scroll
+in one row instead of wrapping to three. All four rows carry the same two affordances: a
+"Swipe for more" hint, and a mask that fades the row's right edge, which is the idiom the
+partner marquee on this page already uses. All CSS: no new runtime state, so nothing to go
+wrong when the DC runtime re-renders.
+
+Every phone behaviour now begins and ends at one width. The four had drifted apart — tabs
+at 620px, the type scale at 760px, the tracks at 900px, the nav at 1000px — so a tablet
+between roughly 680 and 900 got phone carousels with cards sliced mid-word and no hint
+that they scrolled. Tabs and tracks move to the site's own `isPhone` breakpoint, 760px,
+where above it they fall back to the responsive `auto-fit` grids they already carry
+inline. Swept 320 → 1280 in fifteen steps: no document overflow at any width, the header
+on one line at every width, and tabs and tracks reporting the same mode as each other
+everywhere.
+
+**The scroll reveal does not run inside a track,** which was a real bug rather than a
+polish item. The reveal hides everything below the fold and un-hides it when it crosses
+the *viewport*; a card parked off the right edge of a track never crosses it. Measured on
+a phone after scrolling the page end to end: two of the four pain cards and two of the
+four process steps were still at `opacity: 0`, invisible for the whole visit, and then
+slid up from 18px below on a 90ms stagger the moment a swipe brought them in — under the
+reader's thumb. That is what "the section dances" was. Inside a track the swipe *is* the
+reveal, so the entrance is dropped there; the section around it still fades in, and above
+760px, where these are ordinary grids again, the reveal runs exactly as it does on `/`.
+The tracks also drop from `scroll-snap-type: x mandatory` to `x proximity`, so a late
+web-font swap can no longer yank a half-read track back to a snap point.
 
 **Two conversion changes on top of that.** The 4.9 / 380+ rating now sits directly under
 the hero CTA — it used to live at ~55% of the scroll inside the reviews section, where a
@@ -554,6 +584,13 @@ takes the same three steps the inline form takes (`sessionStorage`, `window.__on
 redirect to `/thank-you`), so the lead lands in the same place with the same UTM capture;
 only `form: 'modal'` differs, so modal leads can be told apart downstream. Validation is
 copied verbatim from the runtime's `validate()`, same rules and same four messages.
+
+On a phone the modal is a bottom sheet, not a takeover. It used to be `inset: 0` — edge
+to edge, the page gone behind it — so the only way back was a 44px X in the corner and
+nothing on screen said the site was still there. Capped at `86dvh` it leaves a band of the
+dimmed page above it, which is both the signal that the page is still there and the tap
+target that closes the form: the backdrop handler always closed on a click outside the
+panel, there was simply no backdrop left to click.
 
 Two things that had to be forced rather than declared, both cascade/runtime traps worth
 knowing about: `noValidate` is set imperatively on every open, because `type="email"` with a
@@ -804,12 +841,28 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   and every box in the header byte-identical to the previous build at 1000 and 1440.
 - Sticky CTA: one transition across the whole page, constant document height, and the closing
   form fully usable underneath it.
-- `/lp2` renders identically to `/`: same rendered text, links, images, layout heights
-  and document height, differing only by the robots meta (one extra `<head>` node). The
-  runtime's `location.href` refetch works at the extensionless URL, so both forms keep
-  `noValidate` and the designed inline validation; the menu, tabs, FAQ, reviews toggle and
-  sticky CTA behave the same; the form submits to the shared `/thank-you`; 0 text nodes
-  below AA and no horizontal overflow at 320-2560.
+- `/lp2` and `/` are built from one export through one pipeline: with the override file
+  stashed, `index.html` came out byte-for-byte identical, so nothing on `/lp2` can reach
+  `/`. The runtime's `location.href` refetch works at the extensionless URL, so both forms
+  keep `noValidate` and the designed inline validation; the menu, tabs, FAQ, reviews toggle
+  and sticky CTA behave the same on both; both submit to the shared `/thank-you`.
+- `/lp2` swept at 320 / 360 / 390 / 414 / 430 / 480 / 560 / 620 / 680 / 760 / 761 / 820 /
+  900 / 1000 / 1280: no document overflow at any width, the header on one line (69px) at
+  every width, and tabs and tracks in the same mode as each other everywhere — phone
+  carousels to 760, grids from 761. Nothing is sliced by the viewport edge without both an
+  edge fade and a "Swipe for more" hint.
+- The equipment tabs, 787px of buttons in a 390px box, now carry that fade and hint; before
+  this, 397px of the row — half the categories — was off screen with no signal at all.
+- No track child is left hidden: after reading the page end to end at 390px, 0 of the 13
+  cards across the three tracks are at `opacity: 0` and none carries a transform (it was
+  4 of 13, permanently). Sampled 97 frames across the reveal window: 0px of movement in
+  every card, where two of them used to travel 18px.
+- The lead modal on a phone is a bottom sheet: 60 assertions across 320 / 390 / 430 / 760 /
+  1024 / 1440 — the sheet never exceeds 86dvh, always sits on the bottom edge, always leaves
+  a strip of dimmed page above it, that strip is the backdrop and closes on tap, and X,
+  Escape and focus return all still work.
+- The reviews section is moved, not rebuilt: 35,335 bytes byte-identical to `/`'s, still
+  1,371px tall, now fifth on the page instead of eleventh.
 - Performance measured as a 5-run median against the previous build rather than a single
   sample: first paint 52 -> 56ms, FCP 368 -> 372ms, DCL 105 -> 107ms, and a steady 60fps
   through a scripted scroll burst.
@@ -818,4 +871,3 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   byte-identical to before.
 - No horizontal overflow at 320-2560 **with the webfonts blocked as well as loaded** —
   the swap-window case above.
-- Performance unchanged to better: first paint 52ms, FCP 304ms, DCL 94ms at 390px.
