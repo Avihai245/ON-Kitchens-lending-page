@@ -279,6 +279,29 @@ const READABILITY_CSS = `
 [style*="padding: clamp(88px, 11vh, 150px)"] { min-width: 0; }
 [style*="padding: clamp(88px, 11vh, 150px)"] h1 { overflow-wrap: break-word; }
 
+/* Mobile navigation. The button is always in the markup and hidden above the
+   breakpoint, so it cannot blink in while isDesktop corrects itself at mount; the
+   panel is absolute inside the sticky header so opening it moves nothing. */
+[data-navpanel] {
+  position: absolute; left: 0; right: 0; top: 100%;
+  display: flex; flex-direction: column;
+  margin: 0; padding: 0 var(--edge) 10px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-divider);
+  box-shadow: var(--shadow-lg);
+  max-height: calc(100dvh - 100%);
+  overflow-y: auto; overscroll-behavior: contain;
+}
+[data-navpanel] a {
+  display: flex; align-items: center; min-height: 52px;
+  border-top: 1px solid var(--color-divider);
+  font-family: var(--font-heading); font-weight: 600; font-size: 16px;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  text-decoration: none; color: var(--color-text);
+}
+[data-navpanel] a:first-child { border-top: 0; }
+@media (min-width: 1000px) { [data-navbtn], [data-navpanel] { display: none !important; } }
+
 /* The closing form's fields are near-black; its placeholders need the band's ink,
    not the page's. Higher specificity than the bare ::placeholder rule above, so
    order does not matter. */
@@ -583,9 +606,145 @@ function improveReadability(html, label) {
   return out;
 }
 
+/** The header's five section links, lifted from the desktop <nav> so the two menus
+ *  can never drift apart. */
+const NAV_LINKS = [
+  ['#kitchens', 'Kitchens'],
+  ['#included', "What's Included"],
+  ['#reviews', 'What Clients Say'],
+  ['#locations', 'Locations'],
+  ['#faq', 'FAQ'],
+];
+
 /**
- * Patches the export's runtime: the reveal observer, the accessibility sheet, and
- * the hero video's phone gate.
+ * Gives every viewport under 1000px a navigation menu, because none had one.
+ *
+ * The header's <nav> is wrapped in `<sc-if value="{{ isDesktop }}">` and isDesktop is
+ * `matchMedia('(min-width: 1000px)')` — so phones AND portrait tablets rendered no
+ * navigation at all, not a collapsed one. This adds the button and the panel, wired
+ * through the runtime's own state machine exactly as `moreReviews` is: state,
+ * handler, render values, <sc-if>.
+ *
+ * Two decisions worth keeping:
+ *
+ * The button is unconditional markup hidden by a media query, not an <sc-if> on a
+ * state value. isDesktop starts optimistically `true` and is corrected in
+ * componentDidMount, so a state-gated button would blink into existence on every
+ * phone load.
+ *
+ * The panel is `position: absolute`, not another line in the header's flex row. The
+ * header is `position: sticky`, and a stuck sticky element still occupies its flow
+ * box up-page — so growing it would push the whole document down by the panel's
+ * height while the scroll position stayed put, and the content under the reader's
+ * thumb would jump.
+ */
+function addMobileNav(html, label) {
+  let out = html;
+
+  // ---- state, handler, render values, and the two places that close it ----
+  out = replaceExactly(
+    out,
+    '      moreReviews: false,',
+    '      moreReviews: false, navOpen: false,',
+    1,
+    'nav state'
+  );
+  out = replaceExactly(
+    out,
+    '  toggleReviews = () => this.setState(s => ({ moreReviews: !s.moreReviews }));',
+    '  toggleReviews = () => this.setState(s => ({ moreReviews: !s.moreReviews }));\n' +
+      '  toggleNav = () => this.setState(s => ({ navOpen: !s.navOpen }));',
+    1,
+    'nav handler'
+  );
+  out = replaceExactly(
+    out,
+    '      toggleReviews: this.toggleReviews,',
+    '      toggleReviews: this.toggleReviews,\n' +
+      '      navOpen: s.navOpen,\n' +
+      '      navClosed: !s.navOpen,\n' +
+      '      toggleNav: this.toggleNav,',
+    1,
+    'nav render values'
+  );
+  out = replaceExactly(
+    out,
+    "    this._onKey = (ev) => { if (ev.key === 'Escape' && this.state.a11yOpen) this.setState({ a11yOpen: false }); };",
+    "    this._onKey = (ev) => {\n" +
+      "      if (ev.key !== 'Escape') return;\n" +
+      "      if (this.state.a11yOpen) this.setState({ a11yOpen: false });\n" +
+      "      if (this.state.navOpen) this.setState({ navOpen: false });\n" +
+      "    };\n" +
+      "    // A tap anywhere outside the header closes the menu.\n" +
+      "    //\n" +
+      "    // Capture phase, deliberately. In the bubble phase this fires after React has\n" +
+      "    // already re-rendered — and the button's own click swaps its hamburger icon for\n" +
+      "    // a close icon, so ev.target is the <path> that render just detached. closest()\n" +
+      "    // on an orphaned node returns null, the header test fails, and the menu closes\n" +
+      "    // in the same click that opened it. Running first means the DOM is still intact\n" +
+      "    // and this.state is still the pre-click value: the opening click sees navOpen\n" +
+      "    // false and bails, and a click on the button while open is inside <header> and\n" +
+      "    // bails too, leaving React's own toggle to close it.\n" +
+      "    this._onDocClick = (ev) => {\n" +
+      "      if (!this.state.navOpen) return;\n" +
+      "      if (ev.target && ev.target.closest && ev.target.closest('header')) return;\n" +
+      "      this.setState({ navOpen: false });\n" +
+      "    };\n" +
+      "    document.addEventListener('click', this._onDocClick, true);",
+    1,
+    'nav escape + outside click'
+  );
+  // Crossing a breakpoint closes it, so the button's aria-expanded can never disagree
+  // with a panel the media query has hidden.
+  out = replaceExactly(
+    out,
+    '    const sync = () => this.setState({\n      isPhone: this._mq.matches,',
+    '    const sync = () => this.setState({\n      navOpen: false,\n      isPhone: this._mq.matches,',
+    1,
+    'nav closes on breakpoint change'
+  );
+  out = replaceExactly(
+    out,
+    '    if (this._onKey) window.removeEventListener(\'keydown\', this._onKey);',
+    '    if (this._onKey) window.removeEventListener(\'keydown\', this._onKey);\n' +
+      '    if (this._onDocClick) document.removeEventListener(\'click\', this._onDocClick, true);',
+    1,
+    'nav listener cleanup'
+  );
+
+  // ---- the button and the panel, in the header ----
+  const icon = (paths) =>
+    '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.5" stroke-linecap="round" aria-hidden="true">' + paths + '</svg>';
+  const button =
+    '<button type="button" data-navbtn onClick="{{ toggleNav }}" aria-expanded="{{ navOpen }}" ' +
+      'aria-controls="site-nav" aria-label="Menu" class="btn btn-secondary" ' +
+      'style="width: 48px; height: 48px; min-height: 48px; padding: 0; flex: none;">\n' +
+    '      <sc-if value="{{ navClosed }}" hint-placeholder-val="{{ true }}">' +
+      icon('<path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path>') +
+      '</sc-if>\n' +
+    '      <sc-if value="{{ navOpen }}">' +
+      icon('<path d="M6 6l12 12"></path><path d="M18 6L6 18"></path>') +
+      '</sc-if>\n' +
+    '    </button>\n';
+  const panel =
+    '<sc-if value="{{ navOpen }}">\n' +
+    '      <nav id="site-nav" data-navpanel aria-label="Sections">\n' +
+    NAV_LINKS.map(([href, text]) =>
+      `        <a href="${href}" onClick="{{ toggleNav }}">${text}</a>\n`).join('') +
+    '      </nav>\n' +
+    '    </sc-if>\n';
+  const CTA =
+    '<a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; ' +
+    'letter-spacing: 0.06em; padding: 10px 18px; font-size: 14px; white-space: nowrap;">';
+  out = replaceExactly(out, '    ' + CTA, '    ' + button + '    ' + panel + '    ' + CTA, 1, 'nav markup');
+
+  return out;
+}
+
+/**
+ * Patches the export's runtime: the reveal observer, the sticky CTA, the
+ * accessibility sheet, and the hero video's phone gate.
  */
 function rewriteRuntime(html, label) {
   let out = html;
@@ -653,6 +812,95 @@ function rewriteRuntime(html, label) {
     targets.concat(items).forEach(el => this._io.observe(el));`,
     1,
     'reveal observer'
+  );
+
+  // ---- sticky CTA: on as soon as the visitor scrolls, and on to the end ----
+  // Two things were wrong. #hero-sentinel is named for the hero but sits *below* the
+  // partners strip and the how-it-works list, so the bar did not appear until ~1350px
+  // of scroll — 13% of the page, measured. And `!tourVisible` fought the 76px spacer
+  // the fixed bar needs to clear the footer: that spacer is inside the document, so
+  // dropping it shortened the page, which moved the scroll position, which moved
+  // #tour back across the observer's 0.15 threshold, which put the spacer back. A
+  // feedback loop, worst on a short viewport where 76px is a large share of the
+  // screen. Measured on the previous build: the document alternated between 15441 and
+  // 15517px while scrolling.
+  //
+  // So: the bar keys off <main> with a small hysteresis, the #tour observer is gone,
+  // and the spacer below is unconditional — the document height is now constant.
+  // The read stays getBoundingClientRect()-based, which is what the export was
+  // reaching for with a sentinel: it does not assume the viewport is the scroller.
+  out = replaceExactly(
+    out,
+    `    const sentinel = document.getElementById('hero-sentinel');
+    if (sentinel && 'IntersectionObserver' in window) {
+      this._ioHero = new IntersectionObserver(([en]) => {
+        const past = !en.isIntersecting && en.boundingClientRect.top < 0;
+        if (past !== this.state.scrolled) this.setState({ scrolled: past });
+      }, { threshold: 0 });
+      this._ioHero.observe(sentinel);
+    }
+    // belt and braces: the scroll container may be body rather than the viewport
+    this._onScroll = () => {
+      if (!sentinel) return;
+      const past = sentinel.getBoundingClientRect().top < 0;
+      if (past !== this.state.scrolled) this.setState({ scrolled: past });
+    };
+    document.addEventListener('scroll', this._onScroll, { capture: true, passive: true });
+    this._onScroll();
+    const tour = document.getElementById('tour');
+    if (tour && 'IntersectionObserver' in window) {
+      this._ioTour = new IntersectionObserver(([en]) => this.setState({ tourVisible: en.isIntersecting }), { threshold: 0.15 });
+      this._ioTour.observe(tour);
+    }`,
+    `    const top = document.getElementById('top');
+    let ticking = false;
+    const measure = () => {
+      ticking = false;
+      if (!top) return;
+      const y = -top.getBoundingClientRect().top;
+      // hysteresis, so a scroll that rests on the boundary cannot chatter
+      const past = this.state.scrolled ? y > -16 : y > 8;
+      if (past !== this.state.scrolled) this.setState({ scrolled: past });
+    };
+    this._onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(measure);
+    };
+    document.addEventListener('scroll', this._onScroll, { capture: true, passive: true });
+    measure();`,
+    1,
+    'sticky CTA trigger'
+  );
+  out = replaceExactly(
+    out,
+    '      showSticky: s.scrolled && !s.tourVisible,',
+    '      showSticky: s.scrolled,',
+    1,
+    'sticky CTA condition'
+  );
+  out = replaceExactly(
+    out,
+    '      scrolled: false, tourVisible: false, videoOpen: false,',
+    '      scrolled: false, videoOpen: false,',
+    1,
+    'drop tourVisible state'
+  );
+  out = replaceExactly(
+    out,
+    '    if (this._ioTour) this._ioTour.disconnect();\n',
+    '',
+    1,
+    'drop tour observer cleanup'
+  );
+  // The spacer that keeps the fixed bar off the footer stops being conditional: a
+  // document whose height changes with the bar is what made the bar flicker.
+  out = replaceExactly(
+    out,
+    '  <sc-if value="{{ showSticky }}">\n    <div style="height: 76px;"></div>\n  </sc-if>',
+    '  <div aria-hidden="true" style="height: 76px;"></div>',
+    1,
+    'sticky CTA spacer'
   );
 
   // ---- high contrast: give it a selector that actually matches ----
@@ -1058,6 +1306,7 @@ async function buildIndex() {
 
   html = addScrollMotion(html, 'index.html');
   html = improveReadability(html, 'index.html');
+  html = addMobileNav(html, 'index.html');
   html = rewriteRuntime(html, 'index.html');
 
   const stripped = stripCornerMarkup(html, 'index.html');
@@ -1067,7 +1316,7 @@ async function buildIndex() {
   console.log(
     `  index.html      <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect, ` +
       `${stripped.removed} corner marks removed, ${guarded.guarded} grid minimums guarded, ` +
-      `${widened.widened} wrappers widened, scroll motion + dark benefits band, contrast floor + mobile type scale)`
+      `${widened.widened} wrappers widened, scroll motion + dark benefits band, contrast floor + mobile type scale, mobile nav + persistent sticky CTA)`
   );
 }
 

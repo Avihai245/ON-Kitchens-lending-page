@@ -359,6 +359,76 @@ the **whole document scrolled sideways** — 451px wide at every viewport from 3
 414. `min-width: 0` on the hero block plus `overflow-wrap: break-word` on the headline
 fixes it; both are inert once the real font lands.
 
+## Mobile navigation
+
+There was none. The header's `<nav>` is wrapped in `<sc-if value="{{ isDesktop }}">` and
+`isDesktop` is `matchMedia('(min-width: 1000px)')` — so **every viewport under 1000px
+rendered no navigation at all**, phones and portrait tablets alike. Not a collapsed menu, no
+hamburger: the five section links simply did not exist below that width.
+
+`addMobileNav()` adds a button and a panel, wired through the runtime's own state machine
+exactly as `moreReviews` is — state, handler, render values, `<sc-if>`. The links are
+generated from one `NAV_LINKS` list so the two menus cannot drift apart.
+
+Three decisions worth keeping:
+
+**The button is unconditional markup hidden by a media query**, not an `<sc-if>` on a state
+value. `isDesktop` starts optimistically `true` and is corrected in `componentDidMount`, so a
+state-gated button would blink into existence on every phone load. Verified: across 40 frames
+sampled from navigation onward, zero show both the hamburger and the desktop nav.
+
+**The panel is `position: absolute` inside the sticky header**, not another line in its flex
+row. The header is `position: sticky`, and a stuck sticky element still occupies its flow box
+up-page — so growing it would push the whole document down by the panel's height while the
+scroll position stayed put, and the content under the reader's thumb would jump. Verified: a
+content element's box and the document height are identical before and after opening.
+
+**The outside-click listener runs in the capture phase.** This one cost a debugging round. In
+the bubble phase it fires *after* React has re-rendered, and the button's own click swaps its
+hamburger icon for a close icon — so `ev.target` is the `<path>` that render just detached,
+`closest()` on an orphaned node returns `null`, the "was this inside the header?" test fails,
+and the menu closed in the same click that opened it. Running first means the DOM is still
+intact and `this.state` is still the pre-click value: the opening click sees `navOpen` false
+and bails, and a click on the button while open is inside `<header>` and bails too, leaving
+React's own toggle to close it.
+
+The menu also closes on Escape, on a link, and on a breakpoint change — the last so the
+button's `aria-expanded` can never disagree with a panel the media query has hidden.
+
+## The sticky CTA comes and stays
+
+It was meant to appear past the hero and step aside for the closing form. Two things were
+wrong with that.
+
+**`#hero-sentinel` is named for the hero but sits below the partners strip and the
+how-it-works list**, two sections further down. Measured on a 390x844 phone: the bar did not
+appear until 13% of the page had scrolled.
+
+**The step-aside fought the spacer.** The fixed bar needs a 76px spacer to clear the footer,
+and that spacer was `<sc-if value="{{ showSticky }}">` — *inside the document*. So dropping
+the bar shortened the page, which moved the scroll position, which moved `#tour` back across
+its observer's 0.15 threshold, which put the bar and the spacer back. A feedback loop, worst
+on a short viewport where 76px is a large share of the screen.
+
+Sampling the bar at 41 scroll positions from top to bottom, before and after:
+
+```
+before  ......#################################..   2 transitions, document 15441 <-> 15517px
+after   .########################################   1 transition,  document 15517px, fixed
+```
+
+`showSticky` is now just `s.scrolled`; `scrolled` keys off `<main>` with an 8px/-16px
+hysteresis so the bar arrives within about 77px of scroll and cannot chatter at the boundary;
+the `#tour` observer and its state are gone; and **the spacer is unconditional**, so the
+document height is constant. The read stays `getBoundingClientRect()`-based, which is what the
+export was reaching for with a sentinel — it does not assume the viewport is the scroller —
+and the scroll handler is `requestAnimationFrame`-guarded now that it alone decides the bar.
+
+A bar that never stands aside does sit over the bottom 77px of the closing form. Verified that
+this traps nothing: all four inputs and the submit button clear the bar when scrolled to, and
+the submit button is the topmost element at its own centre. Restoring the step-aside is one
+term in `showSticky`.
+
 ## Lead webhook
 
 Every validated submission from either form is POSTed to `LEAD_WEBHOOK_URL`, then the
@@ -578,7 +648,17 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
 - Contrast, measured on computed styles over the composited background after a full
   scroll: **0 text nodes below AA** at 390 and 1440, on the landing page and the
   thank-you page — including every button state on both grounds.
-- Every interactive element on the page is at least 24x24 at 390px.
+- Every interactive element on the page is at least 24x24 at 390px, the 48x48 menu button
+  included.
+- Mobile menu: present below 1000px and absent at 1000px and above; opens and closes by
+  button, link, Escape and outside click; `aria-expanded` tracks; five links at 52px each,
+  every target resolving; no layout shift on open; no horizontal overflow open or closed at
+  320 / 390 / 768 / 999.
+- Sticky CTA: one transition across the whole page, constant document height, and the closing
+  form fully usable underneath it.
+- Performance measured as a 5-run median against the previous build rather than a single
+  sample: first paint 52 -> 56ms, FCP 368 -> 372ms, DCL 105 -> 107ms, and a steady 60fps
+  through a scripted scroll burst.
 - Mobile type: nothing under 14px below 760px, nothing tighter than 1.35 leading except
   `.btn` (1.2, deliberate), section padding 68px; at 761px and above the scale is
   byte-identical to before.
