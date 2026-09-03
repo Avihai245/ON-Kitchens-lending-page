@@ -245,6 +245,66 @@ const MOTION_CSS = `
 }
 `;
 
+/**
+ * Readability and mobile rhythm, appended to the same helmet <style> as MOTION_CSS.
+ *
+ * The rules key off the inline styles the design already writes rather than off
+ * hook attributes, because the export sets every dimension inline and there is no
+ * class to hang them on. That is safe for LENGTHS but not for colours: the DC
+ * runtime parses each style attribute into a React style object and re-serialises
+ * it through CSSOM, which rewrites #141414 to rgb(20, 20, 20) — the reason the
+ * export's own [style*="#141414"] rescue rule matched nothing — while leaving
+ * lengths and clamp() expressions byte-identical. Measured in the built page:
+ * [style*="font-size: 15px"] matches 38 elements on a phone, [style*="#141414"]
+ * matches 0.
+ *
+ * Why a media query at all: the export ships exactly ONE for the whole site
+ * (prefers-reduced-motion). Everything else is clamp() and auto-fit, which scales
+ * layout but not type — so a phone renders the desktop type scale verbatim, and
+ * every clamp() floor tuned for a desktop minimum becomes a phone's fixed value.
+ * 760px is the runtime's own phone breakpoint (matchMedia('(max-width: 760px)')).
+ */
+const READABILITY_CSS = `
+/* ---- readability (build-time addition) ----
+   The headline can out-measure a 320-414px viewport while the fallback font is
+   still swapping in. The hero is a grid, and a grid item's automatic minimum size
+   is its min-content width, so for the length of that swap the whole document
+   scrolled sideways. Both rules are inert once Barlow Condensed lands. */
+[style*="padding: clamp(88px, 11vh, 150px)"] { min-width: 0; }
+[style*="padding: clamp(88px, 11vh, 150px)"] h1 { overflow-wrap: break-word; }
+
+@media (max-width: 900px) {
+  /* The hero reserves 82vh and bottom-aligns ~510px of content inside it, so the
+     leftover — 45px at 390x844, 108px at 430x932, 217px at 768x1024 — stacks on
+     top of a 93-113px padding and reads as dead space under the header. Both have
+     to come down: dropping only the padding hands the space straight back to the
+     grid. Carried past 760px because a portrait tablet has the worst of it. */
+  [style*="min-height: clamp(600px, 82vh, 880px)"] { min-height: 0 !important; }
+  [style*="padding: clamp(88px, 11vh, 150px)"] { padding-top: clamp(28px, 4vh, 44px) !important; }
+}
+
+@media (max-width: 760px) {
+  /* 13px is the single most common size in the export (67 declarations) and it is
+     nearly all uppercase labels tracked at 0.14em; 15px is the body default. */
+  [style*="font-size: 13px"] { font-size: 14px !important; }
+  [style*="font-size: 15px"] { font-size: 16px !important; }
+  /* line-height 12px under a 13px font — a leading smaller than the type. It
+     collides with itself the moment the label wraps, which the hero eyebrow does
+     on every phone width. */
+  [style*="line-height: 12px"] { line-height: 1.35 !important; }
+  /* 1.50 is the WCAG 1.4.12 floor, not a comfortable phone measure. Scoped to the
+     two body sizes so the 20/24 and 21/24 headings keep their tight leading. */
+  [style*="font-size: 15px"][style*="line-height: 24px"],
+  [style*="font-size: 16px"][style*="line-height: 24px"] { line-height: 1.6 !important; }
+  /* Section padding pins to its 48px floor on a phone (6vw is 23px at 390) while
+     the cards inside are padded 24px — so a section boundary reads barely stronger
+     than a card edge and the page runs together. */
+  [style*="padding: clamp(48px, 6vw, 96px) var(--edge);"] { padding-top: 68px !important; padding-bottom: 68px !important; }
+  [style*="padding: clamp(48px, 6vw, 88px)"] { padding-top: 68px !important; }
+  [style*="var(--edge) clamp(48px, 6vw, 96px)"] { padding-bottom: 68px !important; }
+}
+`;
+
 /** Every element that paints its own #141414 background. Tagging them `data-band`
  *  gives the accessibility panel's high-contrast mode a selector that actually
  *  matches — see rewriteA11y() for why the export's own one cannot. */
@@ -290,7 +350,7 @@ function addScrollMotion(html, label) {
   out = replaceExactly(
     out,
     '[data-marquee-wrap]:hover [data-marquee] { animation-play-state: paused; }\n',
-    '[data-marquee-wrap]:hover [data-marquee] { animation-play-state: paused; }\n' + MOTION_CSS,
+    '[data-marquee-wrap]:hover [data-marquee] { animation-play-state: paused; }\n' + MOTION_CSS + READABILITY_CSS,
     1,
     'motion css'
   );
@@ -384,6 +444,85 @@ function addScrollMotion(html, label) {
       '<section data-band="dark" style="background: #141414; padding: clamp(48px, 6vw, 88px) 0; margin-top: clamp(24px, 3vw, 40px);">\n' +
       '    <div data-rev style="max-width: 1240px; margin: 0 auto; padding: 0 var(--edge);">';
     out = pre + open + body + '\n    </div>\n  ' + post;
+  }
+
+  return out;
+}
+
+/**
+ * The readability changes that live in the markup rather than the stylesheet.
+ *
+ * Runs after addScrollMotion, so the benefits-band restructure is already in place,
+ * and before stripCornerMarkup and guardGridMinimums, whose counts are unaffected:
+ * moving figures between two grids inside one section changes neither the number of
+ * corner marks nor the number of grid minimums.
+ */
+function improveReadability(html, label) {
+  let out = html;
+
+  // ---- contrast: the four fades that fail WCAG AA on the light ground ----
+  // Composited over #FAF8F5 the export's muted tiers measure 4.01:1 (55%),
+  // 4.42:1 (58%), 4.72:1 (60%) and 5.05:1 (62%) against a 4.5:1 requirement —
+  // 19 declarations, all of them `color:`. The four 8% uses are `border-bottom`
+  // hairlines and are deliberately untouched; raising those would turn the
+  // page's hairlines into rules.
+  //
+  // They collapse onto one 70% tier (6.66:1) instead of being nudged
+  // individually: no reader distinguishes 4.01 from 5.05, and the hierarchy that
+  // does carry meaning is the one above — 70 < 72 < 78 < 80 < 86 < 100.
+  for (const [pct, n] of [['55', 2], ['58', 12], ['60', 3], ['62', 2]]) {
+    out = replaceExactly(
+      out,
+      `color-mix(in srgb, var(--color-text) ${pct}%, transparent)`,
+      'color-mix(in srgb, var(--color-text) 70%, transparent)',
+      n,
+      `contrast floor ${pct}%`
+    );
+  }
+
+  // ---- reviews: open with three quotes instead of six ----
+  // The section shows 6 of 12 and hides the rest behind a "See more reviews"
+  // button that already exists, driven by state that already exists. Three of the
+  // visible six move into that hidden grid: no new state, no new markup, nothing
+  // deleted, and the control's own label already covers both directions. On a
+  // phone the grid is one column, so this takes three full cards of near-identical
+  // praise out of the scroll — the largest perceived-density win available without
+  // touching a word of copy. The 4.9 aggregate and the screenshot marquee, both
+  // above it, still carry the proof.
+  {
+    const GRID = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: clamp(20px, 2.6vw, 32px)';
+    const OPEN_VISIBLE = `<div style="${GRID};">`;
+    const OPEN_HIDDEN = `<div style="${GRID}; margin-top: clamp(20px, 2.6vw, 32px);">`;
+    const FIG = '<figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">';
+    const END = '</figure>';
+
+    const total = out.split(FIG).length - 1;
+    if (total !== 12) {
+      throw new Error(`[build] ${label}: expected 12 testimonial figures, found ${total}.`);
+    }
+    const iVis = out.indexOf(OPEN_VISIBLE);
+    const iHid = out.indexOf(OPEN_HIDDEN);
+    if (iVis === -1 || iHid <= iVis || out.indexOf(OPEN_VISIBLE, iVis + 1) !== -1) {
+      throw new Error(`[build] ${label}: the two review grids are missing or out of order.`);
+    }
+    const parts = out.slice(iVis + OPEN_VISIBLE.length, iHid).split(FIG);
+    if (parts.length !== 7) {
+      throw new Error(`[build] ${label}: expected 6 visible reviews, found ${parts.length - 1}.`);
+    }
+    // Everything after the sixth </figure> is the grid's own close plus the <sc-if>
+    // that opens the hidden half; it has to stay where it is.
+    const cut = parts[6].lastIndexOf(END) + END.length;
+    const figures = parts.slice(1).map((p, i) => FIG + (i === 5 ? p.slice(0, cut) : p));
+    out =
+      out.slice(0, iVis + OPEN_VISIBLE.length) +
+      parts[0] + figures.slice(0, 3).join('') +
+      parts[6].slice(cut) +
+      OPEN_HIDDEN + figures.slice(3).join('') +
+      out.slice(iHid + OPEN_HIDDEN.length);
+
+    if (out.split(FIG).length - 1 !== 12) {
+      throw new Error(`[build] ${label}: a testimonial was lost moving the reviews.`);
+    }
   }
 
   return out;
@@ -817,6 +956,7 @@ async function buildIndex() {
   );
 
   html = addScrollMotion(html, 'index.html');
+  html = improveReadability(html, 'index.html');
   html = rewriteRuntime(html, 'index.html');
 
   const stripped = stripCornerMarkup(html, 'index.html');
@@ -826,7 +966,7 @@ async function buildIndex() {
   console.log(
     `  index.html      <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect, ` +
       `${stripped.removed} corner marks removed, ${guarded.guarded} grid minimums guarded, ` +
-      `${widened.widened} wrappers widened, scroll motion + dark benefits band)`
+      `${widened.widened} wrappers widened, scroll motion + dark benefits band, contrast floor + mobile type scale)`
   );
 }
 
