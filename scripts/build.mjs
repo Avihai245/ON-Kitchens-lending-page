@@ -9,6 +9,7 @@
  * Run locally with:  node scripts/build.mjs && npx http-server dist -p 8080 -c-1
  */
 
+import { CHAT_STEPS, CHAT_CSS, CHAT_JS } from './chat-widget.mjs';
 import { cp, mkdir, rm, readFile, writeFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -109,6 +110,9 @@ window.__onSendLead = function (lead) {
     var payload = JSON.stringify({
       name: lead.name, phone: lead.phone, email: lead.email,
       business: lead.business, form: lead.form,
+      // Only the chat sends this — the two forms have no message field, and
+      // JSON.stringify drops an undefined key, so their payloads are unchanged.
+      note: lead.note,
       submittedAt: new Date().toISOString(),
       pageUrl: location.href, referrer: document.referrer || null,
       utm: {
@@ -1122,6 +1126,61 @@ function widenDesktopLayout(html, label) {
 }
 
 /**
+ * Injects the chat widget: its stylesheet into <head>, its script before </body>.
+ *
+ * Both anchors are the ones /lp2's modal already uses, and both are asserted to appear
+ * exactly once. The script carries the question list as JSON rather than duplicating it,
+ * so scripts/chat-widget.mjs is the single place the conversation is defined.
+ *
+ * Nothing is injected into <x-dc>. The widget builds its own DOM and appends it to
+ * <body> at runtime — see the module's header for why that is not optional.
+ */
+function addChatWidget(html, label) {
+  const script = CHAT_JS.replace('__STEPS__', JSON.stringify(CHAT_STEPS));
+  if (script.includes('__STEPS__')) {
+    throw new Error(`[build] ${label}: the chat script still has an unfilled step list.`);
+  }
+  let out = replaceExactly(html, '</head>', CHAT_CSS + '</head>', 1, `${label}: chat stylesheet`);
+  out = replaceExactly(out, '</body>', script + '</body>', 1, `${label}: chat script`);
+  return out;
+}
+
+/**
+ * Moves the accessibility launcher to the bottom-left and rounds it.
+ *
+ * It was bottom-right, which is where the chat widget's button now goes. Two rewrites:
+ * the container flips `right` to `left` and its `align-items` from `flex-end` to
+ * `flex-start`, so the panel that grows above the button anchors to the left edge
+ * instead of hanging off the right one; and the button takes `border-radius: 50%`.
+ *
+ * The radius has to be inline. The design system squares every control in one line —
+ * `.card, .btn, .input, .tag, .seg, .dialog { border-radius: 0 }` — and an inline style
+ * is the only thing that beats it without an `!important`. The page is otherwise
+ * entirely square by design, so rounding is a deliberate break, and a legible one: the
+ * two floating launchers are a layer over the page, not part of its blueprint grammar.
+ * The panel stays square. It is a panel, not a control.
+ *
+ * The launcher lives in the read-only export, which is why this is a build pass at all.
+ */
+function moveAccessibilityLauncher(html, label) {
+  let out = replaceExactly(
+    html,
+    '<div style="position: fixed; right: 16px; bottom: 96px; z-index: 90; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 12px;">',
+    '<div style="position: fixed; left: 16px; bottom: 96px; z-index: 90; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 12px;">',
+    1,
+    `${label}: a11y launcher corner`
+  );
+  out = replaceExactly(
+    out,
+    'aria-label="Accessibility options" title="Accessibility options" class="btn btn-primary blueprint" style="width: 54px; height: 54px; padding: 0;">',
+    'aria-label="Accessibility options" title="Accessibility options" class="btn btn-primary blueprint" style="width: 54px; height: 54px; padding: 0; border-radius: 50%;">',
+    1,
+    `${label}: a11y launcher shape`
+  );
+  return out;
+}
+
+/**
  * Adds the developer credit as a bottom row of the footer.
  *
  * The export's footer is a four-column grid — brand, Van Nuys, Los Angeles, Contact —
@@ -1142,18 +1201,23 @@ function widenDesktopLayout(html, label) {
  * visible text before adding the destination, so voice control still matches what is
  * on screen (WCAG 2.5.3) while a screen reader is told where the link goes.
  *
- * The 70px of right padding is the accessibility launcher's footprint — it is fixed at
- * `right: 16px` and 54px wide, so it owns the rightmost 70px of the viewport at every
- * width. Measured without it, one line of this sentence ran under the button at 320px
- * and 360px (17px and 19px of overlap). Reserving the column rather than tuning a
- * breakpoint keeps that true whatever the font does to the wrap points; above a phone
- * the line has wrapped long before it, so the padding costs nothing.
+ * The 56px of bottom padding reserves the band the two floating launchers live in. Both
+ * are fixed 54px buttons at `bottom: 96px`, so between 96px and 150px off the bottom of
+ * the viewport the page has a button over each corner — and this sentence, being the last
+ * line of the document, lands exactly there when someone scrolls to the end. It was first
+ * measured running under the launcher on the right (17px and 19px of overlap at 320px and
+ * 360px) and, once the launcher moved left for the chat, under it on the left instead.
+ *
+ * Clearing the band vertically fixes both at once and needs no breakpoint: 56px here plus
+ * the footer's own bottom padding plus the sticky bar's 76px spacer puts the last line
+ * above 150px on every page and every width. Reserving a column on one side instead would
+ * only ever solve one corner, and reserving both would leave 154px of measure at 320px.
  *
  * Runs after the counting passes, so new markup can never perturb their assertions.
  */
 function addFooterCredit(html, label) {
   const CREDIT =
-    '      <p style="grid-column: 1 / -1; margin: 0; padding-top: 20px; padding-right: 70px; ' +
+    '      <p style="grid-column: 1 / -1; margin: 0; padding-top: 20px; padding-bottom: 56px; ' +
     'border-top: 1px solid var(--color-divider); font-size: 13px; line-height: 24px; ' +
     'color: color-mix(in srgb, var(--color-text) 70%, transparent);">Site developed by ' +
     '<a href="https://www.instagram.com/sabatier_group_ai_marketing/" target="_blank" ' +
@@ -1423,6 +1487,8 @@ async function buildLandingPage({ outFile, label, robots = '', variant = null })
   // live page, then my change" and cannot trip the count assertions the shared
   // passes make against the pristine export.
   let out = addFooterCredit(widened.html, label);
+  out = moveAccessibilityLauncher(out, label);
+  out = addChatWidget(out, label);
   let overridden = false;
   if (variant) {
     const before = out;
@@ -1437,7 +1503,7 @@ async function buildLandingPage({ outFile, label, robots = '', variant = null })
   console.log(
     `  ${outFile.padEnd(15)} <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect, ` +
       `${stripped.removed} corner marks removed, ${guarded.guarded} grid minimums guarded, ` +
-      `${widened.widened} wrappers widened, scroll motion + dark benefits band, contrast floor + mobile type scale, mobile nav + persistent sticky CTA, footer credit` +
+      `${widened.widened} wrappers widened, scroll motion + dark benefits band, contrast floor + mobile type scale, mobile nav + persistent sticky CTA, footer credit, round a11y launcher, chat widget` +
       (robots ? `, ${robots}` : '') + (overridden ? ', page overrides' : '') + ')'
   );
   return { html: out, overridden };
