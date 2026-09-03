@@ -455,6 +455,69 @@ this traps nothing: all four inputs and the submit button clear the bar when scr
 the submit button is the topmost element at its own centre. Restoring the step-aside is one
 term in `showSticky`.
 
+## The chat widget
+
+`scripts/chat-widget.mjs` holds a floating chat, injected into both landing pages by
+`addChatWidget()`. It is **a conversational lead form, not a chatbot**: a fixed sequence
+of five questions, validated the way the page's own form validates them, submitted through
+`window.__onSendLead` — the same seam the inline form and the /lp2 modal use. Only the
+`form` field differs: `'chat'`, joining `'mid-page'`, `'end-of-page'` and `'modal'`, so
+chat leads are distinguishable inside one stream rather than living in a parallel one.
+
+| # | The bot asks | Fills | Required | On a bad answer |
+|---|---|---|---|---|
+| 1 | We're ŌN Kitchens. Tell us what you cook and how much of it — we'll point you at the kitchen that fits. | `note` | yes | *Tell us a little about what you cook.* |
+| 2 | Got it. What's your full name? | `fullName` | yes | *Please enter your full name.* |
+| 3 | And the best number to reach you on? | `phone` | yes | *Please enter a phone number.* / *Please enter a 10-digit phone number.* |
+| 4 | Your email? | `email` | yes | *Please enter your email.* / *That email address does not look right.* |
+| 5 | Last one — your business name, if you have one. | `business` | no, with a **Skip** button | never validated, as in the form |
+
+Rows 2 to 4 are the form's own messages, character for character, applied in the same order
+by the same rules — a 10-digit floor after stripping non-digits, the same email regex. A
+lead the form would accept and the chat would not, or the reverse, would be a bug.
+
+**The one field the form does not have** is row 1. The site collects no message or
+description, so rather than ask the opening question and throw the answer away,
+`leadSenderScript()` gained an optional `note` key. It is additive: the two forms pass no
+`note`, `JSON.stringify` drops undefined keys, and their bytes on the wire are unchanged —
+asserted against the real shipped sender, not a re-implementation.
+
+**The widget builds its own DOM and appends it to `<body>`.** This is the decision that
+matters. Everything inside `<x-dc>` belongs to React, which re-renders the whole tree on
+every scroll-threshold crossing, every media-query change and every five-second gallery
+tick — reconciling a half-finished transcript back to nothing. `document.body` is outside
+`#dc-root` and React never reaches it. Open state still lives in a `data-on-chat` attribute
+on `<html>`, the pattern the mobile menu and the lead modal established.
+
+The chat does not navigate to `/thank-you`; it closes in the panel with the same promise the
+rest of the site makes — *One of our team will call you shortly* — and swaps the composer
+for a **Back to the page** button. **No phone number appears**: it is commented out in 40
+places across the repo and stays that way.
+
+Panel 360px wide above the button on a desktop; below 760px a bottom sheet capped at 86dvh,
+the same treatment the lead modal gets, and there the button hides so it cannot float over
+its own transcript. Bubbles and panel are square like everything else; only the two floating
+launchers are round. User bubbles take `--color-accent-700` `#7A5216` at 6.5:1, not the
+brighter `--color-accent-600`, which measures 4.70:1 and leaves nothing in hand.
+
+The button nudges every eight seconds until it has been opened once. That stops under
+`prefers-reduced-motion` and under the accessibility panel's own **Stop motion** setting,
+whose universal `animation: none !important` reaches it without any help.
+
+## The accessibility launcher
+
+It moved to the **bottom-left** and became **round**, freeing the bottom-right corner for
+the chat. `moveAccessibilityLauncher()` rewrites two inline styles in the read-only export:
+the container flips `right` to `left` and its `align-items` from `flex-end` to
+`flex-start`, so the panel that grows above it anchors to the left edge instead of hanging
+off the right one; and the button takes `border-radius: 50%`.
+
+The radius has to be inline. The design system squares every control in a single line —
+`.card, .btn, .input, .tag, .seg, .dialog { border-radius: 0 }` — and an inline style is
+the only thing that beats it without an `!important`. The page is otherwise entirely square
+by design, so rounding is a deliberate break, and a legible one: the two launchers are a
+layer floating over the page, not part of its blueprint grammar. The panel stays square.
+
 ## The footer credit
 
 `addFooterCredit()` adds one line as a new bottom row of the footer:
@@ -547,7 +610,7 @@ phone number." rather than a browser bubble.
 
 ### What /lp2 currently overrides
 
-Measured against `/` at 390px: **15,618px → 10,658px, −31.8%**, on 867 rendered words
+Measured against `/` at 390px: **15,674px → 10,714px, −31.6%**, on 867 rendered words
 instead of 1,084. The hero (617px) and the reviews section (1,371px) come out
 byte-identical — asserted, not assumed.
 
@@ -832,8 +895,12 @@ These are behaviours of the design prototype, left alone deliberately:
   render. The funnel now *looks* complete end to end, which makes this more
   dangerous than before, not less: every lead is still dropped. Wire the submit to a
   real endpoint before driving traffic here.
-- **The header phone CTA is commented out** in the export, in 10 places
-  (`(844) 435-1255`). The number is still live on 14 other `tel:` links.
+- **Every phone number on the site is commented out.** `(844) 435-1255` appears 40 times
+  across the repo — 10 `PHONE CTA` blocks and 4 inline fragments per landing page, plus the
+  export — and **all 40 are inside HTML comments**. There is no clickable `tel:` link on any
+  built page, so the outbound call the forms and the chat both promise is the only channel
+  the visitor has. (An earlier version of this line claimed 14 links were "still live". They
+  are not; 14 was the total count of `tel:` hrefs, every one of them commented out.)
 - **Maps use OpenStreetMap's public infrastructure** — `tile.openstreetmap.org` for
   tiles and `nominatim.openstreetmap.org` for geocoding. OSM's usage policies
   discourage commercial production traffic against both; a paid tile provider is
@@ -910,8 +977,33 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   Instagram href, `target="_blank"` with `rel="noopener"`, an `aria-label` containing the
   visible text, a target of at least 24x24, 6.5:1 on the link and 6.66:1 on the sentence,
   nothing covering it, and it being the last paragraph in the page's own flow.
-- No line of the credit overlaps the fixed accessibility launcher at 320 / 360 / 390 / 414 /
-  430 / 768 / 1024 / 1440, measured per line box against the button's rectangle.
+- No line of the credit overlaps either floating launcher at 320 / 360 / 390 / 430 / 620 /
+  768 / 1024 / 1440, chat open and closed, measured per line box against each button's
+  rectangle. The credit reserves the band vertically rather than a column on one side —
+  the launchers now sit in both corners, and reserving both would have left 154px of
+  measure at 320px.
+- The chat: **108 assertions** driving the whole conversation end to end on both pages at
+  390 and 1440 — every question in order, every validation branch (empty note, a
+  1-character name, a formatted 9-digit phone, `dana@example`), the Skip path, exactly one
+  `__onSendLead` call with exactly the six expected keys, `form: 'chat'`, the closing
+  message by first name, no `tel:` anywhere, and no navigation.
+- **98 more** on the fixed layer: no overlaps between the two launchers, the sticky bar and
+  every line box of the footer credit at eight widths, chat open and closed; the panel
+  always fully on screen; a pressable close control at every width; the phone sheet capped
+  under 86dvh with the page still visible above it; document height constant through open
+  and close, so the sticky-CTA feedback loop cannot restart.
+- **The transcript survives React.** Two answers in, then a scroll past the threshold, both
+  media-query crossings and a full five-second gallery tick: the message count is unchanged,
+  the panel is still open, the widget is still outside `#dc-root`, and the conversation
+  completes normally afterwards.
+- The forms are untouched by the `note` addition: driving the **real shipped sender** (built
+  with a webhook URL) a form lead puts `name,phone,email,business,form,submittedAt,pageUrl,
+  referrer,utm` on the wire and no `note`; a chat lead adds exactly that one key. Both
+  capture UTM identically.
+- The launcher is bottom-left and 50% round at 320 / 390 / 768 / 1440; its panel opens fully
+  on screen at every one, keeps its five controls, and still closes on Escape.
+- The nudge runs by default, stops permanently once the chat has been opened, and is off
+  under both `prefers-reduced-motion` and the accessibility panel's Stop motion setting.
 - Performance measured as a 5-run median against the previous build rather than a single
   sample: first paint 52 -> 56ms, FCP 368 -> 372ms, DCL 105 -> 107ms, and a steady 60fps
   through a scripted scroll burst.
