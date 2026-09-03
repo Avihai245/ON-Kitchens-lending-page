@@ -503,6 +503,35 @@ validation replaces the designed inline errors. Confirmed working at the extensi
 `/lp2`: both forms still report `noValidate === true` and still show "Please enter a 10-digit
 phone number." rather than a browser bubble.
 
+### What /lp2 currently overrides
+
+Measured against `/` at 390px: **15,517px → 10,284px, −33.7%**, on 864 rendered words
+instead of 1,084. The hero (617px) and the reviews section (1,371px) come out
+byte-identical — asserted, not assumed.
+
+The diagnosis behind it was that the page's problem was not length but repetition:
+`certified` ×7, `permitting` ×7, `24/7` ×5, `construction` ×4, `hood` ×4, `walk-in` ×4.
+The middle said five things five times, so the eye never felt it was making progress.
+Almost everything cut was already stated somewhere else; the counts are now 5 / 4 / 3 /
+3 / 3 / 3.
+
+Structurally: the pain section moves above "How it works", so the problem is established
+before the process (the export had them the other way round); "Our mission" comes out;
+the facility list folds into the kitchens section as four labelled lines instead of four
+bordered cards; the duplicate mid-page lead form becomes a CTA strip and moves up ahead
+of the film section; the FAQ drops from eight questions to four, with "What does it
+cost?" moving from last to first; and both location maps come out of the markup, which
+also drops two Leaflet iframes and their OpenStreetMap tile traffic.
+
+For interactivity, three stacked lists — the pain cards, the audience rows and the
+process steps — become horizontal scroll-snap tracks with a "Swipe for more" hint, and
+the five equipment tabs scroll in one row instead of wrapping to three. All CSS: no new
+runtime state, so nothing to go wrong when the DC runtime re-renders.
+
+Still missing, and only the client can supply them: a price (the page has no number
+anywhere), the phone number (present in the code, commented out in 10 places) and a
+risk-reversal line on the tour.
+
 Both pages submit to the same `/thank-you`. If you later want to tell which page a lead came
 from, the place to add it is the payload in `leadSenderScript()`.
 
