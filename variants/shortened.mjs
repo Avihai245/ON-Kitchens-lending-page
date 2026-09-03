@@ -1,17 +1,17 @@
 /**
- * Page-specific changes for the /lp2 variant.
+ * The shortened, redesigned page — what ships at `/`.
  *
- * /lp2 is a duplicate of the landing page that exists so changes can be tried on it
- * without touching the page at `/`. Both are built from the same design export
- * through the same pipeline in scripts/build.mjs, so anything fixed for the base
- * page — a bug, a performance change, an accessibility change — reaches /lp2 for
- * free. Everything that should apply to /lp2 ALONE goes in this file, and nothing in
- * this file can affect `/`.
+ * `/lp` is the original, kept at a secondary URL so nothing that already linked to it
+ * breaks; it gets nothing from this file. Both pages are built from the same design
+ * export through the same pipeline in scripts/build.mjs, so anything fixed for the
+ * shared pipeline — a bug, a performance change, an accessibility change — reaches
+ * both without being written twice. Everything below is what makes `/` diverge from
+ * `/lp`, and nothing in this file can affect `/lp`.
  *
  * `transform` receives the finished HTML — after every shared transform, after the
  * corner strip, the grid guarding and the desktop widening — and returns the HTML to
  * write. Running last is deliberate: what you see here is exactly what ships to `/`,
- * so an override reads as "the live page, then my change", and edits here cannot
+ * so an override reads as "the shared page, then my change", and edits here cannot
  * trip the count assertions the shared passes make against the pristine export.
  *
  * ---------------------------------------------------------------------------
