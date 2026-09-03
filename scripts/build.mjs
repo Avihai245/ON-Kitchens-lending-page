@@ -14,7 +14,7 @@ import { cp, mkdir, rm, readFile, writeFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as lp2Variant from '../variants/lp2.mjs';
+import * as shortenedVariant from '../variants/shortened.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'palette-and-photography-decisions', 'project');
@@ -56,9 +56,10 @@ const VENUE_PHOTOS = [
  *  `<path>/`, and serve `<path>/index.html`. The flat file therefore lands on
  *  /thank-you exactly, with no redirect hop and no trailing slash. */
 const THANK_YOU_PATH = '/thank-you';
-/** The /lp2 duplicate. Flat file, so Amplify serves it at /lp2 the same way
- *  thank-you.html is served at /thank-you — see the note on THANK_YOU_FILE. */
-const LP2_FILE = 'lp2.html';
+/** /lp: the original page, kept at a secondary URL so nothing that already linked to it
+ *  breaks. Flat file, so Amplify serves it at /lp the same way thank-you.html is served
+ *  at /thank-you — see the note on THANK_YOU_FILE. */
+const LP_FILE = 'lp.html';
 const THANK_YOU_FILE = 'thank-you.html';
 
 /** The web fonts the design system asks for. Declared here as a <link> in <head>
@@ -1128,8 +1129,8 @@ function widenDesktopLayout(html, label) {
 /**
  * Injects the chat widget: its stylesheet into <head>, its script before </body>.
  *
- * Both anchors are the ones /lp2's modal already uses, and both are asserted to appear
- * exactly once. The script carries the question list as JSON rather than duplicating it,
+ * Both anchors are the ones the lead modal on / already uses, and both are asserted to
+ * appear exactly once. The script carries the question list as JSON rather than duplicating it,
  * so scripts/chat-widget.mjs is the single place the conversation is defined.
  *
  * Nothing is injected into <x-dc>. The widget builds its own DOM and appends it to
@@ -1368,16 +1369,17 @@ function replaceExactly(text, find, replacement, expected, label) {
 /**
  * Builds a landing page from the design export.
  *
- * Called twice: once for `/` and once for the `/lp2` duplicate. Both come from the
- * same export through the same transforms, so a fix to the shared pipeline reaches
- * both without being written twice — which is the whole point of /lp2 existing as a
- * place to try changes rather than as a second copy to keep in sync.
+ * Called twice: once for `/`, the shortened/redesigned page, and once for `/lp`, the
+ * original kept at a secondary URL. Both come from the same export through the same
+ * transforms, so a fix to the shared pipeline reaches both without being written twice —
+ * which is why /lp is a place `/` diverges from rather than a second copy to keep in
+ * sync.
  *
  * @param outFile  filename under dist/
  * @param label    what assertion failures call this page
  * @param robots   value for a <meta name="robots">, or '' for none
  * @param variant  optional { transform(html, { replaceExactly }) }, applied LAST —
- *                 see variants/lp2.mjs for why the hook runs after everything else.
+ *                 see variants/shortened.mjs for why the hook runs after everything else.
  */
 async function buildLandingPage({ outFile, label, robots = '', variant = null }) {
   let html = await readFile(join(SRC, ENTRY), 'utf8');
@@ -1514,32 +1516,18 @@ async function buildLandingPage({ outFile, label, robots = '', variant = null })
  * search is the one way this feature can quietly cost something — so it is asserted
  * on every build.
  *
- * The equality check is different: it only runs while variants/lp2.mjs is still a
- * pass-through. Until the first override lands, /lp2 is meant to BE the landing page,
- * so any drift is a bug and should fail the build rather than be found in a browser.
- * The moment a real override exists the pages are supposed to differ, and the check
- * retires itself rather than standing in the way of the thing /lp2 was made for.
+ * This used to also assert /lp2 was byte-equal to / while its override was a no-op —
+ * useful while variants/lp2.mjs was expected to start as a pass-through. Now / and /lp
+ * carry the noindex meta and the variant on two DIFFERENT pages by design, always, so
+ * there is no "while un-overridden" state left to guard: shortenedVariant.transform
+ * never is a no-op, and the two build calls can only ever diverge via the robots/variant
+ * values passed at their call sites in main() — both visible side by side there.
  */
-function assertLp2MatchesIndex(index, lp2, overridden) {
+function assertNoindexed(html, label) {
   const ROBOTS = '<meta name="robots" content="noindex, nofollow">\n';
-  if (!lp2.includes(ROBOTS)) {
-    throw new Error('[build] lp2.html: the noindex meta is missing.');
+  if (!html.includes(ROBOTS)) {
+    throw new Error(`[build] ${label}: the noindex meta is missing.`);
   }
-  if (overridden) {
-    console.log('  lp2.html        <- page overrides applied (identity check retired)');
-    return;
-  }
-  const stripped = lp2.replace(ROBOTS, '');
-  if (stripped !== index) {
-    const i = [...index].findIndex((c, n) => c !== stripped[n]);
-    throw new Error(
-      `[build] lp2.html: variants/lp2.mjs is a pass-through, so lp2 should match ` +
-        `index.html apart from the robots meta — but they diverge at character ${i}:\n` +
-        `  index: ${JSON.stringify(index.slice(i, i + 90))}\n` +
-        `    lp2: ${JSON.stringify(stripped.slice(i, i + 90))}`
-    );
-  }
-  console.log('  lp2.html        <- identical to index.html apart from the robots meta');
 }
 
 /**
@@ -1682,17 +1670,21 @@ async function main() {
     console.log(`  ${entry.padEnd(15)} <- site/`);
   }
 
-  const index = await buildLandingPage({ outFile: 'index.html', label: 'index.html' });
-  // /lp2: the same page, to try changes on without touching /. Page-specific
-  // overrides live in variants/lp2.mjs; while that hook is a pass-through the two
-  // files must differ by the robots meta and nothing else, and the build says so.
-  const lp2 = await buildLandingPage({
-    outFile: LP2_FILE,
-    label: LP2_FILE,
-    robots: 'noindex, nofollow',
-    variant: lp2Variant,
+  // /: the shortened, redesigned page. Page-specific overrides live in
+  // variants/shortened.mjs, applied last — see buildLandingPage()'s own doc comment.
+  const index = await buildLandingPage({
+    outFile: 'index.html',
+    label: 'index.html',
+    variant: shortenedVariant,
   });
-  assertLp2MatchesIndex(index.html, lp2.html, lp2.overridden);
+  // /lp: the original page, kept at a secondary URL so nothing that already linked to
+  // it breaks. Carries noindex so it doesn't compete with / in search.
+  const lp = await buildLandingPage({
+    outFile: LP_FILE,
+    label: LP_FILE,
+    robots: 'noindex, nofollow',
+  });
+  assertNoindexed(lp.html, LP_FILE);
   await buildMap();
   await buildThankYou();
 

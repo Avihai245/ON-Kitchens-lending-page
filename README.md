@@ -16,11 +16,12 @@ scripts/build.mjs                  Assembles dist/. Node stdlib only, no depende
 site/                              Files added on top of the design export
   404.html                           custom not-found page, brand-matched
   favicon.svg
+  lp2.html                          static redirect stub: sends /lp2 to /
   robots.txt
 templates/
   thank-you.html                   post-submission page; reviews injected at build
 variants/
-  lp2.mjs                          page-specific changes for /lp2 — nothing else touches it
+  shortened.mjs                    the shortened/redesigned page — ships at / — see below
 vendor/                            Pinned libraries, served from our own origin
   react-18.3.1.production.min.js
   react-dom-18.3.1.production.min.js
@@ -34,7 +35,7 @@ palette-and-photography-decisions/ The Claude Design export — treat as read-on
     assets/                          21 WebP images used by the page
     uploads/                         23 MB of design-tool source material, unused
 dist/                              Build output (gitignored)
-  index.html  lp2.html  thank-you.html  404.html  map.html  assets/  _ds/  vendor/  …
+  index.html  lp.html  lp2.html  thank-you.html  404.html  map.html  assets/  _ds/  vendor/  …
 ```
 
 ## Build and preview
@@ -460,7 +461,7 @@ term in `showSticky`.
 `scripts/chat-widget.mjs` holds a floating chat, injected into both landing pages by
 `addChatWidget()`. It is **a conversational lead form, not a chatbot**: a fixed sequence
 of five questions, validated the way the page's own form validates them, submitted through
-`window.__onSendLead` — the same seam the inline form and the /lp2 modal use. Only the
+`window.__onSendLead` — the same seam the inline form and the lead modal on `/` use. Only the
 `form` field differs: `'chat'`, joining `'mid-page'`, `'end-of-page'` and `'modal'`, so
 chat leads are distinguishable inside one stream rather than living in a parallel one.
 
@@ -525,7 +526,7 @@ layer floating over the page, not part of its blueprint grammar. The panel stays
 > Site developed by **Sabatier Group LLC** · AI Digital Marketing Solutions
 
 with the company name linking to the studio's Instagram. It runs inside
-`buildLandingPage()`, so `/` and `/lp2` get it from one place; `/thank-you` carries the
+`buildLandingPage()`, so `/` and `/lp` get it from one place; `/thank-you` carries the
 same line as a `.credit` rule in its own template, since that page has no `<footer>` and
 is styled with classes rather than the export's inline styles. `/404` does not carry it.
 
@@ -560,57 +561,63 @@ The pass runs after `widenDesktopLayout`, so its markup is never seen by the pas
 assert counts against the pristine export, and it anchors on `</footer>` — which occurs
 exactly once, a fact `replaceExactly` proves on every build rather than assuming.
 
-## The /lp2 duplicate
+## The /lp duplicate
 
-`/lp2` is the landing page again, so changes can be tried on it without touching the page
-at `/`. Both are built by the same `buildLandingPage()` from the same design export through
-the same transforms, so anything fixed for the base page — a bug, a performance change, an
-accessibility change — reaches `/lp2` for free and is never written twice.
+`/lp` is the original landing page, kept at a secondary URL — see "The old `/lp2` address"
+below for how it got there. Both `/` and `/lp` are built by the same `buildLandingPage()`
+from the same design export through the same transforms, so anything fixed for the shared
+pipeline — a bug, a performance change, an accessibility change — reaches both for free and
+is never written twice.
 
-**Everything that should apply to /lp2 alone goes in `variants/lp2.mjs`**, and nothing in
-that file can affect `/`. It exports one function:
+**Everything that makes `/` diverge from `/lp` goes in `variants/shortened.mjs`**, and
+nothing in that file can affect `/lp`. It exports one function:
 
 ```js
 export function transform(html, { replaceExactly }) {
-  return html;   // pass-through today
+  // shortens, resequences and adds the lead modal + chat-driven CTAs — see below
 }
 ```
 
 It receives the **finished** HTML — after every shared transform, after the corner strip, the
 grid guarding and the desktop widening — and returns what gets written. Running last is
-deliberate twice over: an override reads as "the live page, then my change", and edits there
+deliberate twice over: an override reads as "the shared page, then my change", and edits there
 cannot trip the count assertions the shared passes make against the pristine export (add a
 wrapper and you would otherwise break `widenDesktopLayout`'s "exactly 18"). Use the
 `replaceExactly` passed in for anything anchored to the export's markup — it throws on a
 count mismatch instead of silently doing nothing.
 
-**Two guards, and they behave differently on purpose.** The noindex meta is asserted on every
-build: a duplicate competing with the original in search is the one way this can quietly cost
-something. The *equality* check — that `lp2.html` matches `index.html` byte for byte apart
-from that meta — only runs while the hook is still a pass-through. Until the first override
-lands, drift is a bug and should fail the build rather than be found in a browser; the moment
-a real override exists the pages are supposed to differ, and the check retires itself rather
-than standing in the way of the thing `/lp2` was made for. Verified both ways: with a
-throwaway override in place, only `lp2.html` changed and `index.html` was untouched.
+**One guard.** The noindex meta on `/lp` is asserted on every build: a duplicate competing
+with the original in search is the one way this can quietly cost something. (This used to be
+paired with a byte-equality check between the two pages, retired along with `index.html`/
+`lp2.html`'s roles: it only ever ran while the override was a no-op, and the shortening
+transform never is one, so it never actually ran its comparison. The two build calls can
+only diverge via the `robots`/`variant` values passed at their call sites in `main()` — both
+visible side by side there.)
 
-**Search.** `/lp2` carries `<meta name="robots" content="noindex, nofollow">`. It is
+**Search.** `/lp` carries `<meta name="robots" content="noindex, nofollow">`. It is
 deliberately *not* paired with a `Disallow` in `robots.txt` — blocking the crawl would stop
 Google ever reading the noindex, which is the opposite of the intent — and not paired with a
-canonical either, which Google treats as a contradictory signal alongside noindex. One line in
-`buildLandingPage()`'s call site removes it when `/lp2` should be indexable.
+canonical either, which Google treats as a contradictory signal alongside noindex.
 
-**Routing.** `lp2.html` is a flat file, so Amplify serves it at `/lp2` the same way
+**Routing.** `lp.html` is a flat file, so Amplify serves it at `/lp` the same way
 `thank-you.html` is served at `/thank-you` — no console rule needed, and `customHttp.yml`'s
 `**/*.html` cache rule already covers it. One thing worth knowing: `support.js` re-fetches
 `location.href` at boot to re-read its own template, and that refetch is what recovers the
 camelCase attributes — lose it and `noValidate` goes with it, and the browser's native
 validation replaces the designed inline errors. Confirmed working at the extensionless
-`/lp2`: both forms still report `noValidate === true` and still show "Please enter a 10-digit
+`/lp`: both forms still report `noValidate === true` and still show "Please enter a 10-digit
 phone number." rather than a browser bubble.
 
-### What /lp2 currently overrides
+**The old `/lp2` address still works.** `/` and `/lp` used to be `index.html` and `lp2.html`;
+`site/lp2.html` is now a small static page, outside the design-export pipeline entirely, that
+sends visitors on to `/` — a synchronous `<script>` in `<head>` (fires before the body even
+renders), a `<meta http-equiv="refresh">` fallback for JS-off visitors, and a visible
+"Continue →" link for the rest. It exists so nothing that already linked to `/lp2` breaks,
+and carries its own noindex for the same reason `/lp` does.
 
-Measured against `/` at 390px: **15,674px → 10,714px, −31.6%**, on 867 rendered words
+### What / has that /lp doesn't
+
+Measured against `/lp` at 390px: **15,674px → 10,714px, −31.6%**, on 867 rendered words
 instead of 1,084. The hero (617px) and the reviews section (1,371px) come out
 byte-identical — asserted, not assumed.
 
@@ -629,17 +636,17 @@ cost?" moving from last to first; and both location maps come out of the markup,
 also drops two Leaflet iframes and their OpenStreetMap tile traffic.
 
 The reviews section moves from roughly 70% of the scroll to fifth block on the page,
-straight after the photograph below. On `/` six sections talk about the building before
+straight after the photograph below. On `/lp` six sections talk about the building before
 anyone else vouches for it; here the order is *this is your problem* -> *this is you, in
 the kitchen* -> *these are the 380 people who did exactly that*. The section itself is
-moved, not rebuilt: it still measures 1,371px and its text is byte-identical to `/`'s,
+moved, not rebuilt: it still measures 1,371px and its text is byte-identical to `/lp`'s,
 which the build proves rather than assumes.
 
 `assets/could-be-you.webp` — the photograph with **THIS COULD BE YOU**, **AND THIS COULD
 BE YOUR KITCHEN** and **YOUR LOGO COULD BE HERE** burned into it — moves to the pivot.
-On `/` it sits inside the mid-page lead form, under a headline that already says "Seen
+On `/lp` it sits inside the mid-page lead form, under a headline that already says "Seen
 enough?": by then the reader has decided, and the image is decoration beside a form rather
-than the thing that got them there. (Replacing that section for `/lp2` had also dropped
+than the thing that got them there. (Replacing that section here had also dropped
 the image off the page entirely, which is how the placement came up.) It now sits
 full-bleed between the pain section and the reviews, so the page reads *here is your
 problem* -> *here is the alternative, as a photograph rather than a claim* -> *here are the
@@ -671,7 +678,7 @@ four process steps were still at `opacity: 0`, invisible for the whole visit, an
 slid up from 18px below on a 90ms stagger the moment a swipe brought them in — under the
 reader's thumb. That is what "the section dances" was. Inside a track the swipe *is* the
 reveal, so the entrance is dropped there; the section around it still fades in, and above
-760px, where these are ordinary grids again, the reveal runs exactly as it does on `/`.
+760px, where these are ordinary grids again, the reveal runs exactly as it does on `/lp`.
 The tracks also drop from `scroll-snap-type: x mandatory` to `x proximity`, so a late
 web-font swap can no longer yank a half-read track back to a snap point.
 
@@ -709,7 +716,7 @@ The inline `#tour` form stays where it is. With scripting off, every CTA is stil
 to a working form.
 
 Still missing, and only the client can supply them: a price (the page has no number
-anywhere), the phone number (present in the code, commented out in 10 places) and a
+anywhere), the phone number (present in the code, commented out in 40 places) and a
 risk-reversal line on the tour.
 
 Both pages submit to the same `/thank-you`. If you later want to tell which page a lead came
@@ -877,8 +884,9 @@ and off: exactly two boxes differ, and they are the two links.
    `X-Frame-Options` is `SAMEORIGIN` rather than `DENY` on purpose — the page
    iframes `map.html` from this same origin for the two location maps, and `DENY`
    would blank both.
-5. `/lp2` needs no rule of its own — Amplify resolves `<path>.html` before
-   `<path>/index.html`, which is the same mechanism that serves `/thank-you`.
+5. `/lp` needs no rule of its own — Amplify resolves `<path>.html` before
+   `<path>/index.html`, which is the same mechanism that serves `/thank-you`. Neither
+   does `/lp2`: it's `site/lp2.html`, a static redirect to `/`, served the same flat way.
 6. Attach the custom domain, then add the `Sitemap:` line to `site/robots.txt` and
    consider adding `og:`/`twitter:` tags and a `<link rel="canonical">` to
    `scripts/build.mjs` — those need the final domain, so they were left out.
@@ -950,16 +958,22 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   and every box in the header byte-identical to the previous build at 1000 and 1440.
 - Sticky CTA: one transition across the whole page, constant document height, and the closing
   form fully usable underneath it.
-- `/lp2` and `/` are built from one export through one pipeline: with the override file
-  stashed, `index.html` came out byte-for-byte identical, so nothing on `/lp2` can reach
-  `/`. The runtime's `location.href` refetch works at the extensionless URL, so both forms
-  keep `noValidate` and the designed inline validation; the menu, tabs, FAQ, reviews toggle
-  and sticky CTA behave the same on both; both submit to the shared `/thank-you`.
-- `/lp2` swept at 320 / 360 / 390 / 414 / 430 / 480 / 560 / 620 / 680 / 760 / 761 / 820 /
-  900 / 1000 / 1280: no document overflow at any width, the header on one line (69px) at
-  every width, and tabs and tracks in the same mode as each other everywhere — phone
+- `/` and `/lp` are built from one export through one pipeline: with `variants/shortened.mjs`
+  swapped for a pass-through, `index.html` came out byte-for-byte identical to `lp.html`
+  apart from the robots meta, so nothing on `/` can reach `/lp`. The runtime's
+  `location.href` refetch works at the extensionless URL, so both forms keep `noValidate`
+  and the designed inline validation; the menu, tabs, FAQ, reviews toggle and sticky CTA
+  behave the same on both; both submit to the shared `/thank-you`.
+- `/` and `/lp` swapped roles (see "The /lp duplicate" above) with a full sequence-diff
+  against a pre-swap build: the only difference anywhere in either page's bytes is one
+  corrected doc-comment string, confirming the content moved without changing. `/lp2` was
+  driven with a real browser, JS on and off: both land on `/`, the visible fallback link
+  resolves, and the noindex meta is present.
+- `/` swept at 320 / 360 / 390 / 414 / 430 / 480 / 560 / 620 / 680 / 760 / 761 /
+  820 / 900 / 1000 / 1280: no document overflow at any width, the header on one line (69px)
+  at every width, and tabs and tracks in the same mode as each other everywhere — phone
   carousels to 760, grids from 761. Nothing is sliced by the viewport edge without both an
-  edge fade and a "Swipe for more" hint.
+  edge fade and a "Swipe for more" hint. `/lp` swept clean the same way.
 - The equipment tabs, 787px of buttons in a 390px box, now carry that fade and hint; before
   this, 397px of the row — half the categories — was off screen with no signal at all.
 - No track child is left hidden: after reading the page end to end at 390px, 0 of the 13
@@ -970,9 +984,10 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   1024 / 1440 — the sheet never exceeds 86dvh, always sits on the bottom edge, always leaves
   a strip of dimmed page above it, that strip is the backdrop and closes on tap, and X,
   Escape and focus return all still work.
-- The reviews section is moved, not rebuilt: 35,335 bytes byte-identical to `/`'s, still
+- The reviews section is moved, not rebuilt: 35,335 bytes byte-identical to `/lp`'s, still
   1,371px tall, now fifth on the page instead of eleventh.
-- The footer credit: 90 assertions across `/`, `/lp2` and `/thank-you` at 390 and 1440 —
+- The footer credit: 90 assertions across `/`, `/lp2` (now `/lp`) and `/thank-you` at
+  390 and 1440 —
   the exact sentence from the rendered text, only the company name inside the anchor, the
   Instagram href, `target="_blank"` with `rel="noopener"`, an `aria-label` containing the
   visible text, a target of at least 24x24, 6.5:1 on the link and 6.66:1 on the sentence,

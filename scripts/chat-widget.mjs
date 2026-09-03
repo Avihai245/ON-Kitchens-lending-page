@@ -3,7 +3,7 @@
  *
  * It asks a fixed sequence of questions, validates each answer the way the page's own
  * form validates it, and submits the result through `window.__onSendLead` — the exact
- * seam the inline form and the /lp2 modal already use. A chat lead and a form lead land
+ * seam the inline form and the lead modal on / already use. A chat lead and a form lead land
  * in the same place, distinguished only by `form: 'chat'`, which joins the three values
  * that field already carries: 'mid-page', 'end-of-page', 'modal'.
  *
@@ -384,7 +384,7 @@ export const CHAT_JS = String.raw`
   }
 
   // Escape is claimed twice already on this page — the runtime's window handler closes
-  // the accessibility panel and the nav, and /lp2's modal has its own. stopPropagation
+  // the accessibility panel and the nav, and the lead modal has its own. stopPropagation
   // keeps one press from closing the chat and something else with it.
   document.addEventListener('keydown', function (ev) {
     if (ev.key !== 'Escape') return;
