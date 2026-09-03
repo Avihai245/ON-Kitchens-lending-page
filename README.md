@@ -455,6 +455,48 @@ this traps nothing: all four inputs and the submit button clear the bar when scr
 the submit button is the topmost element at its own centre. Restoring the step-aside is one
 term in `showSticky`.
 
+## The footer credit
+
+`addFooterCredit()` adds one line as a new bottom row of the footer:
+
+> Site developed by **Sabatier Group LLC** · AI Digital Marketing Solutions
+
+with the company name linking to the studio's Instagram. It runs inside
+`buildLandingPage()`, so `/` and `/lp2` get it from one place; `/thank-you` carries the
+same line as a `.credit` rule in its own template, since that page has no `<footer>` and
+is styled with classes rather than the export's inline styles. `/404` does not carry it.
+
+The export's footer is a four-column grid — brand, Van Nuys, Los Angeles, Contact — that
+simply stops. There is no copyright line, no legal row, nothing beneath it, so this is a
+new row and it takes a hairline above it to read as one rather than as a fifth orphan
+column. Nothing else in it is a new decision: `grid-column: 1 / -1` spans the grid the
+footer already has, so the row inherits its width clamp and `--edge` padding instead of
+duplicating them; the 13px/24px type, the hairline and the 70% muted tier are copied from
+the smallest print already on the page; and the link carries no colour of its own,
+inheriting `a { color: var(--color-accent-700) }` — the same `#7A5216` as the footer's
+other link, which measures 6.5:1 on `#FAF8F5`.
+
+Two details worth knowing:
+
+**The accessibility launcher owns the rightmost 70px of the viewport** — it is fixed at
+`right: 16px` and 54px wide. Without a reservation, one line of this sentence ran under
+it at 320px and 360px (17px and 19px of overlap; measured per line box, not eyeballed).
+The paragraph reserves that column with `padding-right: 70px` rather than tuning a
+breakpoint, so it stays true whatever a font swap does to the wrap points; above a phone
+the line has wrapped long before it and the padding costs nothing. It is the first footer
+content long enough to reach that column — the existing "Schedule a tour" link never did.
+
+**`data-tap="footer"`** reuses the rule the other footer link already relies on
+(`display: inline-block`, `scripts/build.mjs`): against a 24px line box that makes the
+link's own box 24px tall, which is what keeps "nothing under 24x24" true. The
+`aria-label` repeats the visible text before naming the destination, so voice control
+still matches what is on screen (WCAG 2.5.3) while a screen reader is told where the link
+goes.
+
+The pass runs after `widenDesktopLayout`, so its markup is never seen by the passes that
+assert counts against the pristine export, and it anchors on `</footer>` — which occurs
+exactly once, a fact `replaceExactly` proves on every build rather than assuming.
+
 ## The /lp2 duplicate
 
 `/lp2` is the landing page again, so changes can be tried on it without touching the page
@@ -505,7 +547,7 @@ phone number." rather than a browser bubble.
 
 ### What /lp2 currently overrides
 
-Measured against `/` at 390px: **15,517px → 10,557px, −32.0%**, on 867 rendered words
+Measured against `/` at 390px: **15,618px → 10,658px, −31.8%**, on 867 rendered words
 instead of 1,084. The hero (617px) and the reviews section (1,371px) come out
 byte-identical — asserted, not assumed.
 
@@ -863,6 +905,13 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   Escape and focus return all still work.
 - The reviews section is moved, not rebuilt: 35,335 bytes byte-identical to `/`'s, still
   1,371px tall, now fifth on the page instead of eleventh.
+- The footer credit: 90 assertions across `/`, `/lp2` and `/thank-you` at 390 and 1440 —
+  the exact sentence from the rendered text, only the company name inside the anchor, the
+  Instagram href, `target="_blank"` with `rel="noopener"`, an `aria-label` containing the
+  visible text, a target of at least 24x24, 6.5:1 on the link and 6.66:1 on the sentence,
+  nothing covering it, and it being the last paragraph in the page's own flow.
+- No line of the credit overlaps the fixed accessibility launcher at 320 / 360 / 390 / 414 /
+  430 / 768 / 1024 / 1440, measured per line box against the button's rectangle.
 - Performance measured as a 5-run median against the previous build rather than a single
   sample: first paint 52 -> 56ms, FCP 368 -> 372ms, DCL 105 -> 107ms, and a steady 60fps
   through a scripted scroll burst.
