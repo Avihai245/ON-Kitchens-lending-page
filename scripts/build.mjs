@@ -1122,6 +1122,49 @@ function widenDesktopLayout(html, label) {
 }
 
 /**
+ * Adds the developer credit as a bottom row of the footer.
+ *
+ * The export's footer is a four-column grid — brand, Van Nuys, Los Angeles, Contact —
+ * that simply stops; there is no copyright line, no legal row, nothing below it. So
+ * this is a new row, and it needs the hairline to read as one rather than as a fifth
+ * orphan column.
+ *
+ * Nothing here is a new design decision. `grid-column: 1 / -1` spans the grid the
+ * footer already has, so the row inherits its width clamp and `--edge` padding instead
+ * of duplicating them; the 13px/24px type, the hairline and the 70% muted tier are
+ * copied from the smallest print already on the page; and the link carries no colour of
+ * its own, inheriting `a { color: var(--color-accent-700) }` — the same #7A5216 as the
+ * footer's other link, which measures 6.5:1 on #FAF8F5.
+ *
+ * `data-tap="footer"` reuses the rule the other footer link already relies on
+ * (`display: inline-block`): against a 24px line box it makes the link's own box 24px
+ * tall, which is what keeps "nothing under 24x24" true. `aria-label` repeats the
+ * visible text before adding the destination, so voice control still matches what is
+ * on screen (WCAG 2.5.3) while a screen reader is told where the link goes.
+ *
+ * The 70px of right padding is the accessibility launcher's footprint — it is fixed at
+ * `right: 16px` and 54px wide, so it owns the rightmost 70px of the viewport at every
+ * width. Measured without it, one line of this sentence ran under the button at 320px
+ * and 360px (17px and 19px of overlap). Reserving the column rather than tuning a
+ * breakpoint keeps that true whatever the font does to the wrap points; above a phone
+ * the line has wrapped long before it, so the padding costs nothing.
+ *
+ * Runs after the counting passes, so new markup can never perturb their assertions.
+ */
+function addFooterCredit(html, label) {
+  const CREDIT =
+    '      <p style="grid-column: 1 / -1; margin: 0; padding-top: 20px; padding-right: 70px; ' +
+    'border-top: 1px solid var(--color-divider); font-size: 13px; line-height: 24px; ' +
+    'color: color-mix(in srgb, var(--color-text) 70%, transparent);">Site developed by ' +
+    '<a href="https://www.instagram.com/sabatier_group_ai_marketing/" target="_blank" ' +
+    'rel="noopener" data-tap="footer" aria-label="Sabatier Group LLC on Instagram">' +
+    'Sabatier Group LLC</a> &middot; AI Digital Marketing Solutions</p>\n';
+  // </footer> occurs exactly once, so this anchor is unique by construction — and
+  // replaceExactly proves it on every build rather than trusting that.
+  return replaceExactly(html, '    </div>\n  </footer>', CREDIT + '    </div>\n  </footer>', 1, `${label}: footer credit`);
+}
+
+/**
  * Guards the export's grid minimums against very narrow viewports.
  *
  * The layout is built from `repeat(auto-fit, minmax(<N>px, 1fr))` tracks. A bare
@@ -1379,7 +1422,7 @@ async function buildLandingPage({ outFile, label, robots = '', variant = null })
   // The page-specific hook runs on the finished HTML, so an override reads as "the
   // live page, then my change" and cannot trip the count assertions the shared
   // passes make against the pristine export.
-  let out = widened.html;
+  let out = addFooterCredit(widened.html, label);
   let overridden = false;
   if (variant) {
     const before = out;
@@ -1394,7 +1437,7 @@ async function buildLandingPage({ outFile, label, robots = '', variant = null })
   console.log(
     `  ${outFile.padEnd(15)} <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect, ` +
       `${stripped.removed} corner marks removed, ${guarded.guarded} grid minimums guarded, ` +
-      `${widened.widened} wrappers widened, scroll motion + dark benefits band, contrast floor + mobile type scale, mobile nav + persistent sticky CTA` +
+      `${widened.widened} wrappers widened, scroll motion + dark benefits band, contrast floor + mobile type scale, mobile nav + persistent sticky CTA, footer credit` +
       (robots ? `, ${robots}` : '') + (overridden ? ', page overrides' : '') + ')'
   );
   return { html: out, overridden };
