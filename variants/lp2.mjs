@@ -90,7 +90,7 @@ function moveBefore(html, open, target, label) {
 const LP2_CSS = `
 <style>
 /* ---- compact facility list, replacing the four-card "More than a kitchen" ---- */
-.lp2-also { margin-top: clamp(30px, 4vw, 44px); border-top: 1px solid var(--color-divider); }
+.lp2-also { margin-top: clamp(18px, 2.6vw, 32px); border-top: 1px solid var(--color-divider); }
 .lp2-also > h3 {
   font-family: var(--font-heading); font-weight: 600; font-size: 13px; line-height: 1.35;
   letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-accent-700);
@@ -99,7 +99,7 @@ const LP2_CSS = `
 .lp2-also dl { margin: 0; display: grid; gap: 0; }
 .lp2-also dl > div {
   display: grid; grid-template-columns: minmax(96px, 132px) 1fr; gap: 4px 18px;
-  align-items: baseline; padding: 13px 0; border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
+  align-items: baseline; padding: 10px 0; border-bottom: 1px solid color-mix(in srgb, var(--color-text) 10%, transparent);
 }
 .lp2-also dl > div:last-child { border-bottom: 0; }
 .lp2-also dt {
@@ -111,7 +111,13 @@ const LP2_CSS = `
   color: color-mix(in srgb, var(--color-text) 78%, transparent);
 }
 @media (max-width: 560px) {
-  .lp2-also dl > div { grid-template-columns: 1fr; gap: 2px; padding: 11px 0; }
+  .lp2-also dl > div { grid-template-columns: 1fr; gap: 2px; padding: 9px 0; }
+}
+
+/* A 56px gap ahead of a one-line note and its button was more air than the note
+   is worth, and it sits directly under the list above. */
+#kitchens [style*="border-top: 1px solid var(--color-divider); display: flex"] {
+  margin-top: 20px !important; padding-top: 16px !important;
 }
 
 /* ---- mid-page CTA strip, replacing the duplicate lead form ---- */
@@ -161,6 +167,20 @@ section[aria-label="Our partners"] [data-marquee-wrap] {
 }
 footer > div { padding-top: clamp(30px, 4vw, 52px) !important; padding-bottom: clamp(24px, 3vw, 40px) !important; }
 footer nav, footer ul { row-gap: 6px !important; }
+
+/* ---- the "this could be you" band ----
+   The annotations are burned into the photograph, so the band carries no copy of its
+   own: a section heading above it would compete with THIS COULD BE YOU set inside it.
+   Full-bleed on a phone, capped at the file's own 1200px above that — stretched to the
+   page's 1760px content width it visibly softens, and this is the one image that cannot
+   afford to look cheap. */
+/* Flush against its neighbours: a full-bleed image does not also need a full
+   section's padding above and below it — the picture is its own separator. */
+.lp2-could { display: block; margin: -28px 0; background: #141414; }
+.lp2-could img {
+  display: block; width: 100%; height: auto;
+  max-width: 1200px; margin: 0 auto;
+}
 
 /* ---- equipment tabs: five buttons wrapped to three rows on a phone ---- */
 @media (max-width: 620px) {
@@ -492,6 +512,30 @@ export function transform(html, { replaceExactly }) {
   ];
   for (const [from, to, label] of DEDUPE) {
     out = replaceExactly(out, from, to, 1, `dedupe: ${label}`);
+  }
+
+  // ---- 12. the "this could be you" photograph moves to the pivot -------------
+  // could-be-you.webp is the one asset that asks the reader to picture themselves in
+  // the space rather than telling them about it — THIS COULD BE YOU over the cook,
+  // AND THIS COULD BE YOUR KITCHEN over the line, YOUR LOGO COULD BE HERE over a
+  // blank kraft bag. On / it sits inside the mid-page lead form, under a headline
+  // that already says "Seen enough?" — by then the reader has decided, and the image
+  // is decoration beside a form rather than the thing that got them there. Step 4
+  // above then dropped that form from this page, and the image went with it.
+  //
+  // It belongs at the pivot: pain, then this, then process. "This could be you" only
+  // lands once there is a reason to want to be someone else, and the section above
+  // has just spent four cards establishing one. The hero is protected, so this is the
+  // earliest position on the page where the picture can do its work.
+  {
+    const IMG = out.match(/<img src="assets\/could-be-you\.webp"[^>]*>/);
+    if (IMG) throw new Error('[lp2] could-be-you: already on the page — step 4 should have removed it.');
+    const ALT = 'A cook plating bowls in a stainless commercial kitchen, annotated: this could be you, and this could be your kitchen, your logo could be here';
+    const band =
+      '<div class="lp2-could">\n' +
+      `      <img src="assets/could-be-you.webp" alt="${ALT}" loading="lazy" width="1200" height="932" />\n` +
+      '    </div>\n\n  ';
+    out = replaceExactly(out, OPEN.howItWorks, band + OPEN.howItWorks, 1, 'could-be-you band');
   }
 
   return out;

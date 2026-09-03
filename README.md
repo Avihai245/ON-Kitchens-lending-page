@@ -505,7 +505,7 @@ phone number." rather than a browser bubble.
 
 ### What /lp2 currently overrides
 
-Measured against `/` at 390px: **15,517px → 10,284px, −33.7%**, on 864 rendered words
+Measured against `/` at 390px: **15,517px → 10,483px, −32.4%**, on 861 rendered words
 instead of 1,084. The hero (617px) and the reviews section (1,371px) come out
 byte-identical — asserted, not assumed.
 
@@ -522,6 +522,18 @@ bordered cards; the duplicate mid-page lead form becomes a CTA strip and moves u
 of the film section; the FAQ drops from eight questions to four, with "What does it
 cost?" moving from last to first; and both location maps come out of the markup, which
 also drops two Leaflet iframes and their OpenStreetMap tile traffic.
+
+`assets/could-be-you.webp` — the photograph with **THIS COULD BE YOU**, **AND THIS COULD
+BE YOUR KITCHEN** and **YOUR LOGO COULD BE HERE** burned into it — moves to the pivot.
+On `/` it sits inside the mid-page lead form, under a headline that already says "Seen
+enough?": by then the reader has decided, and the image is decoration beside a form rather
+than the thing that got them there. (Replacing that section for `/lp2` had also dropped
+the image off the page entirely, which is how the placement came up.) It now sits
+full-bleed between the pain section and "How it works", so the page reads *here is your
+problem* -> *here is the alternative, as a photograph rather than a claim* -> *here is how
+you get there*. No heading above it: the annotations are the headline. Capped at the
+file's own 1200px above that width, since stretched to the page's 1760px content width it
+visibly softens, and carrying `width`/`height` so the browser reserves the space.
 
 For interactivity, three stacked lists — the pain cards, the audience rows and the
 process steps — become horizontal scroll-snap tracks with a "Swipe for more" hint, and
