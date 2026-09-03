@@ -19,6 +19,8 @@ site/                              Files added on top of the design export
   robots.txt
 templates/
   thank-you.html                   post-submission page; reviews injected at build
+variants/
+  lp2.mjs                          page-specific changes for /lp2 — nothing else touches it
 vendor/                            Pinned libraries, served from our own origin
   react-18.3.1.production.min.js
   react-dom-18.3.1.production.min.js
@@ -32,7 +34,7 @@ palette-and-photography-decisions/ The Claude Design export — treat as read-on
     assets/                          21 WebP images used by the page
     uploads/                         23 MB of design-tool source material, unused
 dist/                              Build output (gitignored)
-  index.html  thank-you.html  404.html  map.html  assets/  _ds/  vendor/  …
+  index.html  lp2.html  thank-you.html  404.html  map.html  assets/  _ds/  vendor/  …
 ```
 
 ## Build and preview
@@ -453,6 +455,57 @@ this traps nothing: all four inputs and the submit button clear the bar when scr
 the submit button is the topmost element at its own centre. Restoring the step-aside is one
 term in `showSticky`.
 
+## The /lp2 duplicate
+
+`/lp2` is the landing page again, so changes can be tried on it without touching the page
+at `/`. Both are built by the same `buildLandingPage()` from the same design export through
+the same transforms, so anything fixed for the base page — a bug, a performance change, an
+accessibility change — reaches `/lp2` for free and is never written twice.
+
+**Everything that should apply to /lp2 alone goes in `variants/lp2.mjs`**, and nothing in
+that file can affect `/`. It exports one function:
+
+```js
+export function transform(html, { replaceExactly }) {
+  return html;   // pass-through today
+}
+```
+
+It receives the **finished** HTML — after every shared transform, after the corner strip, the
+grid guarding and the desktop widening — and returns what gets written. Running last is
+deliberate twice over: an override reads as "the live page, then my change", and edits there
+cannot trip the count assertions the shared passes make against the pristine export (add a
+wrapper and you would otherwise break `widenDesktopLayout`'s "exactly 18"). Use the
+`replaceExactly` passed in for anything anchored to the export's markup — it throws on a
+count mismatch instead of silently doing nothing.
+
+**Two guards, and they behave differently on purpose.** The noindex meta is asserted on every
+build: a duplicate competing with the original in search is the one way this can quietly cost
+something. The *equality* check — that `lp2.html` matches `index.html` byte for byte apart
+from that meta — only runs while the hook is still a pass-through. Until the first override
+lands, drift is a bug and should fail the build rather than be found in a browser; the moment
+a real override exists the pages are supposed to differ, and the check retires itself rather
+than standing in the way of the thing `/lp2` was made for. Verified both ways: with a
+throwaway override in place, only `lp2.html` changed and `index.html` was untouched.
+
+**Search.** `/lp2` carries `<meta name="robots" content="noindex, nofollow">`. It is
+deliberately *not* paired with a `Disallow` in `robots.txt` — blocking the crawl would stop
+Google ever reading the noindex, which is the opposite of the intent — and not paired with a
+canonical either, which Google treats as a contradictory signal alongside noindex. One line in
+`buildLandingPage()`'s call site removes it when `/lp2` should be indexable.
+
+**Routing.** `lp2.html` is a flat file, so Amplify serves it at `/lp2` the same way
+`thank-you.html` is served at `/thank-you` — no console rule needed, and `customHttp.yml`'s
+`**/*.html` cache rule already covers it. One thing worth knowing: `support.js` re-fetches
+`location.href` at boot to re-read its own template, and that refetch is what recovers the
+camelCase attributes — lose it and `noValidate` goes with it, and the browser's native
+validation replaces the designed inline errors. Confirmed working at the extensionless
+`/lp2`: both forms still report `noValidate === true` and still show "Please enter a 10-digit
+phone number." rather than a browser bubble.
+
+Both pages submit to the same `/thank-you`. If you later want to tell which page a lead came
+from, the place to add it is the payload in `leadSenderScript()`.
+
 ## Lead webhook
 
 Every validated submission from either form is POSTed to `LEAD_WEBHOOK_URL`, then the
@@ -615,7 +668,9 @@ and off: exactly two boxes differ, and they are the two links.
    `X-Frame-Options` is `SAMEORIGIN` rather than `DENY` on purpose — the page
    iframes `map.html` from this same origin for the two location maps, and `DENY`
    would blank both.
-5. Attach the custom domain, then add the `Sitemap:` line to `site/robots.txt` and
+5. `/lp2` needs no rule of its own — Amplify resolves `<path>.html` before
+   `<path>/index.html`, which is the same mechanism that serves `/thank-you`.
+6. Attach the custom domain, then add the `Sitemap:` line to `site/robots.txt` and
    consider adding `og:`/`twitter:` tags and a `<link rel="canonical">` to
    `scripts/build.mjs` — those need the final domain, so they were left out.
 
@@ -682,6 +737,12 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   and every box in the header byte-identical to the previous build at 1000 and 1440.
 - Sticky CTA: one transition across the whole page, constant document height, and the closing
   form fully usable underneath it.
+- `/lp2` renders identically to `/`: same rendered text, links, images, layout heights
+  and document height, differing only by the robots meta (one extra `<head>` node). The
+  runtime's `location.href` refetch works at the extensionless URL, so both forms keep
+  `noValidate` and the designed inline validation; the menu, tabs, FAQ, reviews toggle and
+  sticky CTA behave the same; the form submits to the shared `/thank-you`; 0 text nodes
+  below AA and no horizontal overflow at 320-2560.
 - Performance measured as a 5-run median against the previous build rather than a single
   sample: first paint 52 -> 56ms, FCP 368 -> 372ms, DCL 105 -> 107ms, and a steady 60fps
   through a scripted scroll burst.
