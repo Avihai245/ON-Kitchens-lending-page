@@ -392,6 +392,30 @@ intact and `this.state` is still the pre-click value: the opening click sees `na
 and bails, and a click on the button while open is inside `<header>` and bails too, leaving
 React's own toggle to close it.
 
+### The header row, and two of them
+
+The header reads wordmark, then Schedule a Tour, then the menu at the right-hand end. The
+wordmark carries `margin-right: auto` and the button `margin-left: auto`, so the free space
+splits evenly either side of the CTA — measured at 36px each at 390px, 50px each at 430px —
+and it sits in the middle rather than flush against the menu.
+
+Adding the button had pushed the row past a small phone's width. It is `var(--edge)` +
+wordmark 105 + gap 20 + button 48 + gap 20 + CTA 139 + `var(--edge)` = 372px, so **at 320
+and 360 the CTA wrapped to a second line and the sticky header doubled from 69px to 116px**.
+Tightening the gap to 12px, the CTA's side padding to 13px and the button to Apple's 44pt
+minimum brings the row to about 342px, which fits from 360 up. Below 350px it still does not
+fit, and there the CTA is the one to drop: the hero's own full-size Schedule a Tour sits
+about 40px underneath it, and the bottom bar carries one from 77px of scroll — a 116px
+sticky header costs more. All of it is measured against the previous build; desktop boxes at
+1000 and 1440 are byte-identical.
+
+**The site header is not the only `<header>`.** The benefits sheet has one for its
+"Sheet 02" strip, so `header`, `header > div` and `closest('header')` all match two
+elements. The CSS above was harmless by luck — that strip has no `<div>` child and no
+primary button — but the outside-click test was not: it reads as "did this tap land in the
+site header?", and a tap on that strip satisfied it and left the menu open. Everything
+meaning "the site header" keys off a `data-siteheader` hook the build adds.
+
 The menu also closes on Escape, on a link, and on a breakpoint change — the last so the
 button's `aria-expanded` can never disagree with a panel the media query has hidden.
 
@@ -651,9 +675,11 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
 - Every interactive element on the page is at least 24x24 at 390px, the 48x48 menu button
   included.
 - Mobile menu: present below 1000px and absent at 1000px and above; opens and closes by
-  button, link, Escape and outside click; `aria-expanded` tracks; five links at 52px each,
-  every target resolving; no layout shift on open; no horizontal overflow open or closed at
-  320 / 390 / 768 / 999.
+  button, link, Escape and outside click — including a tap on the benefits sheet's own
+  `<header>`; `aria-expanded` tracks; five links at 52px each, every target resolving; no
+  layout shift on open; no horizontal overflow open or closed at 320 / 390 / 768 / 999.
+- Header row on one line at 320 / 360 / 390 / 430 (69px, down from 116px at the first two),
+  and every box in the header byte-identical to the previous build at 1000 and 1440.
 - Sticky CTA: one transition across the whole page, constant document height, and the closing
   form fully usable underneath it.
 - Performance measured as a 5-run median against the previous build rather than a single
