@@ -505,7 +505,7 @@ phone number." rather than a browser bubble.
 
 ### What /lp2 currently overrides
 
-Measured against `/` at 390px: **15,517px → 10,483px, −32.4%**, on 861 rendered words
+Measured against `/` at 390px: **15,517px → 10,519px, −32.2%**, on 867 rendered words
 instead of 1,084. The hero (617px) and the reviews section (1,371px) come out
 byte-identical — asserted, not assumed.
 
@@ -539,6 +539,32 @@ For interactivity, three stacked lists — the pain cards, the audience rows and
 process steps — become horizontal scroll-snap tracks with a "Swipe for more" hint, and
 the five equipment tabs scroll in one row instead of wrapping to three. All CSS: no new
 runtime state, so nothing to go wrong when the DC runtime re-renders.
+
+**Two conversion changes on top of that.** The 4.9 / 380+ rating now sits directly under
+the hero CTA — it used to live at ~55% of the scroll inside the reviews section, where a
+first-time visitor never reached it before deciding whether to keep reading. Its stars take
+`--color-accent-400` `#D9AB56`, not the brand `#B07A1C`, which measures 2.0:1 on the hero's
+dark band.
+
+And every CTA now opens a lead modal instead of scrolling to the closing form. All nine
+`a[href="#tour"]` are caught by one delegated listener — the sticky bar's CTA is the same
+markup, so it needs no separate wiring — and open state lives in a `data-lp2-modal`
+attribute on `<html>`, the one place the DC runtime's re-renders cannot reach. The modal
+takes the same three steps the inline form takes (`sessionStorage`, `window.__onSendLead`,
+redirect to `/thank-you`), so the lead lands in the same place with the same UTM capture;
+only `form: 'modal'` differs, so modal leads can be told apart downstream. Validation is
+copied verbatim from the runtime's `validate()`, same rules and same four messages.
+
+Two things that had to be forced rather than declared, both cascade/runtime traps worth
+knowing about: `noValidate` is set imperatively on every open, because `type="email"` with a
+malformed address makes the browser refuse to fire `submit` at all — the handler never runs
+and the reader gets a native bubble instead of the page's own message. And the panel does
+not carry `.blueprint`: that class sets `position: relative`, which beat the panel's
+`position: absolute` and left it in the flow at content height instead of filling the sheet.
+The hairline is drawn directly instead.
+
+The inline `#tour` form stays where it is. With scripting off, every CTA is still an anchor
+to a working form.
 
 Still missing, and only the client can supply them: a price (the page has no number
 anywhere), the phone number (present in the code, commented out in 10 places) and a

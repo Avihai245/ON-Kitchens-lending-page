@@ -168,6 +168,100 @@ section[aria-label="Our partners"] [data-marquee-wrap] {
 footer > div { padding-top: clamp(30px, 4vw, 52px) !important; padding-bottom: clamp(24px, 3vw, 40px) !important; }
 footer nav, footer ul { row-gap: 6px !important; }
 
+/* ---- the lead modal ----
+   Every CTA on the page was an anchor to the closing form: a scroll, a re-orientation
+   and a second decision before anyone could type. The modal puts the form under the
+   button that was clicked. Open state lives in a data attribute on <html>, never on a
+   React-managed node — the DC runtime re-renders on every scroll threshold, and the
+   documentElement is the one place it cannot reach. Centred panel, full-screen sheet
+   below 620px: a side drawer would collide with the sticky CTA on the bottom edge and
+   the accessibility panel bottom-right. */
+.lp2-modal { display: none; }
+html[data-lp2-modal] .lp2-modal { display: block; position: fixed; inset: 0; z-index: 200; }
+html[data-lp2-modal] body { overflow: hidden; }
+.lp2-modal-back { position: absolute; inset: 0; background: color-mix(in srgb, #141414 76%, transparent); }
+.lp2-modal-panel {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(88dvh, 760px); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--color-bg); color: var(--color-text);
+  /* The hairline is drawn here rather than by adding .blueprint: that class also sets
+     position: relative, which beat this rule's position: absolute and left the panel
+     sitting in the flow at content height instead of filling the sheet. */
+  border: 1px solid var(--color-divider);
+  padding: clamp(22px, 3vw, 32px); box-shadow: var(--shadow-lg);
+}
+.lp2-modal-x {
+  position: absolute; top: 8px; right: 8px;
+  width: 44px; height: 44px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; cursor: pointer; color: var(--color-text);
+}
+.lp2-modal-x:hover { color: var(--color-accent-700); }
+.lp2-modal-eyebrow {
+  display: block; font-size: 13px; line-height: 1.35; letter-spacing: 0.14em;
+  text-transform: uppercase; font-weight: 600; color: var(--color-accent-700);
+  margin: 0 44px 10px 0;
+}
+.lp2-modal-panel h2 {
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: clamp(24px, 4.4vw, 30px); line-height: 1.08; letter-spacing: 0.01em;
+  text-transform: uppercase; margin: 0 0 10px;
+}
+.lp2-modal-panel > p {
+  margin: 0 0 20px; font-size: 16px; line-height: 26px;
+  color: color-mix(in srgb, var(--color-text) 78%, transparent);
+}
+.lp2-modal-panel form { display: grid; gap: 14px; }
+.lp2-modal-panel label {
+  display: block; font-family: var(--font-heading); font-weight: 600;
+  font-size: 13px; line-height: 1.35; letter-spacing: 0.1em; text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.lp2-modal-panel label i {
+  font-style: normal; font-weight: 400; letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.lp2-modal-panel .input { min-height: 48px; font-size: 16px; }
+.lp2-err {
+  margin: 6px 0 0; font-size: 13px; line-height: 18px; color: var(--color-accent-700);
+}
+.lp2-err:empty { display: none; }
+.lp2-modal-panel button[type="submit"] {
+  margin-top: 4px; width: 100%; min-height: 52px;
+  text-transform: uppercase; letter-spacing: 0.06em; font-size: 16px;
+}
+@media (max-width: 620px) {
+  .lp2-modal-panel {
+    left: 0; top: 0; right: 0; bottom: 0; transform: none;
+    width: auto; max-height: none; padding: 20px 20px 32px;
+  }
+}
+@media (prefers-reduced-motion: reduce) { .lp2-modal-panel { scroll-behavior: auto; } }
+
+/* ---- hero social proof ----
+   The 4.9 / 380+ rating sat at ~55% of the scroll inside the reviews section, so a
+   first-time visitor never saw it before deciding whether to keep reading. This is the
+   same block the reviews section uses, at a smaller size, directly under the CTA — small
+   enough not to compete with a clamp(44px, 6.4vw, 88px) headline and a 52px button.
+   The stars take --color-accent-400 #D9AB56, not --color-accent #B07A1C: the hero is a
+   dark band, where the darker amber measures 2.0:1 and #D9AB56 measures 8.7:1. It is
+   also the accent the hero already uses for "No waiting." */
+.lp2-rating {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 18px 0 0;
+}
+.lp2-rating .stars { display: flex; gap: 3px; }
+.lp2-rating .stars svg { display: block; }
+.lp2-rating b {
+  font-family: var(--font-heading); font-weight: 600; font-size: 17px;
+  line-height: 1; letter-spacing: 0.02em; color: #FAF8F5;
+}
+.lp2-rating span {
+  font-size: 15px; line-height: 1.2;
+  color: color-mix(in srgb, #FAF8F5 80%, transparent);
+}
+
 /* ---- the "this could be you" band ----
    The annotations are burned into the photograph, so the band carries no copy of its
    own: a section heading above it would compete with THIS COULD BE YOU set inside it.
@@ -235,6 +329,120 @@ section[aria-label="Our partners"] > div {
 }
 @media (prefers-reduced-motion: reduce) { .lp2-track { scroll-behavior: auto; } }
 </style>
+`;
+
+/** The modal's behaviour. Delegated on `document` throughout, because the DC runtime
+ *  re-renders the whole tree on every scroll threshold and per-element listeners would
+ *  be attached to nodes React can replace. Same reasoning — and the same capture-phase
+ *  care — as the mobile menu's outside-click handler. */
+const LP2_MODAL_JS = String.raw`
+<script>
+(function () {
+  var root = document.documentElement;
+  var opener = null;
+
+  function openModal(from) {
+    opener = from || null;
+    root.setAttribute('data-lp2-modal', '');
+    // Set here, not just in the markup. type="email" with a malformed address makes
+    // the browser refuse to fire submit at all, so the handler below never runs and
+    // the reader gets a native bubble instead of the message the rest of the page
+    // uses. The markup carries noValidate too, but the DC runtime rewrites attributes
+    // through React and this is the one that cannot be allowed to go missing.
+    var form = document.getElementById('lp2-form');
+    if (form) form.noValidate = true;
+    var first = document.getElementById('lp2-name');
+    if (first) setTimeout(function () { first.focus(); }, 0);
+  }
+  function closeModal() {
+    if (!root.hasAttribute('data-lp2-modal')) return;
+    root.removeAttribute('data-lp2-modal');
+    if (opener && opener.focus) opener.focus();
+    opener = null;
+  }
+
+  // Every CTA on the page is an <a href="#tour">, the sticky bar's included, so one
+  // delegated handler covers all of them and anything added later. preventDefault only
+  // fires once the modal is actually going to open, so with JS off every CTA is still
+  // an anchor to a working form at the foot of the page.
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    if (t.closest('[data-lp2-close]')) { ev.preventDefault(); closeModal(); return; }
+    var cta = t.closest('a[href="#tour"]');
+    if (cta) { ev.preventDefault(); openModal(cta); return; }
+    if (root.hasAttribute('data-lp2-modal') && !t.closest('[data-lp2-panel]')) closeModal();
+  });
+
+  document.addEventListener('keydown', function (ev) {
+    if (!root.hasAttribute('data-lp2-modal')) return;
+    if (ev.key === 'Escape') { ev.stopPropagation(); closeModal(); return; }
+    if (ev.key !== 'Tab') return;
+    var panel = document.querySelector('[data-lp2-panel]');
+    if (!panel) return;
+    var f = panel.querySelectorAll('button:not([disabled]), input, select, textarea, a[href]');
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+  });
+
+  var IDS = { fullName: 'lp2-name', phone: 'lp2-phone', email: 'lp2-email' };
+  function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+
+  document.addEventListener('submit', function (ev) {
+    var form = ev.target;
+    if (!form || form.id !== 'lp2-form') return;
+    ev.preventDefault();
+
+    var f = {
+      fullName: val('lp2-name'), phone: val('lp2-phone'),
+      email: val('lp2-email'), business: val('lp2-business')
+    };
+
+    // Copied from validate() in the page's own runtime — same rules, same four
+    // messages. A second form that rejected input differently would be worse than no
+    // modal at all.
+    var e = {};
+    if (!f.fullName.trim() || f.fullName.trim().length < 2) e.fullName = 'Please enter your full name.';
+    var digits = f.phone.replace(/[^0-9]/g, '');
+    if (!f.phone.trim()) e.phone = 'Please enter a phone number.';
+    else if (digits.length < 10) e.phone = 'Please enter a 10-digit phone number.';
+    if (!f.email.trim()) e.email = 'Please enter your email.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';
+
+    Object.keys(IDS).forEach(function (k) {
+      var msg = document.getElementById(IDS[k] + '-err');
+      var input = document.getElementById(IDS[k]);
+      if (msg) msg.textContent = e[k] || '';
+      if (input) input.setAttribute('aria-invalid', e[k] ? 'true' : 'false');
+    });
+    var firstBad = Object.keys(e)[0];
+    if (firstBad) {
+      var el = document.getElementById(IDS[firstBad]);
+      if (el) el.focus();
+      return;
+    }
+
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+    // The same three steps the inline form takes, so the lead lands in the same place:
+    // the thank-you page reads on-lead to greet the visitor, __onSendLead carries the
+    // payload and its UTM capture to the webhook, then the redirect. "form: modal"
+    // is the one difference, so modal leads can be told apart downstream.
+    var lead = {
+      name: f.fullName.trim(), phone: f.phone.trim(), email: f.email.trim(),
+      business: (f.business || '').trim(), form: 'modal'
+    };
+    try {
+      sessionStorage.setItem('on-lead', JSON.stringify({ name: lead.name, phone: lead.phone }));
+    } catch (err) { /* private mode — the thank-you page falls back to generic copy */ }
+    try { window.__onSendLead(lead); } catch (err) { /* never block the redirect */ }
+    window.location.assign('/thank-you');
+  });
+})();
+</script>
 `;
 
 export function transform(html, { replaceExactly }) {
@@ -536,6 +744,66 @@ export function transform(html, { replaceExactly }) {
       `      <img src="assets/could-be-you.webp" alt="${ALT}" loading="lazy" width="1200" height="932" />\n` +
       '    </div>\n\n  ';
     out = replaceExactly(out, OPEN.howItWorks, band + OPEN.howItWorks, 1, 'could-be-you band');
+  }
+
+  // ---- 13. the rating moves to where it can still change a mind ---------------
+  // 4.9 out of 380+ reviews is the page's strongest trust signal and it lived at ~55%
+  // of the scroll, inside the reviews section. A visitor deciding whether this page
+  // is worth their time never got to it. It goes directly under the hero CTA — after
+  // the button, before the 24/7 fact strip — so it reads as evidence for the CTA
+  // rather than as one more fact about the building.
+  {
+    const star =
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="var(--color-accent-400)" ' +
+      'stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 ' +
+      '18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
+    const rating =
+      '<div class="lp2-rating">\n' +
+      '        <span class="stars" role="img" aria-label="Rated 4.9 out of 5 from more than 380 reviews">' +
+      star.repeat(5) + '</span>\n' +
+      '        <b>4.9</b>\n' +
+      '        <span>&middot; 380+ reviews</span>\n' +
+      '      </div>\n      ';
+    const FACTS = '<ul style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 10px 26px; font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">';
+    out = replaceExactly(out, FACTS, rating + FACTS, 1, 'hero rating');
+  }
+
+  // ---- 14. the form comes to the CTA ----------------------------------------
+  // The inline #tour form stays exactly where it is: it is the no-JS fallback and the
+  // natural close of the page. This is a second, focused copy that opens on the spot.
+  // Its fields carry their own ids so nothing collides with the m- and f- fields, and
+  // aria-required rather than required — `required` would hand validation to the
+  // browser, whose bubbles would pre-empt the messages the rest of the page uses.
+  {
+    const field = (id, label, type, auto, optional) =>
+      '        <div>\n' +
+      `          <label for="lp2-${id}">${label}${optional ? ' <i>(optional)</i>' : ''}</label>\n` +
+      `          <input class="input" id="lp2-${id}" name="${id}" type="${type}" autoComplete="${auto}"` +
+      (optional ? '' : ' aria-required="true"') +
+      (optional ? '' : ` aria-describedby="lp2-${id}-err"`) + ' />\n' +
+      (optional ? '' : `          <p class="lp2-err" id="lp2-${id}-err" role="alert"></p>\n`) +
+      '        </div>\n';
+    const modal =
+      '<div class="lp2-modal">\n' +
+      '    <div class="lp2-modal-back" data-lp2-close></div>\n' +
+      '    <div class="lp2-modal-panel" data-lp2-panel role="dialog" aria-modal="true" aria-labelledby="lp2-modal-title">\n' +
+      '      <button type="button" class="lp2-modal-x" data-lp2-close aria-label="Close">' +
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>' +
+      '</button>\n' +
+      '      <span class="lp2-modal-eyebrow">Schedule a tour</span>\n' +
+      '      <h2 id="lp2-modal-title">Come see the kitchen you&rsquo;d be cooking in.</h2>\n' +
+      '      <p>Leave your details and we&rsquo;ll call to set a time at Van Nuys or Washington Blvd.</p>\n' +
+      '      <form id="lp2-form" noValidate>\n' +
+      field('name', 'Full name', 'text', 'name') +
+      field('phone', 'Phone', 'tel', 'tel') +
+      field('email', 'Email', 'email', 'email') +
+      field('business', 'Business name', 'text', 'organization', true) +
+      '        <button type="submit" class="btn btn-primary blueprint">Schedule My Tour</button>\n' +
+      '      </form>\n' +
+      '    </div>\n' +
+      '  </div>\n\n  ';
+    out = replaceExactly(out, '</main>', '</main>\n\n  ' + modal.trim() + '\n', 1, 'lead modal markup');
+    out = replaceExactly(out, '</body>', LP2_MODAL_JS + '</body>', 1, 'lead modal script');
   }
 
   return out;
