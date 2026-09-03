@@ -232,6 +232,12 @@ const MOTION_CSS = `
   background: #141414;
   color: #FAF8F5;
 }
+/* The band remaps --color-accent-700 for its numerals, and .btn-primary's hover
+   reads that same token — so inside a dark band the CTA's hover resolved to the
+   band's #D9AB56: a 2.00:1 label, worse than the resting state this change was
+   made to fix. Restoring the token inside the button keeps the ramp identical on
+   every ground, which is the same reason --color-bg is left alone above. */
+[data-band="dark"] .btn-primary { --color-accent-700: #7A5216; }
 /* A dark band prints as white-on-white: browsers drop backgrounds when printing but
    keep colours. One rule restores the whole band because the colours are tokens. */
 @media print {
@@ -242,6 +248,74 @@ const MOTION_CSS = `
     background: #fff !important;
     color: #141414 !important;
   }
+}
+`;
+
+/**
+ * Readability and mobile rhythm, appended to the same helmet <style> as MOTION_CSS.
+ *
+ * The rules key off the inline styles the design already writes rather than off
+ * hook attributes, because the export sets every dimension inline and there is no
+ * class to hang them on. That is safe for LENGTHS but not for colours: the DC
+ * runtime parses each style attribute into a React style object and re-serialises
+ * it through CSSOM, which rewrites #141414 to rgb(20, 20, 20) — the reason the
+ * export's own [style*="#141414"] rescue rule matched nothing — while leaving
+ * lengths and clamp() expressions byte-identical. Measured in the built page:
+ * [style*="font-size: 15px"] matches 38 elements on a phone, [style*="#141414"]
+ * matches 0.
+ *
+ * Why a media query at all: the export ships exactly ONE for the whole site
+ * (prefers-reduced-motion). Everything else is clamp() and auto-fit, which scales
+ * layout but not type — so a phone renders the desktop type scale verbatim, and
+ * every clamp() floor tuned for a desktop minimum becomes a phone's fixed value.
+ * 760px is the runtime's own phone breakpoint (matchMedia('(max-width: 760px)')).
+ */
+const READABILITY_CSS = `
+/* ---- readability (build-time addition) ----
+   The headline can out-measure a 320-414px viewport while the fallback font is
+   still swapping in. The hero is a grid, and a grid item's automatic minimum size
+   is its min-content width, so for the length of that swap the whole document
+   scrolled sideways. Both rules are inert once Barlow Condensed lands. */
+[style*="padding: clamp(88px, 11vh, 150px)"] { min-width: 0; }
+[style*="padding: clamp(88px, 11vh, 150px)"] h1 { overflow-wrap: break-word; }
+
+/* The closing form's fields are near-black; its placeholders need the band's ink,
+   not the page's. Higher specificity than the bare ::placeholder rule above, so
+   order does not matter. */
+[data-form="end"]::placeholder { color: color-mix(in srgb, #FAF8F5 62%, transparent); }
+/* WCAG 2.2 SC 2.5.8, both layout-neutral — see the note in improveReadability(). */
+[data-tap="logo"] { padding-block: 2px; }
+[data-tap="footer"] { display: inline-block; }
+
+@media (max-width: 900px) {
+  /* The hero reserves 82vh and bottom-aligns ~510px of content inside it, so the
+     leftover — 45px at 390x844, 108px at 430x932, 217px at 768x1024 — stacks on
+     top of a 93-113px padding and reads as dead space under the header. Both have
+     to come down: dropping only the padding hands the space straight back to the
+     grid. Carried past 760px because a portrait tablet has the worst of it. */
+  [style*="min-height: clamp(600px, 82vh, 880px)"] { min-height: 0 !important; }
+  [style*="padding: clamp(88px, 11vh, 150px)"] { padding-top: clamp(28px, 4vh, 44px) !important; }
+}
+
+@media (max-width: 760px) {
+  /* 13px is the single most common size in the export (67 declarations) and it is
+     nearly all uppercase labels tracked at 0.14em; 15px is the body default. */
+  [style*="font-size: 13px"] { font-size: 14px !important; }
+  [style*="font-size: 15px"] { font-size: 16px !important; }
+  /* line-height 12px under a 13px font — a leading smaller than the type. It
+     collides with itself the moment the label wraps, which the hero eyebrow does
+     on every phone width. */
+  [style*="line-height: 12px"] { line-height: 1.35 !important; }
+  /* 1.50 is the WCAG 1.4.12 floor, not a comfortable phone measure. Scoped to the
+     two body sizes so the 20/24 and 21/24 headings keep their tight leading. */
+  [style*="font-size: 15px"][style*="line-height: 24px"],
+  [style*="font-size: 16px"][style*="line-height: 24px"] { line-height: 1.6 !important; }
+  /* Section padding pins to its 48px floor on a phone (6vw is 23px at 390) while
+     the cards inside are padded 24px — so a section boundary reads barely stronger
+     than a card edge and the page runs together. */
+  [style*="padding: clamp(48px, 6vw, 96px) var(--edge);"] { padding-top: 68px !important; padding-bottom: 68px !important; }
+  [style*="padding: clamp(48px, 6vw, 88px)"] { padding-top: 68px !important; }
+  [style*="var(--edge) clamp(48px, 6vw, 96px)"] { padding-bottom: 68px !important; }
 }
 `;
 
@@ -290,7 +364,7 @@ function addScrollMotion(html, label) {
   out = replaceExactly(
     out,
     '[data-marquee-wrap]:hover [data-marquee] { animation-play-state: paused; }\n',
-    '[data-marquee-wrap]:hover [data-marquee] { animation-play-state: paused; }\n' + MOTION_CSS,
+    '[data-marquee-wrap]:hover [data-marquee] { animation-play-state: paused; }\n' + MOTION_CSS + READABILITY_CSS,
     1,
     'motion css'
   );
@@ -390,6 +464,126 @@ function addScrollMotion(html, label) {
 }
 
 /**
+ * The readability changes that live in the markup rather than the stylesheet.
+ *
+ * Runs after addScrollMotion, so the benefits-band restructure is already in place,
+ * and before stripCornerMarkup and guardGridMinimums, whose counts are unaffected:
+ * moving figures between two grids inside one section changes neither the number of
+ * corner marks nor the number of grid minimums.
+ */
+function improveReadability(html, label) {
+  let out = html;
+
+  // ---- contrast: the four fades that fail WCAG AA on the light ground ----
+  // Composited over #FAF8F5 the export's muted tiers measure 4.01:1 (55%),
+  // 4.42:1 (58%), 4.72:1 (60%) and 5.05:1 (62%) against a 4.5:1 requirement —
+  // 19 declarations, all of them `color:`. The four 8% uses are `border-bottom`
+  // hairlines and are deliberately untouched; raising those would turn the
+  // page's hairlines into rules.
+  //
+  // They collapse onto one 70% tier (6.66:1) instead of being nudged
+  // individually: no reader distinguishes 4.01 from 5.05, and the hierarchy that
+  // does carry meaning is the one above — 70 < 72 < 78 < 80 < 86 < 100.
+  for (const [pct, n] of [['55', 2], ['58', 12], ['60', 3], ['62', 2]]) {
+    out = replaceExactly(
+      out,
+      `color-mix(in srgb, var(--color-text) ${pct}%, transparent)`,
+      'color-mix(in srgb, var(--color-text) 70%, transparent)',
+      n,
+      `contrast floor ${pct}%`
+    );
+  }
+
+  // ---- placeholders: a latent trap, not a live bug ----
+  // Nothing renders through these rules today — the design gives every field a
+  // visible label and sets no placeholder attribute anywhere, which is the better
+  // pattern and the reason this went unnoticed. But the export ships a single
+  // `::placeholder` rule for the whole site, and the closing form sits on the
+  // #141414 band with `background: color-mix(in srgb, #FAF8F5 8%, transparent)` —
+  // a field resolving to rgb(38, 38, 38). A 42%-black placeholder over that
+  // resolves to rgb(31, 31, 31): 1.06:1, invisible. Adding one placeholder to the
+  // page's primary conversion form would have produced exactly that, silently.
+  // 64% is 5.12:1 over the light form's --color-surface field, and the dark form
+  // gets its own light variant in READABILITY_CSS keyed on the data-form="end"
+  // every input in it already carries.
+  out = replaceExactly(
+    out,
+    '::placeholder { color: color-mix(in srgb, #141414 42%, transparent); }',
+    '::placeholder { color: color-mix(in srgb, #141414 64%, transparent); }',
+    1,
+    'placeholder contrast'
+  );
+
+  // ---- tap targets ----
+  // Two links are under the 24x24 of WCAG 2.2 SC 2.5.8. Both reach it without
+  // moving anything, which is why they are fixed here rather than left as a design
+  // decision: the header row's height is set by the 52px CTA inside a 68px
+  // min-height, and the footer link's paragraph line box is already 24px, so the
+  // link only has to fill it.
+  out = replaceExactly(
+    out,
+    '<a href="#top" style="display: flex; align-items: baseline; gap: 8px;',
+    '<a href="#top" data-tap="logo" style="display: flex; align-items: baseline; gap: 8px;',
+    1,
+    'header logo tap target'
+  );
+  out = replaceExactly(
+    out,
+    '<p style="margin: 0; font-size: 15px; line-height: 24px;"><a href="#tour">Schedule a tour</a></p>',
+    '<p style="margin: 0; font-size: 15px; line-height: 24px;"><a href="#tour" data-tap="footer">Schedule a tour</a></p>',
+    1,
+    'footer link tap target'
+  );
+
+  // ---- reviews: open with three quotes instead of six ----
+  // The section shows 6 of 12 and hides the rest behind a "See more reviews"
+  // button that already exists, driven by state that already exists. Three of the
+  // visible six move into that hidden grid: no new state, no new markup, nothing
+  // deleted, and the control's own label already covers both directions. On a
+  // phone the grid is one column, so this takes three full cards of near-identical
+  // praise out of the scroll — the largest perceived-density win available without
+  // touching a word of copy. The 4.9 aggregate and the screenshot marquee, both
+  // above it, still carry the proof.
+  {
+    const GRID = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: clamp(20px, 2.6vw, 32px)';
+    const OPEN_VISIBLE = `<div style="${GRID};">`;
+    const OPEN_HIDDEN = `<div style="${GRID}; margin-top: clamp(20px, 2.6vw, 32px);">`;
+    const FIG = '<figure class="blueprint" style="margin: 0; padding: 22px; display: flex; flex-direction: column; gap: 14px;">';
+    const END = '</figure>';
+
+    const total = out.split(FIG).length - 1;
+    if (total !== 12) {
+      throw new Error(`[build] ${label}: expected 12 testimonial figures, found ${total}.`);
+    }
+    const iVis = out.indexOf(OPEN_VISIBLE);
+    const iHid = out.indexOf(OPEN_HIDDEN);
+    if (iVis === -1 || iHid <= iVis || out.indexOf(OPEN_VISIBLE, iVis + 1) !== -1) {
+      throw new Error(`[build] ${label}: the two review grids are missing or out of order.`);
+    }
+    const parts = out.slice(iVis + OPEN_VISIBLE.length, iHid).split(FIG);
+    if (parts.length !== 7) {
+      throw new Error(`[build] ${label}: expected 6 visible reviews, found ${parts.length - 1}.`);
+    }
+    // Everything after the sixth </figure> is the grid's own close plus the <sc-if>
+    // that opens the hidden half; it has to stay where it is.
+    const cut = parts[6].lastIndexOf(END) + END.length;
+    const figures = parts.slice(1).map((p, i) => FIG + (i === 5 ? p.slice(0, cut) : p));
+    out =
+      out.slice(0, iVis + OPEN_VISIBLE.length) +
+      parts[0] + figures.slice(0, 3).join('') +
+      parts[6].slice(cut) +
+      OPEN_HIDDEN + figures.slice(3).join('') +
+      out.slice(iHid + OPEN_HIDDEN.length);
+
+    if (out.split(FIG).length - 1 !== 12) {
+      throw new Error(`[build] ${label}: a testimonial was lost moving the reviews.`);
+    }
+  }
+
+  return out;
+}
+
+/**
  * Patches the export's runtime: the reveal observer, the accessibility sheet, and
  * the hero video's phone gate.
  */
@@ -475,6 +669,18 @@ function rewriteRuntime(html, label) {
       '[data-band="dark"] p, [data-band="dark"] li, [data-band="dark"] dd, [data-band="dark"] dt, [data-band="dark"] span, [data-band="dark"] h1, [data-band="dark"] h2, [data-band="dark"] h3, [data-band="dark"] label, [data-band="dark"] a { color: #ffffff !important; }'`,
     1,
     'high-contrast dark bands'
+  );
+
+  // High contrast redefines --color-accent and --color-accent-700 at :root but not
+  // -600, which is now what the primary button paints with — so without this the
+  // page's main call to action would be the one thing the mode could not reach.
+  // #5c4008 is 9.58:1 against the mode's white ground.
+  out = replaceExactly(
+    out,
+    "':root { --color-text: #000000; --color-bg: #ffffff; --color-accent: #6b4409; --color-accent-700: #4a2f06; --color-divider: #000000; }'",
+    "':root { --color-text: #000000; --color-bg: #ffffff; --color-accent: #6b4409; --color-accent-600: #5c4008; --color-accent-700: #4a2f06; --color-divider: #000000; }'",
+    1,
+    'high-contrast accent-600'
   );
 
   // ---- stop motion: un-hide anything the observer had already staged ----
@@ -649,10 +855,24 @@ function guardGridMinimums(html, label) {
 }
 
 /** Rewrites the design-system stylesheet for publication: drops the corner
- *  decoration's own rules so no `.corner` selector survives, and lifts out the
- *  Google Fonts @import, which the built page declares as a <link> in <head>
- *  instead. `.blueprint`'s border rule is deliberately left in place. */
-function stripCornerStyles(css) {
+ *  decoration's own rules so no `.corner` selector survives, lifts out the Google
+ *  Fonts @import (the built page declares it as a <link> in <head> instead), and
+ *  darkens the primary button by one step of its own ramp. `.blueprint`'s border
+ *  rule is deliberately left in place.
+ *
+ *  The button: `#FAF8F5` on `--color-accent` `#B07A1C` measures 3.51:1 against
+ *  AA's 4.5:1, on all 11 amber buttons — every "Schedule a Tour", the sticky bar
+ *  and the skip link. No new colour was needed. `--color-accent-600` `#96661A` is
+ *  4.70:1 and is already the button's own hover value, so rest/hover/active shift
+ *  to 600/700/800 and stay inside the palette the design system ships. Nothing
+ *  else amber changes: the survey markers, the stars, the rail and the -400
+ *  eyebrows on the dark bands all still read `--color-accent`.
+ *
+ *  These rules live here rather than in the helmet block because the design-system
+ *  stylesheet is a <link> in <head> and the helmet <style> lands elsewhere in the
+ *  cascade — same specificity, so source order would decide, which is not a thing
+ *  to leave to chance for the page's primary call to action. */
+function rewriteDesignSystemCss(css) {
   css = replaceExactly(
     css,
     `@import url('${FONT_CSS}');\n`,
@@ -675,6 +895,26 @@ function stripCornerStyles(css) {
 .blueprint > .corner.br { bottom: -6px; right: -6px; }
 `;
   let out = replaceExactly(css, RULES, '', 1, 'corner style rules');
+
+  // The primary button, one step darker. See the note above the function.
+  out = replaceExactly(
+    out,
+    `.btn-primary { background: var(--color-accent); color: var(--color-bg); }
+.btn-primary:hover { background: var(--color-accent-600); }
+.btn-primary:active { background: var(--color-accent-700); }`,
+    `.btn-primary { background: var(--color-accent-600); color: var(--color-bg); }
+.btn-primary:hover { background: var(--color-accent-700); }
+.btn-primary:active { background: var(--color-accent-800); }`,
+    1,
+    'primary button ramp'
+  );
+  out = replaceExactly(
+    out,
+    '.btn-primary { border-color: var(--color-accent); }',
+    '.btn-primary { border-color: var(--color-accent-600); }',
+    1,
+    'primary button border'
+  );
   // Two comments elsewhere in the file describe the marks; leaving them would keep
   // `.corner` greppable in the shipped CSS for a feature that no longer exists.
   out = replaceExactly(
@@ -817,6 +1057,7 @@ async function buildIndex() {
   );
 
   html = addScrollMotion(html, 'index.html');
+  html = improveReadability(html, 'index.html');
   html = rewriteRuntime(html, 'index.html');
 
   const stripped = stripCornerMarkup(html, 'index.html');
@@ -826,7 +1067,7 @@ async function buildIndex() {
   console.log(
     `  index.html      <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect, ` +
       `${stripped.removed} corner marks removed, ${guarded.guarded} grid minimums guarded, ` +
-      `${widened.widened} wrappers widened, scroll motion + dark benefits band)`
+      `${widened.widened} wrappers widened, scroll motion + dark benefits band, contrast floor + mobile type scale)`
   );
 }
 
@@ -958,7 +1199,7 @@ async function main() {
       }
     }
     const css = join(OUT, '_ds', dir, 'styles.css');
-    await writeFile(css, stripCornerStyles(await readFile(css, 'utf8')));
+    await writeFile(css, rewriteDesignSystemCss(await readFile(css, 'utf8')));
     console.log('  _ds styles.css  <- corner rules stripped');
   }
 

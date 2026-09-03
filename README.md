@@ -226,6 +226,139 @@ change cannot swap the iframe in and out, and initialised to "no video" so nothi
 fetched before the check runs. **`navigator.connection` does not exist on Safari/iOS**,
 so iPhones always get the video; there is no platform API to do better.
 
+## Readability and the mobile type scale
+
+The page reads as crowded on a phone and its muted text was below WCAG AA. Both are
+measured, both are fixed in `READABILITY_CSS` and `improveReadability()` in the build.
+
+**Contrast.** Composited over `#FAF8F5`, the export's muted tiers measured 4.01:1
+(`--color-text 55%`, x2), 4.42:1 (58%, x12), 4.72:1 (60%, x3) and 5.05:1 (62%, x2)
+against a 4.5:1 requirement — 19 declarations, all of them `color:`. They now collapse
+onto one 70% tier at 6.66:1. Nothing distinguishes 4.01 from 5.05 to a reader, and the
+hierarchy that carries meaning is the one above it: 70 < 72 < 78 < 80 < 86 < 100. The
+four `8%` uses are `border-bottom` hairlines and are deliberately untouched. The same
+three failing values appear in `templates/thank-you.html` and got the same floor.
+
+**Type on phones.** The export ships **one media query for the whole site**
+(`prefers-reduced-motion`); everything else is `clamp()` and `auto-fit`, which scales
+layout but not type. So a phone rendered the desktop scale verbatim — 13px x67
+(uppercase labels tracked at 0.14em), 15px x56 — and every `clamp()` floor tuned as a
+desktop minimum became a phone's fixed value. Below 760px, the export's own `isPhone`
+breakpoint, 13px goes to 14px, 15px to 16px, body leading from 1.50 to 1.6, and the
+eyebrow's `line-height: 12px` under a 13px font — a leading *smaller than the type*,
+which collided with itself the moment the label wrapped, as the hero eyebrow does at
+every phone width — to 1.35. Section padding pins to its 48px floor on a phone (6vw is
+23px at 390) while the cards inside are padded 24px, so a section break read barely
+stronger than a card edge; it goes to 68px. Desktop keeps its sizes and its 86px
+rhythm; only the contrast floor crosses the breakpoint.
+
+**How the rules target.** They key off the inline styles the design already writes,
+because the export sets every dimension inline and there is no class to hang them on.
+That is safe for **lengths** but not for **colours**: the DC runtime parses each style
+attribute into a React style object and re-serialises it through CSSOM, which rewrites
+`#141414` to `rgb(20, 20, 20)` — the reason the export's own `[style*="#141414"]`
+rescue rule matched nothing — while leaving lengths and `clamp()` expressions
+byte-identical. Verified in the built page: `[style*="font-size: 15px"]` matches 38
+elements on a phone, `[style*="#141414"]` matches 0. If a re-export ever changes that,
+the fallback is the pattern used everywhere else here — count-asserted `data-` hooks
+added by the build.
+
+### The hero's dead space
+
+The hero is `min-height: clamp(600px, 82vh, 880px)` with `align-items: end`, holding a
+block padded `clamp(88px, 11vh, 150px)` on top. It bottom-aligns ~510px of content
+inside a box sized to the viewport, so the leftover stacked on top of the padding:
+
+| viewport | header to eyebrow, before | after |
+|---|---|---|
+| 390 x 844 | 138px | 34px |
+| 360 x 800 | 88px | 32px |
+| 430 x 932 | 210px | 37px |
+| 768 x 1024 | 330px | 41px |
+
+Both levers were needed — dropping only the padding hands the space straight back to
+the grid. Carried to 900px rather than 760px because a portrait tablet had the worst of
+it.
+
+### Reviews open with three, not six
+
+The section rendered 6 of 12 and hid the rest behind a "See more reviews" button that
+already existed, driven by state that already existed. Three of the visible six moved
+into that hidden grid: no new state, no new markup, nothing deleted, and the control's
+label already covered both directions. On a phone the grid is one column, so this took
+three full cards of near-identical praise out of the scroll. The 4.9 aggregate and the
+screenshot marquee, both above it, still carry the proof.
+
+This was the only progressive-disclosure headroom left. The page renders **1,095
+words** — a normal length; the 1,800-word figure that a template count suggests
+includes every collapsed FAQ answer, all five kitchen tab panels and all twelve
+reviews. FAQ is an accordion, the kitchens are tabbed and reviews are now trimmed; the
+pain cards, the benefits band and "Who it's for" are the sections doing the
+persuading, so they stay open.
+
+### The primary button, one step down its own ramp
+
+`#FAF8F5` on `--color-accent` `#B07A1C` measured **3.51:1** against AA's 4.5:1, on
+all 13 amber buttons — every "Schedule a Tour", the sticky bar, the skip link. No new
+colour was needed: `--color-accent-600` `#96661A` is 4.70:1 and was already the
+button's own hover value, so the whole ramp shifts one step inside the palette the
+design system ships.
+
+| state | before | after | label contrast |
+|---|---|---|---|
+| rest | `--color-accent` `#B07A1C` | `--color-accent-600` `#96661A` | 3.51 -> **4.70** |
+| hover | `-600` | `-700` `#7A5216` | **6.50** |
+| active | `-700` | `-800` `#5C3D12` | **9.29** |
+| border | `--color-accent` | `-600` | |
+
+Nothing else amber changes — the survey markers, the stars, the rail and the `-400`
+eyebrows on the dark bands all still read `--color-accent`. The rules live in
+`rewriteDesignSystemCss()` rather than the helmet block because the design-system
+stylesheet is a `<link>` in `<head>` and the helmet `<style>` lands elsewhere in the
+cascade: same specificity, so source order would decide, which is not something to
+leave to chance for the page's primary call to action.
+
+**This surfaced a bug the dark band had introduced.** `[data-band="dark"]` remaps
+`--color-accent-700` to `#D9AB56` so the benefits sheet's numerals clear AA on
+black — and `.btn-primary` reads that same token for a state. Inside a dark band the
+button therefore resolved to `#D9AB56`: a **2.00:1** label, worse than the resting
+state this change was made to fix. It was on `:active` before and would have moved to
+`:hover`. One rule restores the token inside the button —
+`[data-band="dark"] .btn-primary { --color-accent-700: #7A5216; }` — for the same
+reason `--color-bg` is left alone on that band: the CTA must be identical on every
+ground. Verified across all 13 buttons, 5 of them on dark bands: `-700` now resolves
+to `#7A5216` everywhere.
+
+The accessibility panel's high-contrast mode redefines `--color-accent` and
+`--color-accent-700` at `:root` but not `-600`, which is now what the button paints
+with, so `--color-accent-600: #5c4008` (9.58:1 on white) was added to that rule —
+otherwise the page's main call to action would have been the one thing the mode
+could not reach.
+
+### A placeholder trap, closed before anything fell into it
+
+Worth being precise about, because it is easy to misread as a live bug: **no input on
+the site has a `placeholder` attribute**. Every field carries a visible label above
+it, which is the better pattern, and nothing renders through the export's
+`::placeholder` rule today.
+
+But that rule is a single one for the whole site, and the closing form sits on the
+`#141414` band with `background: color-mix(in srgb, #FAF8F5 8%, transparent)` — a
+field resolving to `rgb(38, 38, 38)`. A 42%-black placeholder over that resolves to
+`rgb(31, 31, 31)`: **1.06:1**, invisible. Adding one placeholder to the page's
+primary conversion form would have produced exactly that, silently. The global value
+is now 64% (5.12:1 over the light form's `--color-surface` field) and the dark form
+has its own light variant keyed on the `data-form="end"` its inputs already carry.
+
+### A guard for the font-swap window
+
+`font-display: swap` renders the fallback first, and the fallback's "No construction."
+measures 413px where Barlow Condensed measures far less. The hero is a grid, and a grid
+item's automatic minimum size is its min-content width, so for the length of the swap
+the **whole document scrolled sideways** — 451px wide at every viewport from 320 to
+414. `min-width: 0` on the hero block plus `overflow-wrap: break-word` on the headline
+fixes it; both are inert once the real font lands.
+
 ## Lead webhook
 
 Every validated submission from either form is POSTed to `LEAD_WEBHOOK_URL`, then the
@@ -343,11 +476,16 @@ remaining place. It is a no-op wherever the container is at least `<N>` wide, so
 every tablet and desktop layout is unchanged — confirmed by measuring 150 bounding
 boxes at 390 / 768 / 1440 against an unguarded build: identical.
 
-Known, not fixed: two links on the landing page are under the 24x24 px WCAG 2.2
-SC 2.5.8 target size — the header logo (105x20) and the footer "Schedule a tour"
-(101x18). Both need padding on elements inside the design export, which would shift
-its layout, so they are left for a deliberate design decision rather than changed
-here.
+Two links were under the 24x24 px of WCAG 2.2 SC 2.5.8 — the header logo (105x20)
+and the footer "Schedule a tour" (101x18). This was recorded here as needing a
+design decision, on the assumption that padding would shift the layout. Re-measured,
+it doesn't: the header row's height is set by the 52px CTA inside a 68px
+`min-height`, so `padding-block: 2px` takes the logo to 24px and moves nothing; and
+the footer link is an inline `<a>` in a `<p>` whose line box is already 24px, so
+`display: inline-block` makes the link fill the box it already sits in — where
+padding would have grown it. Both carry a `data-tap` hook added by the build.
+Confirmed by snapshotting every box in the header and footer with the two rules on
+and off: exactly two boxes differ, and they are the two links.
 
 ## Connecting the app in the Amplify console
 
@@ -437,3 +575,13 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   landing page.
 - Corner removal: 0 `.corner` nodes on every page, `.blueprint` border intact, and
   150 bounding boxes byte-identical to the previous build at all three widths.
+- Contrast, measured on computed styles over the composited background after a full
+  scroll: **0 text nodes below AA** at 390 and 1440, on the landing page and the
+  thank-you page — including every button state on both grounds.
+- Every interactive element on the page is at least 24x24 at 390px.
+- Mobile type: nothing under 14px below 760px, nothing tighter than 1.35 leading except
+  `.btn` (1.2, deliberate), section padding 68px; at 761px and above the scale is
+  byte-identical to before.
+- No horizontal overflow at 320-2560 **with the webfonts blocked as well as loaded** —
+  the swap-window case above.
+- Performance unchanged to better: first paint 52ms, FCP 304ms, DCL 94ms at 390px.
