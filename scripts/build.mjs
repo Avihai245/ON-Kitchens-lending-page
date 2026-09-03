@@ -13,6 +13,7 @@ import { cp, mkdir, rm, readFile, writeFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as lp2Variant from '../variants/lp2.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'palette-and-photography-decisions', 'project');
@@ -54,6 +55,9 @@ const VENUE_PHOTOS = [
  *  `<path>/`, and serve `<path>/index.html`. The flat file therefore lands on
  *  /thank-you exactly, with no redirect hop and no trailing slash. */
 const THANK_YOU_PATH = '/thank-you';
+/** The /lp2 duplicate. Flat file, so Amplify serves it at /lp2 the same way
+ *  thank-you.html is served at /thank-you — see the note on THANK_YOU_FILE. */
+const LP2_FILE = 'lp2.html';
 const THANK_YOU_FILE = 'thank-you.html';
 
 /** The web fonts the design system asks for. Declared here as a <link> in <head>
@@ -1254,7 +1258,21 @@ function replaceExactly(text, find, replacement, expected, label) {
  * normally and applies. The helmet copy is left in place so the file still round-
  * trips through Claude Design; it resolves to the same URL and is served from cache.
  */
-async function buildIndex() {
+/**
+ * Builds a landing page from the design export.
+ *
+ * Called twice: once for `/` and once for the `/lp2` duplicate. Both come from the
+ * same export through the same transforms, so a fix to the shared pipeline reaches
+ * both without being written twice — which is the whole point of /lp2 existing as a
+ * place to try changes rather than as a second copy to keep in sync.
+ *
+ * @param outFile  filename under dist/
+ * @param label    what assertion failures call this page
+ * @param robots   value for a <meta name="robots">, or '' for none
+ * @param variant  optional { transform(html, { replaceExactly }) }, applied LAST —
+ *                 see variants/lp2.mjs for why the hook runs after everything else.
+ */
+async function buildLandingPage({ outFile, label, robots = '', variant = null }) {
   let html = await readFile(join(SRC, ENTRY), 'utf8');
 
   const dsHref = html.match(
@@ -1286,9 +1304,15 @@ async function buildIndex() {
   // fetched and parsed, so the fonts sat behind a three-hop chain
   // (html -> styles.css -> css2 -> woff2); as a <link> it starts in parallel with
   // styles.css, and the preconnects warm both font origins ahead of it.
+  // A duplicate page carries noindex so the two do not compete for the same
+  // ranking. Deliberately NOT paired with a Disallow in robots.txt: blocking the
+  // crawl would stop Google ever reading the noindex, which is the opposite of the
+  // intent. Also not paired with a canonical — Google treats noindex plus canonical
+  // as contradictory signals.
   const head = [
     `<title>${PAGE_TITLE}</title>`,
     `<meta name="description" content="${PAGE_DESCRIPTION}">`,
+    ...(robots ? [`<meta name="robots" content="${robots}">`] : []),
     `<link rel="icon" href="favicon.svg" type="image/svg+xml">`,
     `<style>x-dc{display:none!important}</style>`,
     `<link rel="preconnect" href="https://fonts.googleapis.com">`,
@@ -1343,20 +1367,70 @@ async function buildIndex() {
     'lead form redirect'
   );
 
-  html = addScrollMotion(html, 'index.html');
-  html = improveReadability(html, 'index.html');
-  html = addMobileNav(html, 'index.html');
-  html = rewriteRuntime(html, 'index.html');
+  html = addScrollMotion(html, label);
+  html = improveReadability(html, label);
+  html = addMobileNav(html, label);
+  html = rewriteRuntime(html, label);
 
-  const stripped = stripCornerMarkup(html, 'index.html');
-  const guarded = guardGridMinimums(stripped.html, 'index.html');
-  const widened = widenDesktopLayout(guarded.html, 'index.html');
-  await writeFile(join(OUT, 'index.html'), widened.html);
+  const stripped = stripCornerMarkup(html, label);
+  const guarded = guardGridMinimums(stripped.html, label);
+  const widened = widenDesktopLayout(guarded.html, label);
+
+  // The page-specific hook runs on the finished HTML, so an override reads as "the
+  // live page, then my change" and cannot trip the count assertions the shared
+  // passes make against the pristine export.
+  let out = widened.html;
+  let overridden = false;
+  if (variant) {
+    const before = out;
+    out = variant.transform(out, { replaceExactly });
+    if (typeof out !== 'string') {
+      throw new Error(`[build] ${label}: the variant transform did not return HTML.`);
+    }
+    overridden = out !== before;
+  }
+
+  await writeFile(join(OUT, outFile), out);
   console.log(
-    `  index.html      <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect, ` +
+    `  ${outFile.padEnd(15)} <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect, ` +
       `${stripped.removed} corner marks removed, ${guarded.guarded} grid minimums guarded, ` +
-      `${widened.widened} wrappers widened, scroll motion + dark benefits band, contrast floor + mobile type scale, mobile nav + persistent sticky CTA)`
+      `${widened.widened} wrappers widened, scroll motion + dark benefits band, contrast floor + mobile type scale, mobile nav + persistent sticky CTA` +
+      (robots ? `, ${robots}` : '') + (overridden ? ', page overrides' : '') + ')'
   );
+  return { html: out, overridden };
+}
+
+/**
+ * The noindex meta is not optional — a duplicate page competing with the original in
+ * search is the one way this feature can quietly cost something — so it is asserted
+ * on every build.
+ *
+ * The equality check is different: it only runs while variants/lp2.mjs is still a
+ * pass-through. Until the first override lands, /lp2 is meant to BE the landing page,
+ * so any drift is a bug and should fail the build rather than be found in a browser.
+ * The moment a real override exists the pages are supposed to differ, and the check
+ * retires itself rather than standing in the way of the thing /lp2 was made for.
+ */
+function assertLp2MatchesIndex(index, lp2, overridden) {
+  const ROBOTS = '<meta name="robots" content="noindex, nofollow">\n';
+  if (!lp2.includes(ROBOTS)) {
+    throw new Error('[build] lp2.html: the noindex meta is missing.');
+  }
+  if (overridden) {
+    console.log('  lp2.html        <- page overrides applied (identity check retired)');
+    return;
+  }
+  const stripped = lp2.replace(ROBOTS, '');
+  if (stripped !== index) {
+    const i = [...index].findIndex((c, n) => c !== stripped[n]);
+    throw new Error(
+      `[build] lp2.html: variants/lp2.mjs is a pass-through, so lp2 should match ` +
+        `index.html apart from the robots meta — but they diverge at character ${i}:\n` +
+        `  index: ${JSON.stringify(index.slice(i, i + 90))}\n` +
+        `    lp2: ${JSON.stringify(stripped.slice(i, i + 90))}`
+    );
+  }
+  console.log('  lp2.html        <- identical to index.html apart from the robots meta');
 }
 
 /**
@@ -1499,7 +1573,17 @@ async function main() {
     console.log(`  ${entry.padEnd(15)} <- site/`);
   }
 
-  await buildIndex();
+  const index = await buildLandingPage({ outFile: 'index.html', label: 'index.html' });
+  // /lp2: the same page, to try changes on without touching /. Page-specific
+  // overrides live in variants/lp2.mjs; while that hook is a pass-through the two
+  // files must differ by the robots meta and nothing else, and the build says so.
+  const lp2 = await buildLandingPage({
+    outFile: LP2_FILE,
+    label: LP2_FILE,
+    robots: 'noindex, nofollow',
+    variant: lp2Variant,
+  });
+  assertLp2MatchesIndex(index.html, lp2.html, lp2.overridden);
   await buildMap();
   await buildThankYou();
 
