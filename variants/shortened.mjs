@@ -163,8 +163,31 @@ const LP2_CSS = `
 /* ---- locations: the two 300px maps were most of the section ----
    The addresses and the two "Tour X" buttons are what a landing page needs; the
    map is for someone who has already booked. Dropping both also drops two Leaflet
-   iframes and the OpenStreetMap tile traffic the README flags as a licensing risk. */
-#locations .blueprint { display: none !important; }
+   iframes and the OpenStreetMap tile traffic the README flags as a licensing risk.
+   The map's markup is removed outright below (step 7), not just hidden — so there
+   is no CSS rule here for it. There used to be one: #locations .blueprint set to
+   display: none !important, meant for the map's own wrapper. But "Tour Van
+   Nuys" and "Tour Los Angeles" carry .blueprint too — it is this page's generic
+   hairline-border utility, not a map-specific hook — and with the map's wrapper
+   gone, that rule's only remaining target was the two buttons this section exists
+   to show. A real, currently-shipping bug, found while widening this section's
+   columns: both buttons rendered at display: none, unclickable, invisible. */
+
+/* ---- locations: side by side on a phone, not stacked ----
+   Each card is a name, two address lines and one button — short enough that forcing
+   the pair onto one row roughly halves the section's height on a phone, which is where
+   a stacked pair costs the most scroll. The trade is the longer address line wrapping
+   to two lines and the button losing some of its horizontal padding; both are cheap
+   against the height this section was taking. */
+@media (max-width: 760px) {
+  #locations > div[style*="grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr))"] {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 20px !important;
+  }
+  #locations h3 { font-size: 21px !important; line-height: 24px !important; }
+  #locations address { font-size: 15px !important; line-height: 22px !important; }
+  #locations .btn { padding: 12px 14px !important; font-size: 13px !important; }
+}
 
 /* ---- vertical rhythm: less text needs less scaffolding around it ---- */
 section[aria-label="Our partners"] [data-marquee-wrap] {
@@ -556,6 +579,12 @@ export function transform(html, { replaceExactly }) {
       1,
       'also-included block'
     );
+    // The nav still points "What's Included" at the section this step just removed —
+    // a real, currently-shipping dead link, found while chasing an unrelated bug in
+    // this same file. Both the desktop and mobile-panel copies of the link need it;
+    // /lp keeps id="included" as a real section, so this is a here-only fix, not a
+    // shared one — changing the nav itself would break the link there instead.
+    out = replaceExactly(out, 'href="#included"', 'href="#kitchens"', 2, 'nav target folded into kitchens');
   }
 
   // ---- 4. the duplicate mid-page form becomes a CTA strip --------------------
