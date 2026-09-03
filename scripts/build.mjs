@@ -177,6 +177,403 @@ function stripCornerMarkup(html, label) {
 }
 
 /**
+ * Scroll motion, appended to the export's own helmet <style> so every rule sits with
+ * the existing [data-rev] / [data-tab] / [data-faq] motion rather than in a second
+ * stylesheet with a different cascade position.
+ *
+ * The hiding strategy is deliberately the opposite of [data-rev]'s. That one writes
+ * inline `opacity: 0`, which beats any non-important stylesheet rule — which is why
+ * applyA11y has to carry an `!important` override for it, and why forgetting one
+ * leaves content permanently invisible. These items hide via a `[data-hide]`
+ * attribute the script adds instead, so the FINAL state is the default: if the
+ * script never runs, if IntersectionObserver is missing, or if the visitor has
+ * reduced motion, the content is simply already in place.
+ *
+ * Stagger comes from :nth-child rather than a JS-computed delay — the items are
+ * siblings in all three sections (4 <li> steps, 4 cards, 5 rows).
+ */
+const MOTION_CSS = `
+/* ---- per-item scroll reveal (build-time addition) ----
+   The stagger delay is written by the script, not by :nth-child. Only items below
+   the fold at mount are hidden, so on a phone where a group straddles the fold the
+   first items are never hidden at all — an :nth-child delay would then leave a hole
+   in the sequence and a dead beat before anything moved. The script counts hidden
+   siblings instead, so the cascade is always 0, 90, 180… over what actually animates. */
+[data-rev-item] { transition: opacity .55s ease, transform .55s ease; }
+[data-rev-item][data-hide] { opacity: 0; transform: translateY(18px); }
+/* how-it-works: the datum rail draws itself over the step's own top border, then
+   the survey marker is planted — both reuse the section's existing vocabulary */
+[data-step]::after {
+  content: ""; position: absolute; top: -1px; left: 0; right: 0; height: 1px;
+  background: var(--color-accent); transform-origin: left;
+  transition: transform .6s ease;
+}
+[data-step][data-hide]::after { transform: scaleX(0); }
+[data-step] > span[aria-hidden="true"] { transition: transform .45s cubic-bezier(.34, 1.4, .64, 1) .15s; }
+[data-step][data-hide] > span[aria-hidden="true"] { transform: scale(0); }
+/* pain cards: the numeral as a ghosted watermark, giving the flat boxes depth */
+[data-num] { overflow: hidden; }
+[data-num]::before {
+  content: attr(data-num); position: absolute; right: -4px; top: -18px;
+  font-family: var(--font-heading); font-weight: 600; font-size: 96px; line-height: 1;
+  letter-spacing: 0.02em; pointer-events: none;
+  color: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+/* benefits band: redefining two tokens recolours every inline
+   color-mix(... var(--color-text) ...) inside the section at once.
+   --color-accent-700 is remapped because #7A5216 is 2.7:1 on #141414 (fails AA)
+   while #D9AB56 is 8.7:1. --color-bg is deliberately NOT redefined — the section
+   never uses it, but .btn-primary reads it for its label colour and the CTA must
+   stay identical to every other CTA on the page. */
+[data-band="dark"] {
+  --color-text: #FAF8F5;
+  --color-divider: color-mix(in srgb, #FAF8F5 22%, transparent);
+  --color-accent-700: #D9AB56;
+  background: #141414;
+  color: #FAF8F5;
+}
+/* A dark band prints as white-on-white: browsers drop backgrounds when printing but
+   keep colours. One rule restores the whole band because the colours are tokens. */
+@media print {
+  [data-band="dark"] {
+    --color-text: #141414;
+    --color-divider: color-mix(in srgb, #141414 16%, transparent);
+    --color-accent-700: #7A5216;
+    background: #fff !important;
+    color: #141414 !important;
+  }
+}
+`;
+
+/** Every element that paints its own #141414 background. Tagging them `data-band`
+ *  gives the accessibility panel's high-contrast mode a selector that actually
+ *  matches — see rewriteA11y() for why the export's own one cannot. */
+const DARK_BANDS = [
+  ['hero', '<section style="position: relative; isolation: isolate; background: #141414;'],
+  ['mission', '<section aria-label="Our mission" style="position: relative; background: #141414;'],
+  ['film', '<section id="film" aria-label="Watch the kitchens" style="background: #141414;'],
+  ['final CTA', '<section id="tour" style="background: #141414;'],
+  ['sticky bar', '<div style="position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;'],
+];
+
+/** Returns [before, section, after] split around the section that starts with
+ *  `openTag`, so a transform can be scoped to one section. Needed because the pain
+ *  cards' markup (`class="blueprint" style="padding: 24px;"`) is byte-identical to
+ *  four cards in the unrelated facility section. */
+function sectionSlice(html, openTag, label) {
+  const i = html.indexOf(openTag);
+  if (i === -1 || html.indexOf(openTag, i + 1) !== -1) {
+    throw new Error(`[build] ${label}: section anchor is missing or not unique.`);
+  }
+  const j = html.indexOf('</section>', i);
+  if (j === -1) throw new Error(`[build] ${label}: no closing </section>.`);
+  return [html.slice(0, i), html.slice(i, j), html.slice(j)];
+}
+
+/**
+ * Adds the per-item scroll motion and turns the benefits sheet into a dark band.
+ *
+ * Must run BEFORE stripCornerMarkup: that pass deletes whole lines that held nothing
+ * but corner marks, and the pain cards' corner line sits directly under the anchor
+ * used here. Must also run before widenDesktopLayout, which counts `max-width: 1240px`
+ * across the whole document and expects exactly 18 — the benefits restructure MOVES
+ * that declaration onto a new inner div rather than adding one, keeping the count.
+ */
+function addScrollMotion(html, label) {
+  const OPEN_A = '<section aria-label="How it works" style="border-bottom: 1px solid var(--color-divider);">';
+  const OPEN_B = '<section data-rev style="max-width: 1240px; margin: 0 auto; padding: clamp(48px, 6vw, 96px) var(--edge);">';
+  const OPEN_C = '<section data-rev style="max-width: 1240px; margin: 0 auto; padding: clamp(24px, 3vw, 40px) var(--edge) clamp(48px, 6vw, 96px);">';
+  const CARD = '<div class="blueprint" style="padding: 24px;">';
+  let out = html;
+
+  // ---- stylesheet: append to the export's own motion block ----
+  out = replaceExactly(
+    out,
+    '[data-marquee-wrap]:hover [data-marquee] { animation-play-state: paused; }\n',
+    '[data-marquee-wrap]:hover [data-marquee] { animation-play-state: paused; }\n' + MOTION_CSS,
+    1,
+    'motion css'
+  );
+  out = replaceExactly(
+    out,
+    '  [data-rev], [data-faq] svg, [data-tab] { transition: none !important; }',
+    '  [data-rev], [data-rev-item], [data-step]::after, [data-step] > span[aria-hidden="true"],\n' +
+      '  [data-faq] svg, [data-tab] { transition: none !important; }',
+    1,
+    'reduced-motion list'
+  );
+
+  // ---- tag every dark band so high contrast has a selector that matches ----
+  for (const [name, anchor] of DARK_BANDS) {
+    const tagged = anchor.replace(/^<(section|div)/, (m, t) => `<${t} data-band="dark"`);
+    out = replaceExactly(out, anchor, tagged, 1, `dark band: ${name}`);
+  }
+
+  // ---- section A: stagger the steps, draw the rail, plant the markers ----
+  out = replaceExactly(
+    out,
+    '<li style="border-top: 1px solid var(--color-divider); padding-top: 16px; position: relative;">',
+    '<li data-rev-item data-step style="border-top: 1px solid var(--color-divider); padding-top: 16px; position: relative;">',
+    4,
+    'how-it-works steps'
+  );
+
+  // ---- section B: stagger the pain cards, add the ghosted numeral ----
+  // The card markup is byte-identical to four cards in the facility section, so this
+  // is scoped to section B and the global count is asserted either side.
+  const cardsBefore = (out.match(new RegExp(CARD.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+  if (cardsBefore !== 8) {
+    throw new Error(`[build] ${label}: expected 8 identical 24px cards, found ${cardsBefore}.`);
+  }
+  {
+    const [pre, sec, post] = sectionSlice(out, OPEN_B, `${label} section B`);
+    const parts = sec.split(CARD);
+    if (parts.length !== 5) {
+      throw new Error(`[build] ${label}: expected 4 pain cards in section B, found ${parts.length - 1}.`);
+    }
+    let rebuilt = parts[0];
+    for (let i = 1; i < parts.length; i++) {
+      rebuilt += `<div class="blueprint" data-rev-item data-num="0${i}" style="padding: 24px;">` + parts[i];
+    }
+    out = pre + rebuilt + post;
+  }
+  const cardsAfter = (out.match(new RegExp(CARD.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+  if (cardsAfter !== 4) {
+    throw new Error(`[build] ${label}: expected 4 untouched cards to remain, found ${cardsAfter}.`);
+  }
+
+  // ---- section C: dark band, its own eyebrow, row-by-row reveal ----
+  {
+    const [pre, sec, post] = sectionSlice(out, OPEN_C, `${label} section C`);
+    let body = sec.slice(OPEN_C.length);
+
+    // Rows reveal one at a time — the list visibly fills in.
+    body = replaceExactly(
+      body,
+      '<div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; padding: 18px 24px; border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);">',
+      '<div data-rev-item style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; padding: 18px 24px; border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);">',
+      4,
+      'benefit rows'
+    );
+    body = replaceExactly(
+      body,
+      '<div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; padding: 18px 24px;">',
+      '<div data-rev-item style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px; padding: 18px 24px;">',
+      1,
+      'benefit last row'
+    );
+
+    // The section carries no eyebrow of its own, which is why the page's numbered
+    // spine reads 01 -> 03 with 02 missing. Give it the 02 slot it already claims
+    // inside the frame as "Sheet 02".
+    body = replaceExactly(
+      body,
+      '<div class="blueprint" style="position: relative;">',
+      '<span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-700); margin-bottom: 12px;">02 &middot; The easy upgrade</span>\n' +
+        '      <hr style="height: 1px; border: 0; margin: 0 0 clamp(28px, 4vw, 44px); background: var(--color-divider);" />\n' +
+        '      <div class="blueprint" style="position: relative;">',
+      1,
+      'benefits eyebrow'
+    );
+
+    // Full-bleed dark band. max-width and the horizontal padding stay on the SAME
+    // element so box-sizing keeps the content box identical to every other section;
+    // only the vertical padding moves out to the band. data-rev moves inward too —
+    // left on the band it would fade and slide the dark background itself.
+    const open =
+      '<section data-band="dark" style="background: #141414; padding: clamp(48px, 6vw, 88px) 0; margin-top: clamp(24px, 3vw, 40px);">\n' +
+      '    <div data-rev style="max-width: 1240px; margin: 0 auto; padding: 0 var(--edge);">';
+    out = pre + open + body + '\n    </div>\n  ' + post;
+  }
+
+  return out;
+}
+
+/**
+ * Patches the export's runtime: the reveal observer, the accessibility sheet, and
+ * the hero video's phone gate.
+ */
+function rewriteRuntime(html, label) {
+  let out = html;
+
+  // ---- reveal observer ----
+  // Two changes. It now also drives [data-rev-item], which hides via an attribute
+  // rather than an inline style so the final state is the default. And it bails when
+  // the accessibility panel's Stop motion is already on: that setting is persisted
+  // separately from the OS one and applied before setState has landed, so without
+  // this the observer hides content the panel's stylesheet then has to fight back
+  // into view with !important — and toggling Stop motion off would drop that shield
+  // and blank whatever had not been scrolled past yet.
+  out = replaceExactly(
+    out,
+    `    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || !('IntersectionObserver' in window)) return;
+    // Only hide what is already below the fold, so nothing visible ever flashes
+    // and the page reads fine with JS disabled.
+    const targets = Array.from(document.querySelectorAll('[data-rev]'))
+      .filter(el => el.getBoundingClientRect().top > window.innerHeight * 0.9);
+    if (!targets.length) return;
+    targets.forEach(el => { el.style.opacity = '0'; el.style.transform = 'translateY(16px)'; });
+    this._io = new IntersectionObserver((entries, obs) => {
+      entries.forEach(en => {
+        if (!en.isIntersecting) return;
+        en.target.style.opacity = '1';
+        en.target.style.transform = 'none';
+        obs.unobserve(en.target);
+      });
+    }, { rootMargin: '0px 0px -12% 0px', threshold: 0.05 });
+    targets.forEach(el => this._io.observe(el));`,
+    `    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let stillOn = false;
+    try { stillOn = !!(JSON.parse(localStorage.getItem('on-a11y') || 'null') || {}).still; } catch (err) { /* private mode */ }
+    if (reduce || stillOn || !('IntersectionObserver' in window)) return;
+    // Only hide what is already below the fold, so nothing visible ever flashes
+    // and the page reads fine with JS disabled.
+    const below = el => el.getBoundingClientRect().top > window.innerHeight * 0.9;
+    const targets = Array.from(document.querySelectorAll('[data-rev]')).filter(below);
+    const items = Array.from(document.querySelectorAll('[data-rev-item]')).filter(below);
+    if (!targets.length && !items.length) return;
+    targets.forEach(el => { el.style.opacity = '0'; el.style.transform = 'translateY(16px)'; });
+    // Stagger across the hidden siblings only. A group that straddles the fold has
+    // its first items left visible, so counting all children would leave a hole in
+    // the cascade and a dead beat before anything moved.
+    const rank = new Map();
+    items.forEach(el => {
+      const n = rank.get(el.parentElement) || 0;
+      rank.set(el.parentElement, n + 1);
+      if (n) el.style.transitionDelay = (n * 90) + 'ms';
+      el.setAttribute('data-hide', '');
+    });
+    this._io = new IntersectionObserver((entries, obs) => {
+      entries.forEach(en => {
+        if (!en.isIntersecting) return;
+        if (en.target.hasAttribute('data-rev-item')) {
+          en.target.removeAttribute('data-hide');
+        } else {
+          en.target.style.opacity = '1';
+          en.target.style.transform = 'none';
+        }
+        obs.unobserve(en.target);
+      });
+    }, { rootMargin: '0px 0px -12% 0px', threshold: 0.05 });
+    targets.concat(items).forEach(el => this._io.observe(el));`,
+    1,
+    'reveal observer'
+  );
+
+  // ---- high contrast: give it a selector that actually matches ----
+  // The export's rescue rule keys off [style*="#141414"], but the DC runtime parses
+  // every style attribute into a React style object and re-serialises it through
+  // CSSOM, so the served DOM says `background: rgb(20, 20, 20)` and that selector
+  // matches nothing. The blanket `color: #000000` therefore lands unopposed on every
+  // dark section: verified 1.02:1 black-on-black across the hero, the film section
+  // and the final CTA today. Keyed on the data-band attribute instead.
+  out = replaceExactly(
+    out,
+    `      '[style*="#FAF8F5"] p, [style*="#141414"] p, [style*="#141414"] li { color: #ffffff !important; }'`,
+    `      '[data-band="dark"] { background: #000000 !important; color: #ffffff !important; --color-text: #ffffff; --color-divider: #ffffff; --color-accent-700: #ffffff; }',
+      '[data-band="dark"] p, [data-band="dark"] li, [data-band="dark"] dd, [data-band="dark"] dt, [data-band="dark"] span, [data-band="dark"] h1, [data-band="dark"] h2, [data-band="dark"] h3, [data-band="dark"] label, [data-band="dark"] a { color: #ffffff !important; }'`,
+    1,
+    'high-contrast dark bands'
+  );
+
+  // ---- stop motion: un-hide anything the observer had already staged ----
+  // The CSS rescue alone is not enough. It only masks the staged state, so turning
+  // Stop motion back OFF drops the mask and re-hides every element the visitor had
+  // not yet scrolled past. Clearing the staged state outright and retiring the
+  // observer makes the change one-way, so the off path has nothing left to expose.
+  out = replaceExactly(
+    out,
+    `      '[data-rev] { opacity: 1 !important; transform: none !important; }'`,
+    `      '[data-rev] { opacity: 1 !important; transform: none !important; }',
+      '[data-hide] { opacity: 1 !important; transform: none !important; }'`,
+    1,
+    'stop-motion rescue'
+  );
+  out = replaceExactly(
+    out,
+    `    el.textContent = rules.join('\\n');
+    try { localStorage.setItem('on-a11y', JSON.stringify(a)); } catch (err) { /* private mode */ }`,
+    `    el.textContent = rules.join('\\n');
+    if (a.still) {
+      // one-way: drop the staged state so toggling Stop motion off cannot re-hide
+      document.querySelectorAll('[data-rev], [data-rev-item]').forEach(node => {
+        node.style.opacity = '';
+        node.style.transform = '';
+        node.style.transitionDelay = '';
+        node.removeAttribute('data-hide');
+      });
+      if (this._io) { this._io.disconnect(); this._io = null; }
+    }
+    try { localStorage.setItem('on-a11y', JSON.stringify(a)); } catch (err) { /* private mode */ }`,
+    1,
+    'stop-motion unstage'
+  );
+
+  // ---- stop both Vimeo players preloading on every visit ----
+  // The raw <x-dc> template is real markup in the document, so the HTML parser
+  // reaches its two <iframe src="player.vimeo.com/…"> tags and starts fetching them
+  // long before boot() removes the subtree. x-dc{display:none} hides them; it does
+  // not stop an iframe loading. The result, measured: two Vimeo player documents
+  // requested on every visit, on every device — including phones, where the export
+  // deliberately renders only a poster, and including the click-to-play modal that
+  // nobody has opened. loading="lazy" suppresses the fetch for markup that is not
+  // near the viewport, which covers both template copies, while the real iframes
+  // React renders are in view when they mount and so still load normally.
+  out = replaceExactly(
+    out,
+    '<iframe src="https://player.vimeo.com/video/703398003?background=1',
+    '<iframe loading="lazy" src="https://player.vimeo.com/video/703398003?background=1',
+    1,
+    'hero video lazy'
+  );
+  out = replaceExactly(
+    out,
+    '<iframe src="https://player.vimeo.com/video/703398003?autoplay=1',
+    '<iframe loading="lazy" src="https://player.vimeo.com/video/703398003?autoplay=1',
+    1,
+    'modal video lazy'
+  );
+
+  // ---- hero video on phones ----
+  // The export gates the Vimeo background iframe off below 760px. Enabled here, with
+  // the one guard the platform actually offers: navigator.connection, read once so a
+  // mid-session estimate change cannot swap the iframe in and out. Note this API is
+  // absent on Safari/iOS, so iPhones are not covered — see the README.
+  out = replaceExactly(
+    out,
+    `      isPhone: this._mq.matches,`,
+    `      isPhone: this._mq.matches,
+      cheapNet: (() => {
+        const c = navigator.connection || {};
+        return !c.saveData && !/^(slow-2g|2g)$/.test(c.effectiveType || '');
+      })(),`,
+    1,
+    'connection probe'
+  );
+  // Starts false so the Vimeo iframe is never rendered — and never begins fetching —
+  // before componentDidMount has actually measured the connection. Left true, the
+  // first render requests the player on every device and the data guard only removes
+  // it afterwards, which is too late to save the bytes.
+  out = replaceExactly(
+    out,
+    `      isPhone: false, isDesktop: true, reduced: false,`,
+    `      isPhone: false, isDesktop: true, reduced: false, cheapNet: false,`,
+    1,
+    'cheapNet initial state'
+  );
+  out = replaceExactly(
+    out,
+    `      showHeroVideo: !s.isPhone && !s.reduced,`,
+    `      showHeroVideo: !s.reduced && s.cheapNet,`,
+    1,
+    'hero video gate'
+  );
+
+  return out;
+}
+
+/**
  * Widens the page on large desktop screens and centres the closing lead form.
  *
  * The export pins all 18 content wrappers to a flat `max-width: 1240px`. On a 1920px
@@ -419,6 +816,9 @@ async function buildIndex() {
     'lead form redirect'
   );
 
+  html = addScrollMotion(html, 'index.html');
+  html = rewriteRuntime(html, 'index.html');
+
   const stripped = stripCornerMarkup(html, 'index.html');
   const guarded = guardGridMinimums(stripped.html, 'index.html');
   const widened = widenDesktopLayout(guarded.html, 'index.html');
@@ -426,7 +826,7 @@ async function buildIndex() {
   console.log(
     `  index.html      <- ${ENTRY} (+ head fixes, stylesheet hoisted, /thank-you redirect, ` +
       `${stripped.removed} corner marks removed, ${guarded.guarded} grid minimums guarded, ` +
-      `${widened.widened} wrappers widened)`
+      `${widened.widened} wrappers widened, scroll motion + dark benefits band)`
   );
 }
 

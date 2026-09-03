@@ -168,6 +168,64 @@ of empty panel to its right. Widening the page would have made that worse, so
 `margin-inline: auto` centres it in the same pass — block-centred, text still
 left-aligned.
 
+## Scroll motion and section differentiation
+
+The page read flat for measurable reasons: **46 `.blueprint` boxes** all rendering as
+plain 1px rectangles, essentially **one ground colour** across the light region, only
+**4 of 15 sections dark** — with five consecutive light ones in the stretch where
+visitors decide whether to keep going — and a scroll experience that was **8 identical
+whole-section fades**. The how-it-works strip had no `data-rev` at all.
+
+**`data-rev-item`** adds per-item reveal. It hides via a `[data-hide]` attribute
+rather than an inline style, which is the opposite of `[data-rev]` and deliberate: the
+final state is the *default*, so if the script never runs, or the visitor has reduced
+motion, or Stop motion is on, the content is simply already in place. The stagger delay
+is written by the script from the item's rank **among hidden siblings**, not
+`:nth-child` — a group straddling the fold has its first items left visible, and a
+positional delay would leave a hole in the cascade.
+
+Applied to: the four how-it-works steps (amber datum rail drawn left to right, marker
+planted after it), the four pain cards (plus a ghosted numeral via
+`::before { content: attr(data-num) }`), and the five benefit rows.
+
+**The benefits sheet is now a dark band.** Its colours come from redefining two tokens
+on the section — every inline `color-mix(… var(--color-text) …)` inside then resolves
+light-on-dark, recolouring 16 references without rewriting one. `--color-accent-700` is
+remapped because `#7A5216` is **2.7:1 on `#141414` and fails AA**; `#D9AB56` is 8.7:1.
+`--color-bg` is deliberately *not* redefined — the section never uses it but
+`.btn-primary` reads it for its label, and the CTA must match every other CTA.
+
+The section also gains the eyebrow it never had, repairing the numbered spine that read
+`01 · Why operators call us` → `03 · The kitchens` with 02 missing.
+
+### Two pre-existing bugs this fixed
+
+**High contrast made every dark section invisible.** The accessibility panel's rescue
+rule keys off `[style*="#141414"]`, but the DC runtime parses every style attribute
+into a React style object and re-serialises it, so the served DOM says
+`background: rgb(20, 20, 20)` and that selector matched **nothing** — verified, zero
+elements. The blanket `color: #000000 !important` therefore landed unopposed: measured
+**1.02:1 black-on-black** on the hero, the film section and the final CTA. Every dark
+element now carries `data-band="dark"` and the rescue keys off that. Measured after:
+21:1.
+
+**Both Vimeo players were fetched on every visit, on every device.** The two
+`<iframe src="player.vimeo.com/…">` tags live in the raw `<x-dc>` template, so the HTML
+parser started loading them before `boot()` removed that subtree — `display:none` hides
+an iframe, it does not stop it fetching. So the export's "phones get a poster" never
+saved the bytes, and neither did the click-to-play modal nobody had opened.
+`loading="lazy"` suppresses both template copies while the iframes React actually mounts
+still load. Vimeo documents per visit: **2 → 1** where the video plays, **2 → 0** where
+it does not. FCP improved 468ms → 336ms as a side effect.
+
+### Hero video on phones
+
+The export gated the video off below 760px. It now plays, gated on `navigator.connection`
+instead — skipped under Save-Data or a 2g estimate, read once so a mid-session estimate
+change cannot swap the iframe in and out, and initialised to "no video" so nothing is
+fetched before the check runs. **`navigator.connection` does not exist on Safari/iOS**,
+so iPhones always get the video; there is no platform API to do better.
+
 ## Lead webhook
 
 Every validated submission from either form is POSTed to `LEAD_WEBHOOK_URL`, then the
