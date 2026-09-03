@@ -302,6 +302,23 @@ const READABILITY_CSS = `
 [data-navpanel] a:first-child { border-top: 0; }
 @media (min-width: 1000px) { [data-navbtn], [data-navpanel] { display: none !important; } }
 
+/* Adding the menu button pushed the header past the width of a small phone: the row is
+   var(--edge) + wordmark 105 + gap 20 + button 48 + gap 20 + CTA 139 + var(--edge) = 372px,
+   at 320 and 360 the CTA wrapped to a second line and the sticky header doubled to 116px.
+   Measured, not assumed. Tightening the gap, the CTA's side padding and the button to
+   Apple's 44pt minimum brings the row to ~342px, which fits from 360 up. */
+@media (max-width: 430px) {
+  [data-siteheader] > div { gap: 12px !important; }
+  [data-navbtn] { width: 44px !important; height: 44px !important; min-height: 44px !important; }
+  [data-siteheader] a.btn-primary { padding-left: 13px !important; padding-right: 13px !important; }
+}
+/* Below ~350px even that does not fit, and the CTA is the redundant one: the hero's own
+   full-size Schedule a Tour sits about 40px underneath, and the bottom bar carries one
+   from 77px of scroll. A wrapped 116px sticky header costs more than this does. */
+@media (max-width: 349px) {
+  [data-siteheader] a.btn-primary { display: none !important; }
+}
+
 /* The closing form's fields are near-black; its placeholders need the band's ink,
    not the page's. Higher specificity than the bare ::placeholder rule above, so
    order does not matter. */
@@ -684,10 +701,11 @@ function addMobileNav(html, label) {
       "    // in the same click that opened it. Running first means the DOM is still intact\n" +
       "    // and this.state is still the pre-click value: the opening click sees navOpen\n" +
       "    // false and bails, and a click on the button while open is inside <header> and\n" +
-      "    // bails too, leaving React's own toggle to close it.\n" +
+      "    // bails too, leaving React's own toggle to close it. Scoped to the site header\n" +
+      "    // by attribute: the benefits sheet has a <header> of its own.\n" +
       "    this._onDocClick = (ev) => {\n" +
       "      if (!this.state.navOpen) return;\n" +
-      "      if (ev.target && ev.target.closest && ev.target.closest('header')) return;\n" +
+      "      if (ev.target && ev.target.closest && ev.target.closest('[data-siteheader]')) return;\n" +
       "      this.setState({ navOpen: false });\n" +
       "    };\n" +
       "    document.addEventListener('click', this._onDocClick, true);",
@@ -713,13 +731,27 @@ function addMobileNav(html, label) {
   );
 
   // ---- the button and the panel, in the header ----
+  // The site header needs a hook of its own. It is not the only <header> in the document:
+  // the benefits sheet has one for its "Sheet 02" strip, so `header`, `header > div` and
+  // closest('header') all match two elements — and the outside-click test below reads as
+  // "did this tap land in the site header?", which a tap on that strip would wrongly
+  // satisfy, leaving the menu open.
+  out = replaceExactly(
+    out,
+    '<header style="position: sticky; top: 0; z-index: 60;',
+    '<header data-siteheader style="position: sticky; top: 0; z-index: 60;',
+    1,
+    'site header hook'
+  );
+
   const icon = (paths) =>
     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
     'stroke-width="1.5" stroke-linecap="round" aria-hidden="true">' + paths + '</svg>';
   const button =
     '<button type="button" data-navbtn onClick="{{ toggleNav }}" aria-expanded="{{ navOpen }}" ' +
       'aria-controls="site-nav" aria-label="Menu" class="btn btn-secondary" ' +
-      'style="width: 48px; height: 48px; min-height: 48px; padding: 0; flex: none;">\n' +
+      'style="width: 48px; height: 48px; min-height: 48px; padding: 0; flex: none; ' +
+      'margin-left: auto;">\n' +
     '      <sc-if value="{{ navClosed }}" hint-placeholder-val="{{ true }}">' +
       icon('<path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path>') +
       '</sc-if>\n' +
@@ -734,10 +766,17 @@ function addMobileNav(html, label) {
       `        <a href="${href}" onClick="{{ toggleNav }}">${text}</a>\n`).join('') +
     '      </nav>\n' +
     '    </sc-if>\n';
-  const CTA =
-    '<a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; ' +
-    'letter-spacing: 0.06em; padding: 10px 18px; font-size: 14px; white-space: nowrap;">';
-  out = replaceExactly(out, '    ' + CTA, '    ' + button + '    ' + panel + '    ' + CTA, 1, 'nav markup');
+  // After the CTA, not before it: the header reads wordmark, then Schedule a Tour,
+  // then the menu at the right-hand end. The logo already carries `margin-right: auto`
+  // and the button now carries `margin-left: auto`, so the free space splits either
+  // side of the CTA and it sits in the middle rather than flush against the menu.
+  out = replaceExactly(
+    out,
+    '  </div>\n</header>',
+    '    ' + button + '    ' + panel + '  </div>\n</header>',
+    1,
+    'nav markup'
+  );
 
   return out;
 }
