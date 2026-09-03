@@ -296,6 +296,60 @@ reviews. FAQ is an accordion, the kitchens are tabbed and reviews are now trimme
 pain cards, the benefits band and "Who it's for" are the sections doing the
 persuading, so they stay open.
 
+### The primary button, one step down its own ramp
+
+`#FAF8F5` on `--color-accent` `#B07A1C` measured **3.51:1** against AA's 4.5:1, on
+all 13 amber buttons — every "Schedule a Tour", the sticky bar, the skip link. No new
+colour was needed: `--color-accent-600` `#96661A` is 4.70:1 and was already the
+button's own hover value, so the whole ramp shifts one step inside the palette the
+design system ships.
+
+| state | before | after | label contrast |
+|---|---|---|---|
+| rest | `--color-accent` `#B07A1C` | `--color-accent-600` `#96661A` | 3.51 -> **4.70** |
+| hover | `-600` | `-700` `#7A5216` | **6.50** |
+| active | `-700` | `-800` `#5C3D12` | **9.29** |
+| border | `--color-accent` | `-600` | |
+
+Nothing else amber changes — the survey markers, the stars, the rail and the `-400`
+eyebrows on the dark bands all still read `--color-accent`. The rules live in
+`rewriteDesignSystemCss()` rather than the helmet block because the design-system
+stylesheet is a `<link>` in `<head>` and the helmet `<style>` lands elsewhere in the
+cascade: same specificity, so source order would decide, which is not something to
+leave to chance for the page's primary call to action.
+
+**This surfaced a bug the dark band had introduced.** `[data-band="dark"]` remaps
+`--color-accent-700` to `#D9AB56` so the benefits sheet's numerals clear AA on
+black — and `.btn-primary` reads that same token for a state. Inside a dark band the
+button therefore resolved to `#D9AB56`: a **2.00:1** label, worse than the resting
+state this change was made to fix. It was on `:active` before and would have moved to
+`:hover`. One rule restores the token inside the button —
+`[data-band="dark"] .btn-primary { --color-accent-700: #7A5216; }` — for the same
+reason `--color-bg` is left alone on that band: the CTA must be identical on every
+ground. Verified across all 13 buttons, 5 of them on dark bands: `-700` now resolves
+to `#7A5216` everywhere.
+
+The accessibility panel's high-contrast mode redefines `--color-accent` and
+`--color-accent-700` at `:root` but not `-600`, which is now what the button paints
+with, so `--color-accent-600: #5c4008` (9.58:1 on white) was added to that rule —
+otherwise the page's main call to action would have been the one thing the mode
+could not reach.
+
+### A placeholder trap, closed before anything fell into it
+
+Worth being precise about, because it is easy to misread as a live bug: **no input on
+the site has a `placeholder` attribute**. Every field carries a visible label above
+it, which is the better pattern, and nothing renders through the export's
+`::placeholder` rule today.
+
+But that rule is a single one for the whole site, and the closing form sits on the
+`#141414` band with `background: color-mix(in srgb, #FAF8F5 8%, transparent)` — a
+field resolving to `rgb(38, 38, 38)`. A 42%-black placeholder over that resolves to
+`rgb(31, 31, 31)`: **1.06:1**, invisible. Adding one placeholder to the page's
+primary conversion form would have produced exactly that, silently. The global value
+is now 64% (5.12:1 over the light form's `--color-surface` field) and the dark form
+has its own light variant keyed on the `data-form="end"` its inputs already carry.
+
 ### A guard for the font-swap window
 
 `font-display: swap` renders the fallback first, and the fallback's "No construction."
@@ -422,11 +476,16 @@ remaining place. It is a no-op wherever the container is at least `<N>` wide, so
 every tablet and desktop layout is unchanged — confirmed by measuring 150 bounding
 boxes at 390 / 768 / 1440 against an unguarded build: identical.
 
-Known, not fixed: two links on the landing page are under the 24x24 px WCAG 2.2
-SC 2.5.8 target size — the header logo (105x20) and the footer "Schedule a tour"
-(101x18). Both need padding on elements inside the design export, which would shift
-its layout, so they are left for a deliberate design decision rather than changed
-here.
+Two links were under the 24x24 px of WCAG 2.2 SC 2.5.8 — the header logo (105x20)
+and the footer "Schedule a tour" (101x18). This was recorded here as needing a
+design decision, on the assumption that padding would shift the layout. Re-measured,
+it doesn't: the header row's height is set by the 52px CTA inside a 68px
+`min-height`, so `padding-block: 2px` takes the logo to 24px and moves nothing; and
+the footer link is an inline `<a>` in a `<p>` whose line box is already 24px, so
+`display: inline-block` makes the link fill the box it already sits in — where
+padding would have grown it. Both carry a `data-tap` hook added by the build.
+Confirmed by snapshotting every box in the header and footer with the two rules on
+and off: exactly two boxes differ, and they are the two links.
 
 ## Connecting the app in the Amplify console
 
@@ -490,14 +549,6 @@ These are behaviours of the design prototype, left alone deliberately:
   `style` attributes and ships its logic in an inline script, so any workable policy
   needs `'unsafe-inline'` for both `script-src` and `style-src`. `customHttp.yml`
   carries an accurate origin list in a comment if you want to enable one anyway.
-- **The primary CTA button label is 3.51:1** — `#FAF8F5` on `--color-accent`
-  `#B07A1C`, against the 4.5:1 AA requirement, on all 11 amber buttons including
-  "Schedule a Tour" and "Schedule My Tour". It is the one text contrast failure left
-  on the page. Every fix is a brand decision rather than a readability one, so none
-  was made here: darkening the accent to about `#966715` reaches 4.5:1 and keeps the
-  amber; `--color-accent-700` `#7A5216` reaches 7.1:1 but reads much heavier; and a
-  `#141414` label on the existing amber reaches 4.94:1 while changing the button's
-  character completely.
 - **Cache lifetimes are short** (one day for images, revalidate for HTML) because no
   filename carries a content hash. Fingerprint the assets and these can go to a
   year.
@@ -525,8 +576,9 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
 - Corner removal: 0 `.corner` nodes on every page, `.blueprint` border intact, and
   150 bounding boxes byte-identical to the previous build at all three widths.
 - Contrast, measured on computed styles over the composited background after a full
-  scroll: **0 body-text nodes below AA** at 390 and 1440, on the landing page and the
-  thank-you page. The one remaining failure is noted under Known gaps.
+  scroll: **0 text nodes below AA** at 390 and 1440, on the landing page and the
+  thank-you page — including every button state on both grounds.
+- Every interactive element on the page is at least 24x24 at 390px.
 - Mobile type: nothing under 14px below 760px, nothing tighter than 1.35 leading except
   `.btn` (1.2, deliberate), section padding 68px; at 761px and above the scale is
   byte-identical to before.

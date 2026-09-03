@@ -232,6 +232,12 @@ const MOTION_CSS = `
   background: #141414;
   color: #FAF8F5;
 }
+/* The band remaps --color-accent-700 for its numerals, and .btn-primary's hover
+   reads that same token — so inside a dark band the CTA's hover resolved to the
+   band's #D9AB56: a 2.00:1 label, worse than the resting state this change was
+   made to fix. Restoring the token inside the button keeps the ramp identical on
+   every ground, which is the same reason --color-bg is left alone above. */
+[data-band="dark"] .btn-primary { --color-accent-700: #7A5216; }
 /* A dark band prints as white-on-white: browsers drop backgrounds when printing but
    keep colours. One rule restores the whole band because the colours are tokens. */
 @media print {
@@ -272,6 +278,14 @@ const READABILITY_CSS = `
    scrolled sideways. Both rules are inert once Barlow Condensed lands. */
 [style*="padding: clamp(88px, 11vh, 150px)"] { min-width: 0; }
 [style*="padding: clamp(88px, 11vh, 150px)"] h1 { overflow-wrap: break-word; }
+
+/* The closing form's fields are near-black; its placeholders need the band's ink,
+   not the page's. Higher specificity than the bare ::placeholder rule above, so
+   order does not matter. */
+[data-form="end"]::placeholder { color: color-mix(in srgb, #FAF8F5 62%, transparent); }
+/* WCAG 2.2 SC 2.5.8, both layout-neutral — see the note in improveReadability(). */
+[data-tap="logo"] { padding-block: 2px; }
+[data-tap="footer"] { display: inline-block; }
 
 @media (max-width: 900px) {
   /* The hero reserves 82vh and bottom-aligns ~510px of content inside it, so the
@@ -480,6 +494,47 @@ function improveReadability(html, label) {
     );
   }
 
+  // ---- placeholders: a latent trap, not a live bug ----
+  // Nothing renders through these rules today — the design gives every field a
+  // visible label and sets no placeholder attribute anywhere, which is the better
+  // pattern and the reason this went unnoticed. But the export ships a single
+  // `::placeholder` rule for the whole site, and the closing form sits on the
+  // #141414 band with `background: color-mix(in srgb, #FAF8F5 8%, transparent)` —
+  // a field resolving to rgb(38, 38, 38). A 42%-black placeholder over that
+  // resolves to rgb(31, 31, 31): 1.06:1, invisible. Adding one placeholder to the
+  // page's primary conversion form would have produced exactly that, silently.
+  // 64% is 5.12:1 over the light form's --color-surface field, and the dark form
+  // gets its own light variant in READABILITY_CSS keyed on the data-form="end"
+  // every input in it already carries.
+  out = replaceExactly(
+    out,
+    '::placeholder { color: color-mix(in srgb, #141414 42%, transparent); }',
+    '::placeholder { color: color-mix(in srgb, #141414 64%, transparent); }',
+    1,
+    'placeholder contrast'
+  );
+
+  // ---- tap targets ----
+  // Two links are under the 24x24 of WCAG 2.2 SC 2.5.8. Both reach it without
+  // moving anything, which is why they are fixed here rather than left as a design
+  // decision: the header row's height is set by the 52px CTA inside a 68px
+  // min-height, and the footer link's paragraph line box is already 24px, so the
+  // link only has to fill it.
+  out = replaceExactly(
+    out,
+    '<a href="#top" style="display: flex; align-items: baseline; gap: 8px;',
+    '<a href="#top" data-tap="logo" style="display: flex; align-items: baseline; gap: 8px;',
+    1,
+    'header logo tap target'
+  );
+  out = replaceExactly(
+    out,
+    '<p style="margin: 0; font-size: 15px; line-height: 24px;"><a href="#tour">Schedule a tour</a></p>',
+    '<p style="margin: 0; font-size: 15px; line-height: 24px;"><a href="#tour" data-tap="footer">Schedule a tour</a></p>',
+    1,
+    'footer link tap target'
+  );
+
   // ---- reviews: open with three quotes instead of six ----
   // The section shows 6 of 12 and hides the rest behind a "See more reviews"
   // button that already exists, driven by state that already exists. Three of the
@@ -614,6 +669,18 @@ function rewriteRuntime(html, label) {
       '[data-band="dark"] p, [data-band="dark"] li, [data-band="dark"] dd, [data-band="dark"] dt, [data-band="dark"] span, [data-band="dark"] h1, [data-band="dark"] h2, [data-band="dark"] h3, [data-band="dark"] label, [data-band="dark"] a { color: #ffffff !important; }'`,
     1,
     'high-contrast dark bands'
+  );
+
+  // High contrast redefines --color-accent and --color-accent-700 at :root but not
+  // -600, which is now what the primary button paints with — so without this the
+  // page's main call to action would be the one thing the mode could not reach.
+  // #5c4008 is 9.58:1 against the mode's white ground.
+  out = replaceExactly(
+    out,
+    "':root { --color-text: #000000; --color-bg: #ffffff; --color-accent: #6b4409; --color-accent-700: #4a2f06; --color-divider: #000000; }'",
+    "':root { --color-text: #000000; --color-bg: #ffffff; --color-accent: #6b4409; --color-accent-600: #5c4008; --color-accent-700: #4a2f06; --color-divider: #000000; }'",
+    1,
+    'high-contrast accent-600'
   );
 
   // ---- stop motion: un-hide anything the observer had already staged ----
@@ -788,10 +855,24 @@ function guardGridMinimums(html, label) {
 }
 
 /** Rewrites the design-system stylesheet for publication: drops the corner
- *  decoration's own rules so no `.corner` selector survives, and lifts out the
- *  Google Fonts @import, which the built page declares as a <link> in <head>
- *  instead. `.blueprint`'s border rule is deliberately left in place. */
-function stripCornerStyles(css) {
+ *  decoration's own rules so no `.corner` selector survives, lifts out the Google
+ *  Fonts @import (the built page declares it as a <link> in <head> instead), and
+ *  darkens the primary button by one step of its own ramp. `.blueprint`'s border
+ *  rule is deliberately left in place.
+ *
+ *  The button: `#FAF8F5` on `--color-accent` `#B07A1C` measures 3.51:1 against
+ *  AA's 4.5:1, on all 11 amber buttons — every "Schedule a Tour", the sticky bar
+ *  and the skip link. No new colour was needed. `--color-accent-600` `#96661A` is
+ *  4.70:1 and is already the button's own hover value, so rest/hover/active shift
+ *  to 600/700/800 and stay inside the palette the design system ships. Nothing
+ *  else amber changes: the survey markers, the stars, the rail and the -400
+ *  eyebrows on the dark bands all still read `--color-accent`.
+ *
+ *  These rules live here rather than in the helmet block because the design-system
+ *  stylesheet is a <link> in <head> and the helmet <style> lands elsewhere in the
+ *  cascade — same specificity, so source order would decide, which is not a thing
+ *  to leave to chance for the page's primary call to action. */
+function rewriteDesignSystemCss(css) {
   css = replaceExactly(
     css,
     `@import url('${FONT_CSS}');\n`,
@@ -814,6 +895,26 @@ function stripCornerStyles(css) {
 .blueprint > .corner.br { bottom: -6px; right: -6px; }
 `;
   let out = replaceExactly(css, RULES, '', 1, 'corner style rules');
+
+  // The primary button, one step darker. See the note above the function.
+  out = replaceExactly(
+    out,
+    `.btn-primary { background: var(--color-accent); color: var(--color-bg); }
+.btn-primary:hover { background: var(--color-accent-600); }
+.btn-primary:active { background: var(--color-accent-700); }`,
+    `.btn-primary { background: var(--color-accent-600); color: var(--color-bg); }
+.btn-primary:hover { background: var(--color-accent-700); }
+.btn-primary:active { background: var(--color-accent-800); }`,
+    1,
+    'primary button ramp'
+  );
+  out = replaceExactly(
+    out,
+    '.btn-primary { border-color: var(--color-accent); }',
+    '.btn-primary { border-color: var(--color-accent-600); }',
+    1,
+    'primary button border'
+  );
   // Two comments elsewhere in the file describe the marks; leaving them would keep
   // `.corner` greppable in the shipped CSS for a feature that no longer exists.
   out = replaceExactly(
@@ -1098,7 +1199,7 @@ async function main() {
       }
     }
     const css = join(OUT, '_ds', dir, 'styles.css');
-    await writeFile(css, stripCornerStyles(await readFile(css, 'utf8')));
+    await writeFile(css, rewriteDesignSystemCss(await readFile(css, 'utf8')));
     console.log('  _ds styles.css  <- corner rules stripped');
   }
 
