@@ -45,6 +45,7 @@ const OPEN = {
   tourMid: `<section id="tour-mid" aria-label="Schedule a tour" style="${WIDE} padding: clamp(48px, 6vw, 88px) var(--edge) clamp(16px, 2vw, 24px);">`,
   locations: `<section id="locations" data-rev style="${WIDE} padding: clamp(48px, 6vw, 96px) var(--edge);">`,
   faq: `<section id="faq" data-rev style="${WIDE} padding: clamp(48px, 6vw, 96px) var(--edge);">`,
+  reviews: '<section id="reviews" data-rev style="padding: clamp(48px, 6vw, 88px) 0 clamp(40px, 5vw, 64px);">',
 };
 
 const CLOSE = '</section>';
@@ -81,6 +82,23 @@ function moveBefore(html, open, target, label) {
     throw new Error(`[lp2] ${label}: destination anchor missing or not unique.`);
   }
   return rest.slice(0, i) + body + '\n\n  ' + rest.slice(i);
+}
+
+/** Puts the swipe hint immediately after the element opened by `open` and closed by
+ *  the first `close` that follows it — safe only for elements with no nesting of
+ *  that tag, which every caller below asserts by construction. The hint is hidden
+ *  by CSS above the phone breakpoint, so it speaks only where the row scrolls. */
+function hintAfter(html, open, close, label, cls = '') {
+  const i = html.indexOf(open);
+  if (i === -1 || html.indexOf(open, i + 1) !== -1) {
+    throw new Error(`[lp2] ${label}: hint anchor missing or not unique.`);
+  }
+  const j = html.indexOf(close, i);
+  if (j === -1) throw new Error(`[lp2] ${label}: no ${close} after the anchor.`);
+  const at = j + close.length;
+  return html.slice(0, at) +
+    `\n      <p class="lp2-hint${cls ? ' ' + cls : ''}">Swipe for more &rarr;</p>` +
+    html.slice(at);
 }
 
 
@@ -173,9 +191,9 @@ footer nav, footer ul { row-gap: 6px !important; }
    and a second decision before anyone could type. The modal puts the form under the
    button that was clicked. Open state lives in a data attribute on <html>, never on a
    React-managed node — the DC runtime re-renders on every scroll threshold, and the
-   documentElement is the one place it cannot reach. Centred panel, full-screen sheet
-   below 620px: a side drawer would collide with the sticky CTA on the bottom edge and
-   the accessibility panel bottom-right. */
+   documentElement is the one place it cannot reach. Centred panel on a desktop,
+   bottom sheet below 760px: a side drawer would collide with the sticky CTA on the
+   bottom edge and the accessibility panel bottom-right. */
 .lp2-modal { display: none; }
 html[data-lp2-modal] .lp2-modal { display: block; position: fixed; inset: 0; z-index: 200; }
 html[data-lp2-modal] body { overflow: hidden; }
@@ -231,10 +249,17 @@ html[data-lp2-modal] body { overflow: hidden; }
   margin-top: 4px; width: 100%; min-height: 52px;
   text-transform: uppercase; letter-spacing: 0.06em; font-size: 16px;
 }
-@media (max-width: 620px) {
+/* A bottom sheet on a phone, not a takeover. The panel used to be inset: 0 — edge
+   to edge, the page gone behind it — so the only way back was a 44px X in the
+   corner and nothing on screen said the site was still there. Capped at 86dvh it
+   leaves a band of the dimmed page above it, which is both the signal that the
+   page is still there and the tap target that closes the form: the backdrop
+   handler already closes on any click outside the panel, there was simply no
+   backdrop left to click. */
+@media (max-width: 760px) {
   .lp2-modal-panel {
-    left: 0; top: 0; right: 0; bottom: 0; transform: none;
-    width: auto; max-height: none; padding: 20px 20px 32px;
+    left: 0; right: 0; top: auto; bottom: 0; transform: none;
+    width: auto; max-height: 86dvh; padding: 20px 20px 28px;
   }
 }
 @media (prefers-reduced-motion: reduce) { .lp2-modal-panel { scroll-behavior: auto; } }
@@ -276,16 +301,32 @@ html[data-lp2-modal] body { overflow: hidden; }
   max-width: 1200px; margin: 0 auto;
 }
 
-/* ---- equipment tabs: five buttons wrapped to three rows on a phone ---- */
-@media (max-width: 620px) {
+/* ---- the edge fade, shared by every horizontal scroller on the page ----
+   A row that runs past the screen has to say so. The partner marquee already
+   solved this on this page — it fades its own edges with a mask — so the tab row
+   and the swipe tracks reuse the idiom rather than inventing an arrow. Right edge
+   only: at rest there is nothing hidden to the left, and a fade on both sides
+   would suggest there is. */
+:root { --lp2-edge-fade: linear-gradient(to right, #000 calc(100% - 52px), transparent); }
+
+/* ---- equipment tabs: five buttons wrapped to three rows on a phone ----
+   Measured at 390px the row is 787px of buttons in a 390px box: 397px of it — half
+   the categories — sat past the right edge with no scrollbar (deliberately), no
+   sliced button and no hint. It scrolled; nothing said so. */
+@media (max-width: 760px) {
   [role="tablist"] {
     flex-wrap: nowrap !important;
     overflow-x: auto; scroll-snap-type: x proximity;
     scrollbar-width: none; margin-inline: calc(var(--edge) * -1) !important;
     padding-inline: var(--edge);
+    -webkit-mask-image: var(--lp2-edge-fade); mask-image: var(--lp2-edge-fade);
+    /* the hint takes over the gap the row already reserved below itself, so the
+       affordance costs the page about eight pixels rather than a whole line */
+    margin-bottom: 8px !important;
   }
   [role="tablist"]::-webkit-scrollbar { display: none; }
   [role="tablist"] > button { flex: none; scroll-snap-align: start; }
+  .lp2-hint-tabs { margin-bottom: clamp(18px, 2.4vw, 28px); }
 }
 
 /* ---- the partner strip is a trust cue, not a section ---- */
@@ -300,15 +341,16 @@ section[aria-label="Our partners"] > div {
    reader drives them, which is where the interactivity asked for actually belongs:
    in content they were going to scroll past anyway. CSS only — no new runtime
    state, nothing to go wrong when the DC runtime re-renders. */
-@media (max-width: 900px) {
+@media (max-width: 760px) {
   .lp2-track {
     display: grid !important;
     grid-auto-flow: column; grid-auto-columns: min(80%, 320px);
-    overflow-x: auto; scroll-snap-type: x mandatory;
+    overflow-x: auto; scroll-snap-type: x proximity;
     gap: 12px !important; padding-bottom: 16px !important;
     border-top: 0 !important;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
+    -webkit-mask-image: var(--lp2-edge-fade); mask-image: var(--lp2-edge-fade);
   }
   .lp2-track::-webkit-scrollbar { display: none; }
   .lp2-track > * {
@@ -320,6 +362,21 @@ section[aria-label="Our partners"] > div {
   }
   .lp2-track > * > * { max-width: none !important; }
   .lp2-hint { display: block !important; }
+
+  /* ---- the scroll reveal does not run inside a track ----
+     The reveal hides everything below the fold and un-hides it when it crosses
+     the VIEWPORT. A card parked off the right edge of a track never crosses it,
+     so on a phone two of the four pain cards and two of the four process steps
+     stayed at opacity 0 for the whole visit — measured after scrolling the page
+     end to end — and then slid up from 18px below, on a 90ms stagger, under the
+     reader's thumb the moment a swipe brought them in. That is the "dancing".
+     Inside a track the swipe is the reveal, so the entrance is dropped: the
+     section around it still fades in, and above 760px, where these are ordinary
+     grids again, the reveal runs exactly as it does on the base page. */
+  .lp2-track [data-rev-item],
+  .lp2-track [data-rev-item][data-hide] { opacity: 1 !important; transform: none !important; }
+  .lp2-track [data-step][data-hide]::after,
+  .lp2-track [data-step][data-hide] > span[aria-hidden="true"] { transform: none !important; }
 }
 .lp2-hint {
   display: none;
@@ -619,16 +676,16 @@ export function transform(html, { replaceExactly }) {
       1,
       'how-it-works track'
     );
-    // A track that scrolls sideways has to say so, or half the readers never find
-    // the other four cards. Three <dl>s exist on the page, so the hint is anchored
-    // to the close of the one just tagged rather than to '</dl>'.
-    {
-      const i = out.indexOf('<dl class="lp2-track"');
-      const j = out.indexOf('</dl>', i);
-      if (i === -1 || j === -1) throw new Error('[lp2] who-it-is-for: track not found.');
-      const at = j + '</dl>'.length;
-      out = out.slice(0, at) + '\n        <p class="lp2-hint">Swipe for more &rarr;</p>' + out.slice(at);
-    }
+    // A row that scrolls sideways has to say so, or half the readers never find the
+    // other cards — and the hint was on two of the four scrollers, not on the
+    // process steps and not on the equipment tabs. Anchored to the element just
+    // tagged rather than to a bare '</dl>': three <dl>s exist on the page.
+    out = hintAfter(out, '<dl class="lp2-track"', '</dl>', 'who-it-is-for hint');
+    out = hintAfter(out, '<ol class="lp2-track"', '</ol>', 'how-it-works hint');
+    // The tab row is the fourth scroller and the worst offender: 397px of it is off
+    // screen at 390px. It is a flex row of five buttons and nothing else, so the
+    // first </div> after it is its own.
+    out = hintAfter(out, '<div role="tablist"', '</div>', 'equipment tabs hint', 'lp2-hint-tabs');
   }
 
   // ---- 9. the pain cards become the third track ------------------------------
@@ -746,7 +803,20 @@ export function transform(html, { replaceExactly }) {
     out = replaceExactly(out, OPEN.howItWorks, band + OPEN.howItWorks, 1, 'could-be-you band');
   }
 
-  // ---- 13. the rating moves to where it can still change a mind ---------------
+  // ---- 13. the proof moves up behind the photograph --------------------------
+  // The reviews sat at roughly 70% of the scroll, after the process, the benefits,
+  // the kitchens, the audience list, a CTA and the film — six sections of the page
+  // talking about itself before anyone else vouched for it. Moved to just after the
+  // "this could be you" photograph, the sequence reads the way a decision actually
+  // forms: here is the problem you have, here is you standing in the kitchen, here
+  // are 380 people who did exactly that. Everything the section contains — the
+  // twelve testimonials, the six screenshots, the 4.9 — moves with it untouched;
+  // this step only changes where it sits. It runs after step 12 on purpose: both
+  // anchor to the same opener, so the photograph lands first and the reviews land
+  // behind it.
+  out = moveBefore(out, OPEN.reviews, OPEN.howItWorks, 'reviews');
+
+  // ---- 14. the rating moves to where it can still change a mind ---------------
   // 4.9 out of 380+ reviews is the page's strongest trust signal and it lived at ~55%
   // of the scroll, inside the reviews section. A visitor deciding whether this page
   // is worth their time never got to it. It goes directly under the hero CTA — after
@@ -768,7 +838,7 @@ export function transform(html, { replaceExactly }) {
     out = replaceExactly(out, FACTS, rating + FACTS, 1, 'hero rating');
   }
 
-  // ---- 14. the form comes to the CTA ----------------------------------------
+  // ---- 15. the form comes to the CTA ----------------------------------------
   // The inline #tour form stays exactly where it is: it is the no-JS fallback and the
   // natural close of the page. This is a second, focused copy that opens on the spot.
   // Its fields carry their own ids so nothing collides with the m- and f- fields, and
