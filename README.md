@@ -22,6 +22,7 @@ templates/
   thank-you.html                   post-submission page; reviews injected at build
 variants/
   shortened.mjs                    the shortened/redesigned page — ships at / — see below
+                                   (one file per page, named from PAGES in build.mjs)
 vendor/                            Pinned libraries, served from our own origin
   react-18.3.1.production.min.js
   react-dom-18.3.1.production.min.js
@@ -773,13 +774,29 @@ Container `GTM-MLKLN4VG`. Both snippets are placed exactly as Google specifies t
 the container `<script>` as high in `<head>` as this repo can reach, and the
 `<noscript><iframe>` immediately after `<body>`.
 
-**Where the snippets come from.** `GTM_ID`, `gtmHead()` and `gtmNoscript()` in
-`scripts/build.mjs`. The landing pages get the head half as the first entry of the
-existing head array, so it lands on line 6 — directly after `<meta name="viewport">`
-and before `<title>`; only the five lines the read-only export owns precede it. The
-body half is its own `replaceExactly` pass on the single bare `<body>` tag.
-`/thank-you` gets both through `{{GTM_HEAD}}` / `{{GTM_BODY}}` placeholders in
-`templates/thank-you.html`.
+**Every page is tagged, automatically, including ones that don't exist yet.** GTM is
+not written into any producer. `tagEveryPage()` in `scripts/build.mjs` runs once, last,
+over the finished `dist/`: it walks every `.html` file, injects both halves, and then
+asserts exactly one container script and one `ns.html` iframe carrying `GTM_ID` — and
+nothing else. `GTM_ID`, `gtmHead()` and `gtmNoscript()` exist in exactly one place in
+the whole repo.
+
+That inversion is the point. There are four ways an HTML file reaches `dist/` — the
+landing pages in `PAGES`, the thank-you template, the map, and a verbatim copy of
+`site/` that recurses into subdirectories — and tagging them one at a time meant every
+new page was a chance to forget. Sweeping the output instead means a page added any of
+those ways, or a way that does not exist yet, is tracked with nobody remembering to do
+anything. Shipping an untagged page is not unlikely; it is impossible.
+
+**Where it lands.** The head half goes directly after `<meta name="viewport">` —
+line 6, with only the five lines the read-only export owns above it — falling back to
+the charset meta and then to `<head>` itself for a page shaped differently. Never
+above charset, which the spec wants inside the first 1024 bytes. The body half goes
+immediately after the `<body>` tag. Each anchor must occur exactly once or the build
+fails naming the page, the same contract as `replaceExactly()`.
+
+Running last also keeps GTM out of the transform pipeline, so none of the counting
+passes in `buildLandingPage()` ever sees markup it was not written against.
 
 **The `<noscript>` survives React.** `<x-dc>` is `<body>`'s only child and
 `support.js` mounts with `dc.replaceWith(hostEl)` — it swaps that one element and
@@ -787,18 +804,52 @@ never touches body-level siblings. A `<noscript>` inserted before it is a siblin
 `#dc-root`, outside React's tree, so it survives every re-render (and the runtime
 re-renders on every scroll threshold, media-query change and gallery tick).
 
-**Two pages are deliberately untagged**, and `assertSiteTagging()` fails the build if
-either ever picks up a tag:
+**Two pages opt out**, named in `UNTAGGED`. The sweep asserts they stay clean, so
+tagging either by accident fails the build:
 
 | Page | Why not |
 | --- | --- |
 | `/lp2` | A redirect stub. Its `<head>` runs `location.replace('/')` synchronously: a tag above that line starts a fetch the navigation tears down, one below it never runs, and the `<noscript>` path would fire only for JS-off visitors — recording a pageview of a URL nobody actually viewed. The destination `/` records the visit correctly. |
 | `map.html` | Iframed, not visited: zero times on `/` (the variant removes the maps) and **twice** on `/lp`, both `loading="lazy"`. Tagging it would add two unpredictable pageviews per `/lp` session and wreck bounce rate and pages-per-session. If map interaction is ever worth measuring, `postMessage` to the parent's `dataLayer` rather than put a second container in the frame. |
 
-`site/404.html` is copied to `dist/` byte for byte, so it carries the snippets as
-literal text rather than through `gtmHead()`. That is a second copy of the container
-ID; `assertSiteTagging()` asserts the two still agree, so changing `GTM_ID` without
-editing `site/404.html` fails the build rather than shipping a half-tagged site.
+`UNTAGGED` matches on the path relative to `dist/`, not the basename, so a future
+`dist/campaign/map.html` is not silently excluded by a name it happens to share.
+
+`assets/`, `_ds/` and `vendor/` are skipped: all three are verbatim copies, so HTML
+inside them would be design-tool debris or library documentation, not a page anyone
+visits — and `vendor/` must stay byte-identical to the CDN copies for the SRI
+provenance above to hold.
+
+### Adding a landing page
+
+One entry in `PAGES` (`scripts/build.mjs`), and optionally a module in `variants/`:
+
+```js
+const PAGES = [
+  { outFile: 'index.html', variant: 'shortened' },
+  { outFile: LP_FILE, robots: 'noindex, nofollow' },
+  { outFile: 'lp3.html', variant: 'spring-campaign', robots: 'noindex, nofollow',
+    title: 'Spring campaign — ŌN Kitchens', description: '…' },
+];
+```
+
+A flat `lp3.html` is served at `/lp3` with no redirect hop, the same way
+`thank-you.html` is served at `/thank-you`. `variant` is the basename of a file in
+`variants/`, imported on demand — no import line to add, and a name with no matching
+module fails the build before anything is written.
+
+Everything else rides `buildLandingPage()`: Google Tag Manager, the favicon, the
+`/thank-you` redirect and lead sender, the chat widget, the mobile nav, the sticky
+CTA, the footer credit and the accessibility launcher. Nothing outside the build
+enumerates pages either — `amplify.yml` publishes `**/*`, `customHttp.yml`'s cache
+rule is a `**/*.html` glob, `robots.txt` has no per-page rules, there is no sitemap,
+and Amplify serves the new file at its clean URL before the console's `/<*>` →
+`/404.html` rule applies. So there is nothing to remember and nothing else to update.
+
+`robots` is worth a deliberate answer rather than a default: two indexable landing
+pages sharing one `<title>` compete with each other in search, which is why `/lp`
+carries `noindex, nofollow`. Whenever it contains `noindex` the build asserts the meta
+actually made it into the output, so a new page cannot silently lose it.
 
 ### The `generate_lead` event
 
@@ -1144,18 +1195,32 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   byte-identical to before.
 - No horizontal overflow at 320-2560 **with the webfonts blocked as well as loaded** —
   the swap-window case above.
-- **GTM: 57 assertions**, all with `googletagmanager.com` genuinely unreachable from the
-  test sandbox — which makes that the right test rather than a limitation. On `/`, `/lp`,
-  `/thank-you` and `/404`: exactly one container script, in `<head>`, carrying
-  `GTM-MLKLN4VG`; exactly one `ns.html` `<noscript>`, and it is still `<body>`'s **first
-  element child after React has mounted**, so the runtime never displaces it.
-  `window.dataLayer` exists on all four and carries the snippet's own `gtm.start`. `gtm.js`
-  is actually requested and actually fails, with no page or console error, no broken image,
-  and the page rendering normally. `map.html` has no `dataLayer` and no `<noscript>`;
-  `lp2.html` has no GTM markup at all — both asserted, and both re-asserted by
-  `assertSiteTagging()` on every build, along with `site/404.html`'s hand-written copy of
-  the container ID. Negative-tested: changing that ID, or tagging `lp2.html`, fails the
-  build.
+- **GTM: 59 assertions**, all with `googletagmanager.com` genuinely unreachable from the
+  test sandbox — which makes that the right test rather than a limitation. The battery
+  **discovers pages by walking `dist/`** rather than naming them, because the whole point
+  of the sweep is that a page added later is tagged. For each one found: exactly one
+  container script, in `<head>`, carrying `GTM-MLKLN4VG`; exactly one `ns.html`
+  `<noscript>`, and it is still `<body>`'s **first element child after React has mounted**,
+  so the runtime never displaces it; `window.dataLayer` present and carrying the snippet's
+  own `gtm.start`. `gtm.js` is actually requested and actually fails, with no page or
+  console error, no broken image, and the page rendering normally. `map.html` has no
+  `dataLayer` and no `<noscript>`; `lp2.html` has no GTM markup at all.
+- **A page that did not exist when the tests were written.** Dropping a bare
+  `site/__probe.html` into the repo and rebuilding: the sweep tagged it, the battery
+  discovered it unprompted, and all eight per-page assertions passed against it in a real
+  browser with a live `dataLayer` — including a nested `site/__probe/deep.html` with no
+  viewport meta, which exercised the charset fallback anchor. This is the guarantee the
+  design exists for, tested rather than argued.
+- **The tagging refactor changed nothing else, proved by diff.** `dist/` was snapshotted
+  before the change and compared file by file after: the container script and `<noscript>`
+  land byte-for-byte where they already were on all four pages. The only differences in the
+  entire tree are the `googletagmanager` `preconnect` moving from line 17/18 up to line 6
+  beside the script it warms, and `/thank-you` and `/404` gaining that preconnect, which
+  they did not have before.
+- **Five negative tests**, each failing the build with a legible message: an `UNTAGGED` page
+  that carries GTM; a page with no `<body>`; a page with two `<body>` tags; a page that
+  already carries a container before the sweep runs (which would double every pageview);
+  and a `PAGES` entry naming a variant module that does not exist.
 - **The lead event, driven end to end.** A full chat conversation pushes exactly one
   `generate_lead` with exactly the keys `{event, form, page}` and `form: 'chat'`, and the
   page never navigates. A modal submission pushes `form: 'modal'` **before**
