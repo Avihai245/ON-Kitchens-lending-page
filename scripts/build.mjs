@@ -14,7 +14,6 @@ import { cp, mkdir, rm, readFile, writeFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as shortenedVariant from '../variants/shortened.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'palette-and-photography-decisions', 'project');
@@ -62,6 +61,35 @@ const THANK_YOU_PATH = '/thank-you';
 const LP_FILE = 'lp.html';
 const THANK_YOU_FILE = 'thank-you.html';
 
+/** Every landing page the build produces, in one place, so adding one is a line here
+ *  rather than a copy-pasted call in main(). Each entry may carry:
+ *
+ *    outFile      required — the filename under dist/. A flat `lp3.html` is served by
+ *                 Amplify at /lp3 with no redirect hop; see the note on THANK_YOU_PATH.
+ *    variant      the basename of a module in variants/, imported on demand, whose
+ *                 transform() runs last and is where this page diverges from the export.
+ *    robots       a <meta name="robots"> value. Worth a deliberate answer: two indexable
+ *                 landing pages that share a <title> compete with each other in search,
+ *                 which is why /lp carries 'noindex, nofollow'. Asserted below whenever
+ *                 it contains noindex, so a new page cannot silently lose it.
+ *    title        \
+ *    description  / override the shared PAGE_TITLE / PAGE_DESCRIPTION. A page written
+ *                 for a different campaign almost certainly wants its own.
+ *
+ *  Nothing else is needed to add a page. Google Tag Manager, the favicon, the
+ *  /thank-you redirect and lead sender, the chat widget, the mobile nav, the sticky
+ *  CTA, the footer credit and the accessibility launcher all ride buildLandingPage();
+ *  amplify.yml publishes every file under dist/, customHttp.yml's cache rule is an
+ *  HTML glob, robots.txt has no per-page rules and there is no sitemap. */
+const PAGES = [
+  // /: the shortened, redesigned page. Page-specific overrides live in
+  // variants/shortened.mjs, applied last — see buildLandingPage()'s own doc comment.
+  { outFile: 'index.html', variant: 'shortened' },
+  // /lp: the original page, kept at a secondary URL so nothing that already linked to
+  // it breaks. Carries noindex so it doesn't compete with / in search.
+  { outFile: LP_FILE, robots: 'noindex, nofollow' },
+];
+
 /** Google Tag Manager container. A plain constant, not an env var like
  *  LEAD_WEBHOOK_URL: a container ID is public by design — it ships in the page source
  *  where anyone can read it — so there is nothing to keep out of the repo, and a build
@@ -69,9 +97,9 @@ const THANK_YOU_FILE = 'thank-you.html';
  *  than one that always has them. */
 const GTM_ID = 'GTM-MLKLN4VG';
 
-/** The container snippet, verbatim from GTM's own install page, for as high in <head>
- *  as the export lets us reach — first in the head array, so it lands directly after
- *  <meta name="viewport"> and before <title>.
+/** The container snippet, verbatim from GTM's own install page. Placed by
+ *  tagEveryPage() directly after the viewport meta, which is as high in <head> as the
+ *  read-only export lets us reach.
  *
  *  It is inline and synchronous, which is deliberate and not in tension with the
  *  "scripts deferred" work in README's Performance section: that win came from moving
@@ -1455,13 +1483,22 @@ function replaceExactly(text, find, replacement, expected, label) {
  * which is why /lp is a place `/` diverges from rather than a second copy to keep in
  * sync.
  *
- * @param outFile  filename under dist/
- * @param label    what assertion failures call this page
- * @param robots   value for a <meta name="robots">, or '' for none
- * @param variant  optional { transform(html, { replaceExactly }) }, applied LAST —
- *                 see variants/shortened.mjs for why the hook runs after everything else.
+ * @param outFile      filename under dist/
+ * @param label        what assertion failures call this page
+ * @param robots       value for a <meta name="robots">, or '' for none
+ * @param title        <title> text; defaults to the shared PAGE_TITLE
+ * @param description  meta description; defaults to the shared PAGE_DESCRIPTION
+ * @param variant      optional { transform(html, { replaceExactly }) }, applied LAST —
+ *                     see variants/shortened.mjs for why it runs after everything else.
  */
-async function buildLandingPage({ outFile, label, robots = '', variant = null }) {
+async function buildLandingPage({
+  outFile,
+  label,
+  robots = '',
+  title = PAGE_TITLE,
+  description = PAGE_DESCRIPTION,
+  variant = null,
+}) {
   let html = await readFile(join(SRC, ENTRY), 'utf8');
 
   const dsHref = html.match(
@@ -1498,17 +1535,15 @@ async function buildLandingPage({ outFile, label, robots = '', variant = null })
   // crawl would stop Google ever reading the noindex, which is the opposite of the
   // intent. Also not paired with a canonical — Google treats noindex plus canonical
   // as contradictory signals.
+  // Google Tag Manager is deliberately absent here. It is added to every page in dist/
+  // by tagEveryPage(), which runs last — see that function for why one sweep beats
+  // four hand-placed copies. It lands above this block, right after the viewport meta.
   const head = [
-    // First, so it lands directly after <meta name="viewport"> and before <title> —
-    // the highest point reachable without editing the read-only export, whose <head>
-    // holds only the charset and viewport metas above this injection point.
-    gtmHead(),
-    `<title>${PAGE_TITLE}</title>`,
-    `<meta name="description" content="${PAGE_DESCRIPTION}">`,
+    `<title>${title}</title>`,
+    `<meta name="description" content="${description}">`,
     ...(robots ? [`<meta name="robots" content="${robots}">`] : []),
     `<link rel="icon" href="favicon.svg" type="image/svg+xml">`,
     `<style>x-dc{display:none!important}</style>`,
-    `<link rel="preconnect" href="https://www.googletagmanager.com">`,
     `<link rel="preconnect" href="https://fonts.googleapis.com">`,
     `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`,
     `<link rel="stylesheet" href="${FONT_CSS}">`,
@@ -1526,17 +1561,6 @@ async function buildLandingPage({ outFile, label, robots = '', variant = null })
     head + '\n<script defer src="./support.js"></script>',
     1,
     'head injection'
-  );
-
-  // GTM's other half, immediately after <body> — kept next to the head injection so the
-  // two halves of one feature read together. <body> is a bare tag occurring exactly
-  // once, and no other pass anchors on it.
-  html = replaceExactly(
-    html,
-    '<body>',
-    '<body>\n' + gtmNoscript(),
-    1,
-    `${label}: gtm noscript`
   );
 
   // A completed lead form sends the visitor to /thank-you instead of swapping in the
@@ -1636,11 +1660,9 @@ function assertNoindexed(html, label) {
  * testimonials, the latter of which are half-hidden behind "show more" on the
  * landing page but shown in full here.
  */
-/** site/ is copied to dist/ byte for byte, so 404.html carries the container ID as
- *  literal text rather than through gtmHead(). That is a second copy of GTM_ID, and a
- *  second copy is a chance to diverge — so the build asserts they still agree.
- *
- *  It also asserts the two pages that must NOT be tagged still aren't:
+/** Pages that must NOT carry GTM. Matched on the path relative to dist/, not the
+ *  basename, so a future dist/campaign/map.html is not silently excluded by a name it
+ *  happens to share. Both entries are a decision, not an oversight:
  *
  *  - lp2.html is a redirect stub whose <head> runs location.replace('/') synchronously.
  *    A tag above that line starts a fetch the navigation tears down; one below it never
@@ -1650,24 +1672,132 @@ function assertNoindexed(html, label) {
  *    Tagging it would add two unpredictable pageviews per session and wreck both bounce
  *    rate and pages-per-session. If map interaction is ever worth measuring, postMessage
  *    to the parent's dataLayer rather than put a second container in the frame. */
-async function assertSiteTagging() {
-  const notFound = await readFile(join(OUT, '404.html'), 'utf8');
-  const ids = [...new Set([...notFound.matchAll(/GTM-[A-Z0-9]+/g)].map((m) => m[0]))];
-  if (ids.length !== 1 || ids[0] !== GTM_ID) {
-    throw new Error(
-      `[build] 404.html: expected the container id ${GTM_ID}, found ${ids.join(', ') || 'none'} ` +
-        `— site/404.html holds its own copy of the snippets and must be edited to match GTM_ID`
-    );
-  }
-  if (notFound.split('<!-- Google Tag Manager -->').length - 1 !== 1) {
-    throw new Error(`[build] 404.html: expected exactly one container snippet`);
-  }
-  for (const file of ['lp2.html', 'map.html']) {
-    const html = await readFile(join(OUT, file), 'utf8');
-    if (/GTM-|googletagmanager/.test(html)) {
-      throw new Error(`[build] ${file} is tagged — it is deliberately untagged, see assertSiteTagging()`);
+const UNTAGGED = new Set(['lp2.html', 'map.html']);
+
+/** Top-level directories under dist/ the sweep does not descend into. All three are
+ *  verbatim copies — two from the read-only design export, one from vendor/ — so any
+ *  HTML inside them would be design-tool debris or library documentation, not a page
+ *  anyone visits. vendor/ must additionally stay byte-identical to the CDN copies,
+ *  since the provenance claim in the README rests on the SRI hashes still matching. */
+const UNSWEPT = new Set(['assets', '_ds', 'vendor']);
+
+/** Every .html under dist/, depth-first, as paths relative to dist/.
+ *
+ *  Hand-rolled rather than readdir(dir, { recursive: true }): that option needs Node
+ *  >= 18.17, and this repo pins no Node version — there is no package.json, and
+ *  amplify.yml only says `node scripts/build.mjs`, so the build runs on whatever the
+ *  Amplify image happens to ship. withFileTypes has worked since Node 10. */
+async function htmlPages(dir = OUT, prefix = '') {
+  const found = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      if (prefix === '' && UNSWEPT.has(entry.name)) continue;
+      found.push(...(await htmlPages(join(dir, entry.name), rel)));
+    } else if (entry.name.endsWith('.html')) {
+      found.push(rel);
     }
   }
+  return found;
+}
+
+/** Inserts `addition` immediately after the first of `anchors` that occurs in `html`
+ *  exactly once, and throws naming the page if none does — the same contract as
+ *  replaceExactly, which every other rewrite in this file already relies on. */
+function insertAfter(html, anchors, addition, page, what) {
+  for (const anchor of anchors) {
+    const count = html.split(anchor).length - 1;
+    if (count === 1) return html.replace(anchor, anchor + '\n' + addition);
+    if (count > 1) {
+      throw new Error(
+        `[build] ${page}: ${what} — found ${count} occurrences of ${JSON.stringify(anchor)}, ` +
+          `so there is no single unambiguous place to put it.`
+      );
+    }
+  }
+  throw new Error(
+    `[build] ${page}: ${what} — none of ${anchors.map((a) => JSON.stringify(a)).join(', ')} ` +
+      `occurs exactly once. A page needs one of these anchors, or an entry in UNTAGGED.`
+  );
+}
+
+/** Puts Google Tag Manager on every page in dist/, then proves it.
+ *
+ *  This runs once, last, over the finished output rather than being threaded through
+ *  each producer — and that is the whole point. There are four ways an HTML file
+ *  reaches dist/ (two landing pages from PAGES, the thank-you template, the map, and a
+ *  verbatim copy of site/ that recurses into subdirectories), and tagging them one at a
+ *  time meant every new page was a chance to forget. Sweeping the output instead means
+ *  a page added any of those ways — or a way that does not exist yet — is tagged with
+ *  nobody remembering to do anything, and the assertions below make shipping an
+ *  untagged page impossible rather than merely unlikely.
+ *
+ *  Running last also keeps GTM out of the transform pipeline entirely, so none of the
+ *  counting passes in buildLandingPage() ever sees markup it was not written against.
+ *
+ *  The head half goes after the viewport meta, falling back to the charset meta and
+ *  then to <head> itself — never above charset, which the HTML spec wants inside the
+ *  first 1024 bytes. */
+async function tagEveryPage() {
+  const pages = await htmlPages();
+  const skipped = [];
+
+  for (const page of pages) {
+    const file = join(OUT, page);
+    let html = await readFile(file, 'utf8');
+    const mentions = /GTM-|googletagmanager/.test(html);
+
+    if (UNTAGGED.has(page)) {
+      if (mentions) {
+        throw new Error(
+          `[build] ${page} carries GTM markup, but it is on the UNTAGGED list — see the ` +
+            `comment there for why this page must not be tagged.`
+        );
+      }
+      skipped.push(page);
+      continue;
+    }
+
+    if (mentions) {
+      throw new Error(
+        `[build] ${page} already carries GTM markup before the tagging sweep runs. ` +
+          `Remove it: tagEveryPage() is the only place GTM is added, so a second copy ` +
+          `would ship two containers and double every pageview.`
+      );
+    }
+
+    html = insertAfter(
+      html,
+      [
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        '<meta charset="utf-8">',
+        '<head>',
+      ],
+      `<link rel="preconnect" href="https://www.googletagmanager.com">\n` + gtmHead(),
+      page,
+      'gtm container script'
+    );
+    html = insertAfter(html, ['<body>'], gtmNoscript(), page, 'gtm noscript');
+
+    // Proven, not trusted: exactly one container script and one ns.html iframe, both
+    // carrying this build's container id and no other.
+    const ids = [...new Set([...html.matchAll(/GTM-[A-Z0-9]+/g)].map((m) => m[0]))];
+    const scripts = html.split('<!-- Google Tag Manager -->').length - 1;
+    const frames = html.split('googletagmanager.com/ns.html').length - 1;
+    if (ids.length !== 1 || ids[0] !== GTM_ID || scripts !== 1 || frames !== 1) {
+      throw new Error(
+        `[build] ${page}: expected exactly one ${GTM_ID} container script and one noscript ` +
+          `iframe, got ${scripts} script(s), ${frames} iframe(s), id(s) ${ids.join(', ') || 'none'}`
+      );
+    }
+
+    await writeFile(file, html);
+  }
+
+  console.log(
+    `  google tag manager <- ${GTM_ID} on ${pages.length - skipped.length} page(s); ` +
+      `${skipped.length} deliberately untagged (${skipped.join(', ') || 'none'})`
+  );
 }
 
 async function buildThankYou() {
@@ -1699,9 +1829,9 @@ async function buildThankYou() {
     throw new Error(`[build] thank-you: expected 6 review screenshots in the export, found ${shots.length}`);
   }
 
+  // No GTM placeholders here: tagEveryPage() tags this page along with every other one
+  // in dist/, so the container id lives in exactly one place in the repo.
   const html = (await readFile(join(ROOT, 'templates', 'thank-you.html'), 'utf8'))
-    .replace('{{GTM_HEAD}}', gtmHead())
-    .replace('{{GTM_BODY}}', gtmNoscript())
     .replace('{{STARS_LG}}', star(26).repeat(5))
     .replace(
       '{{REVIEW_SHOTS}}',
@@ -1802,24 +1932,18 @@ async function main() {
     console.log(`  ${entry.padEnd(15)} <- site/`);
   }
 
-  // /: the shortened, redesigned page. Page-specific overrides live in
-  // variants/shortened.mjs, applied last — see buildLandingPage()'s own doc comment.
-  const index = await buildLandingPage({
-    outFile: 'index.html',
-    label: 'index.html',
-    variant: shortenedVariant,
-  });
-  // /lp: the original page, kept at a secondary URL so nothing that already linked to
-  // it breaks. Carries noindex so it doesn't compete with / in search.
-  const lp = await buildLandingPage({
-    outFile: LP_FILE,
-    label: LP_FILE,
-    robots: 'noindex, nofollow',
-  });
-  assertNoindexed(lp.html, LP_FILE);
+  for (const page of PAGES) {
+    // Variants are imported on demand so a new page costs one PAGES entry and nothing
+    // else. A name with no matching module fails here, before anything is written.
+    const variant = page.variant ? await import(`../variants/${page.variant}.mjs`) : null;
+    const built = await buildLandingPage({ label: page.outFile, ...page, variant });
+    if (/noindex/.test(page.robots || '')) assertNoindexed(built.html, page.outFile);
+  }
   await buildMap();
   await buildThankYou();
-  await assertSiteTagging();
+
+  // Last, over the finished output: puts GTM on every page in dist/ and proves it.
+  await tagEveryPage();
 
   console.log(
     LEAD_WEBHOOK_URL
