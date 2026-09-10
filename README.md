@@ -767,6 +767,74 @@ a server, and neither fixable client-side:
   never be lost, put a small server in front: an Amplify function that holds the real
   endpoint plus a shared secret, with the page posting to that instead.
 
+## Analytics — Google Tag Manager
+
+Container `GTM-MLKLN4VG`. Both snippets are placed exactly as Google specifies them:
+the container `<script>` as high in `<head>` as this repo can reach, and the
+`<noscript><iframe>` immediately after `<body>`.
+
+**Where the snippets come from.** `GTM_ID`, `gtmHead()` and `gtmNoscript()` in
+`scripts/build.mjs`. The landing pages get the head half as the first entry of the
+existing head array, so it lands on line 6 — directly after `<meta name="viewport">`
+and before `<title>`; only the five lines the read-only export owns precede it. The
+body half is its own `replaceExactly` pass on the single bare `<body>` tag.
+`/thank-you` gets both through `{{GTM_HEAD}}` / `{{GTM_BODY}}` placeholders in
+`templates/thank-you.html`.
+
+**The `<noscript>` survives React.** `<x-dc>` is `<body>`'s only child and
+`support.js` mounts with `dc.replaceWith(hostEl)` — it swaps that one element and
+never touches body-level siblings. A `<noscript>` inserted before it is a sibling of
+`#dc-root`, outside React's tree, so it survives every re-render (and the runtime
+re-renders on every scroll threshold, media-query change and gallery tick).
+
+**Two pages are deliberately untagged**, and `assertSiteTagging()` fails the build if
+either ever picks up a tag:
+
+| Page | Why not |
+| --- | --- |
+| `/lp2` | A redirect stub. Its `<head>` runs `location.replace('/')` synchronously: a tag above that line starts a fetch the navigation tears down, one below it never runs, and the `<noscript>` path would fire only for JS-off visitors — recording a pageview of a URL nobody actually viewed. The destination `/` records the visit correctly. |
+| `map.html` | Iframed, not visited: zero times on `/` (the variant removes the maps) and **twice** on `/lp`, both `loading="lazy"`. Tagging it would add two unpredictable pageviews per `/lp` session and wreck bounce rate and pages-per-session. If map interaction is ever worth measuring, `postMessage` to the parent's `dataLayer` rather than put a second container in the frame. |
+
+`site/404.html` is copied to `dist/` byte for byte, so it carries the snippets as
+literal text rather than through `gtmHead()`. That is a second copy of the container
+ID; `assertSiteTagging()` asserts the two still agree, so changing `GTM_ID` without
+editing `site/404.html` fails the build rather than shipping a half-tagged site.
+
+### The `generate_lead` event
+
+`window.__onSendLead` — the single seam all four lead paths call — pushes one event
+before it attempts delivery:
+
+```js
+{ event: 'generate_lead', form: 'chat', page: '/' }
+```
+
+`form` is `mid-page`, `end-of-page`, `modal` or `chat`, so each path can be attributed
+without any per-path code. The push comes *first* because the delivery path returns
+early on a successful `sendBeacon`; it sits in its own `try/catch` so a tag failing can
+never stop a lead reaching the webhook. It ships whether or not `LEAD_WEBHOOK_URL` is
+configured — the webhook only controls the delivery half.
+
+**No PII is pushed.** Only `event`, `form` and `page` — never the name, phone or email.
+Everything in `dataLayer` is readable by every tag configured in the container, and the
+thank-you page's whole `sessionStorage` design exists precisely so a future analytics
+tool could never capture a phone number. Two consequences to carry into the GTM console:
+keep the `/thank-you` tag to pageview + URL, and do **not** enable form-field or
+DOM-scraping auto-events — that page's rendered `<h1>` and `#phone` do contain the
+lead's details at runtime even though the URL does not.
+
+**Honest limit on reliability.** The push is synchronous, so it always lands in the
+array — but the two inline forms and the modal call `location.assign('/thank-you')`
+immediately after, and GTM may not flush a tag before the navigation. For those three
+paths the `/thank-you` pageview is the dependable conversion signal. The **chat never
+navigates**, so for chat leads this event is both reliable and the only signal there is
+— which is exactly where it earns its place.
+
+**Before you build conversion tags on this:** `LEAD_WEBHOOK_URL` is unset, so every
+lead the site takes is currently discarded. A conversion tag on `/thank-you` or on
+`generate_lead` will report conversions for leads that never reached anyone. See
+**Lead webhook** above.
+
 ## Vendored libraries
 
 `support.js` fetches React and ReactDOM from `unpkg.com` at load, and `map.html`
@@ -780,6 +848,14 @@ short-circuits its own CDN fetch when `window.React` and `window.ReactDOM` are
 already set, so pre-loading them in `<head>` is all it takes.
 
 To revert, delete `vendor/` and drop the injected tags in `scripts/build.mjs`.
+
+**GTM is the one third-party script that cannot be vendored.** `gtm.js` is generated
+per container and per publish, so it has to come from Google's origin. The exposure is
+much smaller than unpkg's was, though: the injected tag is `async`, so if
+googletagmanager.com stalls or is blocked the page renders exactly as it does without
+it — the failure mode is no analytics, never no page. That is verified, not assumed:
+this sandbox has no route to googletagmanager.com, so the whole regression battery
+below ran with `gtm.js` unreachable.
 
 ## Performance
 
@@ -808,6 +884,38 @@ Three changes did it:
   font origins, so it starts in parallel with the stylesheet.
 - **Hero preloaded.** `<link rel="preload" as="image" fetchpriority="high">` on the
   hero, the LCP element.
+
+### What GTM cost, measured
+
+The container snippet added later is not in tension with the first of those. That win
+came from moving ~210 KB of blocking *external* fetches out of the parser's way; the
+snippet is a few hundred bytes of *inline* script whose only job is to create
+`window.dataLayer` and inject `gtm.js` with `async`, so no network fetch blocks the
+parser. Median of 7 runs at 390 px, the same build served with and without the snippet:
+
+| | without | with |
+| --- | --- | --- |
+| First paint | 64 ms | **52 ms** |
+| First contentful paint | 122 ms | **108 ms** |
+| DOMContentLoaded | 110 ms | **97 ms** |
+| Load event | 134 ms | 330 ms |
+
+The first three are unchanged within noise. **The load event is not a regression, and
+the reason matters:** without the snippet, `load` fires at ~134 ms with 7 resources
+finished and **zero of the page's 17 images loaded** — the runtime is still fetching
+`location.href` and React has not rendered yet, so `load` fires on a page that is
+visually empty. The `async` `gtm.js` holds the load event open just long enough that
+React's render lands inside it, and `load` then fires at ~330 ms with **all 17 images
+and the hero video complete**. The larger number is measuring a finished page; the
+smaller one was measuring an empty one.
+
+That also means the 146 ms in the table above was never a like-for-like figure. It is
+left as recorded — it is what that pass measured — but read it as "the load event",
+not "the page was ready".
+
+Verified against a stub served instantly, a request aborted instantly, and the real
+host unreachable: all three land at the same ~330 ms, so nothing here depends on
+googletagmanager.com being fast, or reachable at all.
 
 Two things deliberately *not* done:
 
@@ -902,7 +1010,9 @@ These are behaviours of the design prototype, left alone deliberately:
   name and phone live only in that visitor's own `sessionStorage` and are cleared on
   render. The funnel now *looks* complete end to end, which makes this more
   dangerous than before, not less: every lead is still dropped. Wire the submit to a
-  real endpoint before driving traffic here.
+  real endpoint before driving traffic here. Google Tag Manager now fires a
+  `generate_lead` event on every submission, which raises the stakes again: a
+  conversion tag built on it will report conversions for leads nobody received.
 - **Every phone number on the site is commented out.** `(844) 435-1255` appears 40 times
   across the repo — 10 `PHONE CTA` blocks and 4 inline fragments per landing page, plus the
   export — and **all 40 are inside HTML comments**. There is no clickable `tel:` link on any
@@ -918,7 +1028,14 @@ These are behaviours of the design prototype, left alone deliberately:
 - **No Content-Security-Policy.** The design styles every element with inline
   `style` attributes and ships its logic in an inline script, so any workable policy
   needs `'unsafe-inline'` for both `script-src` and `style-src`. `customHttp.yml`
-  carries an accurate origin list in a comment if you want to enable one anyway.
+  carries an accurate origin list in a comment if you want to enable one anyway — it
+  now includes googletagmanager.com, though note that any tag added in the GTM console
+  can introduce a new origin without touching this repo, so an enforced policy would
+  need re-checking after every container publish.
+- **The GTM container is unaudited from here.** This repo controls where the container
+  loads, not what it does. Anything added in the console runs on the page with full
+  DOM access and no deploy, no diff and no review. Keep the list of people with publish
+  rights short, and prefer GTM's built-in tag templates over Custom HTML tags.
 - **Cache lifetimes are short** (one day for images, revalidate for HTML) because no
   filename carries a content hash. Fingerprint the assets and these can go to a
   year.
@@ -1027,3 +1144,28 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   byte-identical to before.
 - No horizontal overflow at 320-2560 **with the webfonts blocked as well as loaded** —
   the swap-window case above.
+- **GTM: 57 assertions**, all with `googletagmanager.com` genuinely unreachable from the
+  test sandbox — which makes that the right test rather than a limitation. On `/`, `/lp`,
+  `/thank-you` and `/404`: exactly one container script, in `<head>`, carrying
+  `GTM-MLKLN4VG`; exactly one `ns.html` `<noscript>`, and it is still `<body>`'s **first
+  element child after React has mounted**, so the runtime never displaces it.
+  `window.dataLayer` exists on all four and carries the snippet's own `gtm.start`. `gtm.js`
+  is actually requested and actually fails, with no page or console error, no broken image,
+  and the page rendering normally. `map.html` has no `dataLayer` and no `<noscript>`;
+  `lp2.html` has no GTM markup at all — both asserted, and both re-asserted by
+  `assertSiteTagging()` on every build, along with `site/404.html`'s hand-written copy of
+  the container ID. Negative-tested: changing that ID, or tagging `lp2.html`, fails the
+  build.
+- **The lead event, driven end to end.** A full chat conversation pushes exactly one
+  `generate_lead` with exactly the keys `{event, form, page}` and `form: 'chat'`, and the
+  page never navigates. A modal submission pushes `form: 'modal'` **before**
+  `location.assign` lands, captured from inside the sender. With a real webhook receiver
+  running, both the push and the `sendBeacon` fire for both paths — the tag does not
+  swallow the lead and the beacon does not skip the tag — and the beacon's payload code is
+  byte-identical to the previous build's, diffed against it.
+- **No PII in `dataLayer`**, asserted by submitting a lead with a distinctive name, phone,
+  email, business and note, serializing the entire array and confirming none of the five
+  appears — including the phone in reformatted, digits-only form.
+- **The `<noscript>` costs nothing in layout**: document height, `#dc-root`, `<h1>` and
+  `<footer>` positions are identical to the previous build to the pixel on both pages at
+  390 and 1440, and the element's own box measures 0x0.

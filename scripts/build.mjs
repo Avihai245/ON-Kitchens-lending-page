@@ -62,6 +62,50 @@ const THANK_YOU_PATH = '/thank-you';
 const LP_FILE = 'lp.html';
 const THANK_YOU_FILE = 'thank-you.html';
 
+/** Google Tag Manager container. A plain constant, not an env var like
+ *  LEAD_WEBHOOK_URL: a container ID is public by design — it ships in the page source
+ *  where anyone can read it — so there is nothing to keep out of the repo, and a build
+ *  that silently shipped without analytics because a variable was unset would be worse
+ *  than one that always has them. */
+const GTM_ID = 'GTM-MLKLN4VG';
+
+/** The container snippet, verbatim from GTM's own install page, for as high in <head>
+ *  as the export lets us reach — first in the head array, so it lands directly after
+ *  <meta name="viewport"> and before <title>.
+ *
+ *  It is inline and synchronous, which is deliberate and not in tension with the
+ *  "scripts deferred" work in README's Performance section: that win came from moving
+ *  ~210 KB of blocking EXTERNAL fetches out of the parser's way. This is a few hundred
+ *  bytes of inline script whose only job is to create window.dataLayer and inject
+ *  gtm.js with async — no network fetch blocks the parser, and if googletagmanager.com
+ *  is slow or blocked the page renders exactly as it does without it. */
+function gtmHead() {
+  return (
+    `<!-- Google Tag Manager -->\n` +
+    `<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n` +
+    `new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n` +
+    `j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n` +
+    `'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n` +
+    `})(window,document,'script','dataLayer','${GTM_ID}');</script>\n` +
+    `<!-- End Google Tag Manager -->`
+  );
+}
+
+/** The no-JS fallback, for immediately after <body>.
+ *
+ *  Safe there on the landing pages specifically because <x-dc> is body's only child and
+ *  support.js mounts React with dc.replaceWith(hostEl) — it swaps that one element and
+ *  never touches body-level siblings. A <noscript> inserted before it is a sibling of
+ *  #dc-root, outside React's tree, and survives every re-render. */
+function gtmNoscript() {
+  return (
+    `<!-- Google Tag Manager (noscript) -->\n` +
+    `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${GTM_ID}"\n` +
+    `height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>\n` +
+    `<!-- End Google Tag Manager (noscript) -->`
+  );
+}
+
 /** The web fonts the design system asks for. Declared here as a <link> in <head>
  *  and stripped from the stylesheet's @import — see the head comment in buildIndex(). */
 const FONT_CSS =
@@ -101,13 +145,13 @@ const LEAD_WEBHOOK_URL = process.env.LEAD_WEBHOOK_URL || '';
  * or refuses the payload.
  */
 function leadSenderScript(url) {
-  if (!url) {
-    return `<script>window.__onSendLead=function(){};/* LEAD_WEBHOOK_URL unset at build time */</script>`;
-  }
-  return `<script>
-window.__onSendLead = function (lead) {
-  try {
-    var q = new URLSearchParams(location.search);
+  // Only DELIVERY is conditional on the webhook. The dataLayer push below is not:
+  // tracking and delivery are independent concerns, and the shape this replaced
+  // compiled __onSendLead down to an empty function whenever LEAD_WEBHOOK_URL was
+  // unset — which it is today — so a push written inside that branch would never have
+  // fired on the live site at all.
+  const deliver = url
+    ? `    var q = new URLSearchParams(location.search);
     var payload = JSON.stringify({
       name: lead.name, phone: lead.phone, email: lead.email,
       business: lead.business, form: lead.form,
@@ -126,7 +170,28 @@ window.__onSendLead = function (lead) {
     var type = 'text/plain;charset=UTF-8';
     if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([payload], { type: type }))) return;
     fetch(url, { method: 'POST', mode: 'no-cors', keepalive: true,
-                 headers: { 'Content-Type': type }, body: payload }).catch(function () {});
+                 headers: { 'Content-Type': type }, body: payload }).catch(function () {});`
+    : `    /* LEAD_WEBHOOK_URL unset at build time — the lead is not delivered anywhere. */`;
+  return `<script>
+window.__onSendLead = function (lead) {
+  // GTM first, in its own try/catch, for two reasons. The delivery path below returns
+  // early on a successful sendBeacon, so a push placed after it would be skipped on
+  // the common path; and a tag failing must never stop a lead reaching the webhook.
+  //
+  // No name, phone or email goes in here, deliberately. Everything pushed to dataLayer
+  // is readable by every tag configured in the container, and /thank-you's whole
+  // sessionStorage design exists so that analytics can never capture a phone number.
+  // Lead source and path only — enough to trigger a conversion, nothing personal.
+  try {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'generate_lead',
+      form: (lead && lead.form) || 'unknown',
+      page: location.pathname
+    });
+  } catch (err) { /* never let a tag break the lead */ }
+  try {
+${deliver}
   } catch (err) { /* never let delivery block the redirect */ }
 };
 </script>`;
@@ -1434,11 +1499,16 @@ async function buildLandingPage({ outFile, label, robots = '', variant = null })
   // intent. Also not paired with a canonical — Google treats noindex plus canonical
   // as contradictory signals.
   const head = [
+    // First, so it lands directly after <meta name="viewport"> and before <title> —
+    // the highest point reachable without editing the read-only export, whose <head>
+    // holds only the charset and viewport metas above this injection point.
+    gtmHead(),
     `<title>${PAGE_TITLE}</title>`,
     `<meta name="description" content="${PAGE_DESCRIPTION}">`,
     ...(robots ? [`<meta name="robots" content="${robots}">`] : []),
     `<link rel="icon" href="favicon.svg" type="image/svg+xml">`,
     `<style>x-dc{display:none!important}</style>`,
+    `<link rel="preconnect" href="https://www.googletagmanager.com">`,
     `<link rel="preconnect" href="https://fonts.googleapis.com">`,
     `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>`,
     `<link rel="stylesheet" href="${FONT_CSS}">`,
@@ -1456,6 +1526,17 @@ async function buildLandingPage({ outFile, label, robots = '', variant = null })
     head + '\n<script defer src="./support.js"></script>',
     1,
     'head injection'
+  );
+
+  // GTM's other half, immediately after <body> — kept next to the head injection so the
+  // two halves of one feature read together. <body> is a bare tag occurring exactly
+  // once, and no other pass anchors on it.
+  html = replaceExactly(
+    html,
+    '<body>',
+    '<body>\n' + gtmNoscript(),
+    1,
+    `${label}: gtm noscript`
   );
 
   // A completed lead form sends the visitor to /thank-you instead of swapping in the
@@ -1555,6 +1636,40 @@ function assertNoindexed(html, label) {
  * testimonials, the latter of which are half-hidden behind "show more" on the
  * landing page but shown in full here.
  */
+/** site/ is copied to dist/ byte for byte, so 404.html carries the container ID as
+ *  literal text rather than through gtmHead(). That is a second copy of GTM_ID, and a
+ *  second copy is a chance to diverge — so the build asserts they still agree.
+ *
+ *  It also asserts the two pages that must NOT be tagged still aren't:
+ *
+ *  - lp2.html is a redirect stub whose <head> runs location.replace('/') synchronously.
+ *    A tag above that line starts a fetch the navigation tears down; one below it never
+ *    runs; and the <noscript> path would fire only for JS-off visitors, recording a
+ *    pageview of a URL nobody actually viewed. The destination records the visit.
+ *  - map.html is iframed, never visited — twice per /lp session, both loading="lazy".
+ *    Tagging it would add two unpredictable pageviews per session and wreck both bounce
+ *    rate and pages-per-session. If map interaction is ever worth measuring, postMessage
+ *    to the parent's dataLayer rather than put a second container in the frame. */
+async function assertSiteTagging() {
+  const notFound = await readFile(join(OUT, '404.html'), 'utf8');
+  const ids = [...new Set([...notFound.matchAll(/GTM-[A-Z0-9]+/g)].map((m) => m[0]))];
+  if (ids.length !== 1 || ids[0] !== GTM_ID) {
+    throw new Error(
+      `[build] 404.html: expected the container id ${GTM_ID}, found ${ids.join(', ') || 'none'} ` +
+        `— site/404.html holds its own copy of the snippets and must be edited to match GTM_ID`
+    );
+  }
+  if (notFound.split('<!-- Google Tag Manager -->').length - 1 !== 1) {
+    throw new Error(`[build] 404.html: expected exactly one container snippet`);
+  }
+  for (const file of ['lp2.html', 'map.html']) {
+    const html = await readFile(join(OUT, file), 'utf8');
+    if (/GTM-|googletagmanager/.test(html)) {
+      throw new Error(`[build] ${file} is tagged — it is deliberately untagged, see assertSiteTagging()`);
+    }
+  }
+}
+
 async function buildThankYou() {
   const src = await readFile(join(SRC, ENTRY), 'utf8');
   const star = (n) =>
@@ -1585,6 +1700,8 @@ async function buildThankYou() {
   }
 
   const html = (await readFile(join(ROOT, 'templates', 'thank-you.html'), 'utf8'))
+    .replace('{{GTM_HEAD}}', gtmHead())
+    .replace('{{GTM_BODY}}', gtmNoscript())
     .replace('{{STARS_LG}}', star(26).repeat(5))
     .replace(
       '{{REVIEW_SHOTS}}',
@@ -1702,6 +1819,7 @@ async function main() {
   assertNoindexed(lp.html, LP_FILE);
   await buildMap();
   await buildThankYou();
+  await assertSiteTagging();
 
   console.log(
     LEAD_WEBHOOK_URL
