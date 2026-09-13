@@ -754,12 +754,14 @@ property moves, so the desktop layout cannot be affected — and the reordered e
 non-focusable `<figure><img>`, with everything interactive staying inside `.lp2-mid-ask` in
 DOM order, so nothing about focus sequence changes.
 
-The headline is the instruction — *Leave your number. We'll call you back the same day.* —
-which is what makes the section a call to action rather than a description of the offer; the
-body then removes the two unknowns that stop people filling a form: what happens next, and
-what it commits them to. **"The same day", not "today"**, because today is simply false for
-anyone who submits on a Saturday evening, and a promise that visibly breaks on first contact
-costs more than the conversions it buys. It is still a promise someone has to keep.
+The copy is a question the reader is already asking, then the instruction:
+
+> **Ready to see your kitchen?**
+> Leave your details and we'll call you to schedule a tour.
+
+Short on purpose. Two earlier drafts explained the offer here, and by this point the page has
+already made that case three times, so anything past the ask is delay. It carries no promise
+about call timing either, which is one less thing for someone to have to keep.
 
 It sits at the pivot on purpose: the photograph creates the want, 380 reviews answer the
 doubt, and the ask belongs between them rather than after both. On a phone that moves the
@@ -964,6 +966,37 @@ tagging either by accident fails the build:
 inside them would be design-tool debris or library documentation, not a page anyone
 visits — and `vendor/` must stay byte-identical to the CDN copies for the SRI
 provenance above to hold.
+
+### No long dashes in the copy
+
+The spaced long dash is a tell. Whatever else it signals, it now reads to a lot of people as
+text a machine wrote, which is the last thing a landing page for a real kitchen should look
+like. There were 15 of them in the reader-facing text on `/`, and only about a third were
+added by this build — the rest are the original design copy.
+
+`COPY_DASHES` in `scripts/build.mjs` is a table of whole-sentence rewrites, applied by
+`removeCopyDashes()` in one pass over every built page. It is a table and not a regex because
+each one is a judgement call: a blind swap to a comma makes splices ("dock, everything a
+production kitchen runs on"). A colon where the second half explains the first, a comma where
+it is a plain coordination, a full stop where they were two independent clauses glued
+together. One needed an extra word — *"Both are available. **Which one** makes sense usually
+comes down to…"*, because "Which makes sense" alone is a fragment.
+
+It runs as a final sweep, beside `tagEveryPage()`, for a concrete reason: most of these
+sentences live in the read-only export and are quoted verbatim as `replaceExactly` anchors by
+the variant's `TRIMS` and `DEDUPE` passes. Rewriting them any earlier breaks those anchors
+and the build with them.
+
+Then the assertion that makes it stick: **no long dash may remain in reader-facing text on
+any page.** Script, style and comments are stripped; `alt` and `aria-label` stay in scope
+because a screen reader reads them aloud. A re-export that brings in new dash-joined copy
+fails the build with the offending sentence quoted, rather than quietly shipping it.
+
+**Page titles are the one allowlisted exception.** `ŌN Kitchens — Commercial Kitchen Rental,
+Los Angeles` is the standard shape for a browser tab and a search result and reads as neither
+AI nor error; changing it would change how the site appears in search. The on-page eyebrow
+that used the same construction went to a middot instead — `ŌN Kitchens · The Easy Upgrade` —
+which is already this page's own separator (`01 · Why operators call us`).
 
 ### Adding a landing page
 
