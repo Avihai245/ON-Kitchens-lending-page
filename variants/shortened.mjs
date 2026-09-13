@@ -268,6 +268,15 @@ html[data-lp2-modal] body { overflow: hidden; }
   margin: 6px 0 0; font-size: 13px; line-height: 18px; color: var(--color-accent-700);
 }
 .lp2-err:empty { display: none; }
+/* The honeypot. Taken out of flow and parked off-screen rather than display:none or
+   visibility:hidden, both of which the more careful bots test for before filling a
+   field. Nothing here is reachable: aria-hidden keeps it out of the accessibility
+   tree and tabindex="-1" keeps it out of the tab order, so no real visitor can put a
+   value in it and a submission that has one did not come from a person. */
+.lp2-hp {
+  position: absolute; left: -9999px; top: auto;
+  width: 1px; height: 1px; overflow: hidden;
+}
 .lp2-modal-panel button[type="submit"] {
   margin-top: 4px; width: 100%; min-height: 52px;
   text-transform: uppercase; letter-spacing: 0.06em; font-size: 16px;
@@ -513,7 +522,11 @@ const LP2_MODAL_JS = String.raw`
     // is the one difference, so modal leads can be told apart downstream.
     var lead = {
       name: f.fullName.trim(), phone: f.phone.trim(), email: f.email.trim(),
-      business: (f.business || '').trim(), form: 'modal'
+      business: (f.business || '').trim(), form: 'modal',
+      // The honeypot travels with the lead rather than being checked here, so the drop
+      // happens at the one seam every path shares — and so this handler keeps behaving
+      // identically either way: sessionStorage, redirect, no hint that anything differed.
+      trap: val('lp2-website')
     };
     try {
       sessionStorage.setItem('on-lead', JSON.stringify({ name: lead.name, phone: lead.phone }));
@@ -897,6 +910,14 @@ export function transform(html, { replaceExactly }) {
       field('phone', 'Phone', 'tel', 'tel') +
       field('email', 'Email', 'email', 'email') +
       field('business', 'Business name', 'text', 'organization', true) +
+      // Honeypot. Never shown, never focusable, never announced — so a person cannot
+      // fill it and a form-filling bot usually will. Positioned off-screen rather than
+      // display:none, which the cruder bots check for. The name is plausible on purpose:
+      // "company website" is exactly the kind of field an autofiller reaches for.
+      '        <div class="lp2-hp" aria-hidden="true">\n' +
+      '          <label for="lp2-website">Company website</label>\n' +
+      '          <input id="lp2-website" name="website" type="text" tabindex="-1" autoComplete="off" />\n' +
+      '        </div>\n' +
       '        <button type="submit" class="btn btn-primary blueprint">Schedule My Tour</button>\n' +
       '      </form>\n' +
       '    </div>\n' +

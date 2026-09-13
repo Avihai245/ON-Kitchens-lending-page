@@ -164,64 +164,107 @@ const LEAD_WEBHOOK_URL = process.env.LEAD_WEBHOOK_URL || '';
  * Inline sender, injected into <head>.
  *
  * sendBeacon is the primary path: the browser takes ownership of the request, so it
- * completes even though the page navigates to /thank-you a moment later. The body
- * goes as text/plain rather than application/json deliberately — application/json
- * makes it a preflighted cross-origin request, and sendBeacon cannot preflight.
- * text/plain keeps it a simple request that any origin will accept, and every common
- * receiver (Zapier, Make, n8n) parses a JSON body regardless of the stated type.
- * fetch with keepalive is the fallback for browsers where sendBeacon is unavailable
- * or refuses the payload.
+ * completes even though the page navigates to /thank-you a moment later. fetch with
+ * keepalive is the fallback where sendBeacon is unavailable or refuses the payload.
+ *
+ * The body is form-encoded rather than JSON, and that is a deliberate reversal of an
+ * earlier choice worth explaining. application/json would make this a preflighted
+ * cross-origin request and sendBeacon cannot preflight, so JSON was previously sent
+ * under a text/plain content type on the assumption that "every common receiver parses
+ * a JSON body regardless of the stated type". That assumption was never verified, and
+ * if it is wrong for a given receiver the failure is completely silent: the response is
+ * opaque, so a Zap that stored the whole payload as one unusable blob would look
+ * exactly like success from here.
+ *
+ * application/x-www-form-urlencoded removes the question. It is CORS-safelisted too, so
+ * it stays a simple request and sendBeacon still works — and every webhook receiver
+ * parses it into named fields with no interpretation required. URLSearchParams sets the
+ * content type itself on both transports.
+ *
+ * Keys are flat for the same reason: a nested utm object has to be dug into downstream,
+ * where utm_source is just a field. Absent parameters are omitted rather than sent,
+ * because URLSearchParams would otherwise stringify null into the literal text "null",
+ * which is worse than a missing field.
  */
 function leadSenderScript(url) {
-  // Only DELIVERY is conditional on the webhook. The dataLayer push below is not:
-  // tracking and delivery are independent concerns, and the shape this replaced
-  // compiled __onSendLead down to an empty function whenever LEAD_WEBHOOK_URL was
-  // unset — which it is today — so a push written inside that branch would never have
+  // Only DELIVERY is conditional on the webhook. The dataLayer push and the spam gate
+  // below are not: tracking and delivery are independent concerns, and the shape this
+  // replaced compiled __onSendLead down to an empty function whenever LEAD_WEBHOOK_URL
+  // was unset — which it was — so a push written inside that branch would never have
   // fired on the live site at all.
   const deliver = url
     ? `    var q = new URLSearchParams(location.search);
-    var payload = JSON.stringify({
-      name: lead.name, phone: lead.phone, email: lead.email,
-      business: lead.business, form: lead.form,
-      // Only the chat sends this — the two forms have no message field, and
-      // JSON.stringify drops an undefined key, so their payloads are unchanged.
-      note: lead.note,
-      submittedAt: new Date().toISOString(),
-      pageUrl: location.href, referrer: document.referrer || null,
-      utm: {
-        source: q.get('utm_source'), medium: q.get('utm_medium'),
-        campaign: q.get('utm_campaign'), term: q.get('utm_term'),
-        content: q.get('utm_content'), gclid: q.get('gclid'), fbclid: q.get('fbclid')
-      }
-    });
+    var body = new URLSearchParams();
+    var put = function (k, v) { if (v !== null && v !== undefined && v !== '') body.set(k, v); };
+
+    put('name', lead.name);
+    put('phone', lead.phone);
+    put('email', lead.email);
+    put('business', lead.business);
+    put('form', lead.form);
+    // Only the chat sends this — neither HTML form has a message field.
+    put('note', lead.note);
+    put('submittedAt', new Date().toISOString());
+    put('pageUrl', location.href);
+    put('referrer', document.referrer);
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid']
+      .forEach(function (k) { put(k, q.get(k)); });
+
     var url = ${JSON.stringify(url)};
-    var type = 'text/plain;charset=UTF-8';
-    if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([payload], { type: type }))) return;
-    fetch(url, { method: 'POST', mode: 'no-cors', keepalive: true,
-                 headers: { 'Content-Type': type }, body: payload }).catch(function () {});`
+    if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;
+    fetch(url, { method: 'POST', mode: 'no-cors', keepalive: true, body: body })
+      .catch(function () {});`
     : `    /* LEAD_WEBHOOK_URL unset at build time — the lead is not delivered anywhere. */`;
+
   return `<script>
-window.__onSendLead = function (lead) {
-  // GTM first, in its own try/catch, for two reasons. The delivery path below returns
-  // early on a successful sendBeacon, so a push placed after it would be skipped on
-  // the common path; and a tag failing must never stop a lead reaching the webhook.
+(function () {
+  // Spam gate. The webhook URL ships in the page source — unavoidable for a static site
+  // that posts directly — so anything able to read the page can also post to it. These
+  // listeners are registered here, in <head>, for the same reason the GTM <noscript>
+  // lives outside #dc-root: the runtime re-renders on every scroll threshold and media
+  // query change, and a document-level listener is the only thing that survives that.
   //
-  // No name, phone or email goes in here, deliberately. Everything pushed to dataLayer
-  // is readable by every tag configured in the container, and /thank-you's whole
-  // sessionStorage design exists so that analytics can never capture a phone number.
-  // Lead source and path only — enough to trigger a conversion, nothing personal.
-  try {
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
-      event: 'generate_lead',
-      form: (lead && lead.form) || 'unknown',
-      page: location.pathname
-    });
-  } catch (err) { /* never let a tag break the lead */ }
-  try {
+  // A person cannot fill a form without a pointer or key event, so the false-positive
+  // risk is close to nil — which is the number that matters here, because a dropped real
+  // lead costs far more than a spam one that gets through.
+  //
+  // Note what this cannot do: a bot that scrapes the URL and posts straight to the
+  // endpoint never loads the page at all, so no client-side check can see it. That is a
+  // property of static-site webhooks, not a gap in this code. See the README.
+  var human = false;
+  var mark = function (ev) { if (!ev || ev.isTrusted !== false) human = true; };
+  ['pointerdown', 'keydown', 'touchstart'].forEach(function (t) {
+    document.addEventListener(t, mark, { capture: true, passive: true });
+  });
+
+  window.__onSendLead = function (lead) {
+    // Dropped submissions fail silently: the caller still redirects to /thank-you, so a
+    // bot is never told it was caught. The drop happens before the dataLayer push too —
+    // spam that inflated the conversion count would defeat the point of tracking it.
+    if (lead && lead.trap) return;
+    if (!human) return;
+
+    // GTM first, in its own try/catch, for two reasons. The delivery path below returns
+    // early on a successful sendBeacon, so a push placed after it would be skipped on
+    // the common path; and a tag failing must never stop a lead reaching the webhook.
+    //
+    // No name, phone or email goes in here, deliberately. Everything pushed to dataLayer
+    // is readable by every tag configured in the container, and /thank-you's whole
+    // sessionStorage design exists so that analytics can never capture a phone number.
+    // Lead source and path only — enough to trigger a conversion, nothing personal.
+    try {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: 'generate_lead',
+        form: (lead && lead.form) || 'unknown',
+        page: location.pathname
+      });
+    } catch (err) { /* never let a tag break the lead */ }
+    try {
 ${deliver}
-  } catch (err) { /* never let delivery block the redirect */ }
-};
+    } catch (err) { /* never let delivery block the redirect */ }
+  };
+})();
 </script>`;
 }
 
@@ -1945,11 +1988,24 @@ async function main() {
   // Last, over the finished output: puts GTM on every page in dist/ and proves it.
   await tagEveryPage();
 
-  console.log(
-    LEAD_WEBHOOK_URL
-      ? `\n[build] lead webhook: ${LEAD_WEBHOOK_URL.replace(/^(https?:\/\/[^/]+).*$/, '$1/…')}`
-      : `\n[build] lead webhook: not configured (set LEAD_WEBHOOK_URL to enable)`
-  );
+  // Loud when unset, because the failure is silent everywhere else: the forms validate,
+  // the visitor reaches /thank-you, and GTM reports a conversion — for a lead that was
+  // dropped on the floor. Not a hard failure, though: local builds and the very first
+  // Amplify build both legitimately run before the variable exists.
+  if (LEAD_WEBHOOK_URL) {
+    // Origin only. Catch-hook URLs carry their secret in the path, and build logs are
+    // not a private place.
+    console.log(`\n[build] lead webhook: ${LEAD_WEBHOOK_URL.replace(/^(https?:\/\/[^/]+).*$/, '$1/…')}`);
+  } else {
+    console.log(
+      `\n[build] ⚠  LEAD_WEBHOOK_URL is not set — EVERY LEAD THIS BUILD TAKES IS DISCARDED.\n` +
+        `[build]    The forms still validate and still reach /thank-you, and Google Tag\n` +
+        `[build]    Manager still reports a conversion, so nothing looks wrong from outside.\n` +
+        `[build]    Fix: Amplify console -> App settings -> Environment variables ->\n` +
+        `[build]    LEAD_WEBHOOK_URL = your endpoint, then redeploy (the value is baked in\n` +
+        `[build]    at build time, so saving it alone changes nothing until a build runs).`
+    );
+  }
   console.log(`[build] dist/ ready — publish this directory (amplify.yml baseDirectory).`);
 }
 

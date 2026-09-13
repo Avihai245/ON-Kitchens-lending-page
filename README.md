@@ -725,48 +725,114 @@ from, the place to add it is the payload in `leadSenderScript()`.
 
 ## Lead webhook
 
-Every validated submission from either form is POSTed to `LEAD_WEBHOOK_URL`, then the
-visitor is sent to `/thank-you`. Unset — the default, and the state this repo ships in
-— nothing is sent, nothing errors, and the page behaves exactly as it did before.
+Every validated submission from **all four lead paths** is POSTed to `LEAD_WEBHOOK_URL`.
+The three form paths then send the visitor to `/thank-you`; the chat does not navigate,
+so for chat leads **the webhook POST is the only record that the lead happened**. Unset,
+nothing is sent and nothing errors — but see the warning below, because that state is
+more dangerous than it looks.
 
 **To turn it on:** Amplify console -> App settings -> Environment variables ->
-`LEAD_WEBHOOK_URL` = your endpoint, then redeploy. The build prints which state it
-used. Locally: `LEAD_WEBHOOK_URL=https://… node scripts/build.mjs`.
+`LEAD_WEBHOOK_URL` = your endpoint -> **Redeploy**. The value is baked in at build time,
+so saving the variable alone changes nothing until a build runs. Confirm from the build
+log, which prints the origin with the path redacted — catch-hook URLs carry their secret
+in the path and build logs are not a private place. Locally:
+`LEAD_WEBHOOK_URL=https://… node scripts/build.mjs`.
 
-**Payload** (JSON):
+**Unset is a silent failure, and the build now says so loudly.** Every lead is validated,
+the visitor still reaches `/thank-you`, and Google Tag Manager still fires
+`generate_lead` — so from outside nothing looks wrong while every lead is dropped on the
+floor. The build prints an unmissable warning rather than failing, because local builds
+and the very first Amplify build both legitimately run before the variable exists.
 
-```json
-{
-  "name": "Sarah Mitchell", "phone": "(310) 555-1234",
-  "email": "sarah@bakery.example", "business": "Mitchell Bakehouse",
-  "form": "end-of-page",
-  "submittedAt": "2026-09-02T20:50:33.402Z",
-  "pageUrl": "https://…/?utm_source=google", "referrer": null,
-  "utm": { "source": "google", "medium": "cpc", "campaign": "kitchens_la",
-           "term": null, "content": null, "gclid": "XYZ123", "fbclid": null }
-}
+**Payload** — `application/x-www-form-urlencoded`, flat keys:
+
+```
+name=Sarah+Mitchell&phone=%28310%29+555-1234&email=sarah%40bakery.example
+&business=Mitchell+Bakehouse&form=end-of-page
+&submittedAt=2026-09-02T20%3A50%3A33.402Z&pageUrl=https%3A%2F%2F…%3Futm_source%3Dgoogle
+&utm_source=google&utm_medium=cpc&utm_campaign=kitchens_la&gclid=XYZ123
 ```
 
-`form` is `mid-page` or `end-of-page`, so the two forms can be told apart. UTM,
-`gclid` and `fbclid` are read off the landing URL for attribution.
+Which a receiver parses into named fields:
 
-**Delivery.** `navigator.sendBeacon` first — the browser takes ownership of the
-request, so it completes even though the page navigates a moment later — with
-`fetch(keepalive)` as fallback. The body is sent as `text/plain` on purpose:
-`application/json` makes it a preflighted cross-origin request and sendBeacon cannot
-preflight, while `text/plain` stays a simple request that any origin accepts. Zapier,
-Make and n8n all parse a JSON body regardless of the stated type.
+| field | notes |
+| --- | --- |
+| `name` `phone` `email` | always present. **`phone` is the raw human string** — `(310) 555-1234`, not digits. Normalise downstream. |
+| `business` | optional on every path, never validated. Omitted when blank. |
+| `form` | `mid-page`, `end-of-page`, `modal` or `chat`. |
+| `note` | **chat only** — neither HTML form has a message field. |
+| `submittedAt` `pageUrl` `referrer` | `referrer` omitted on a direct visit. |
+| `utm_source` … `gclid` `fbclid` | read off the landing URL. **Absent ones are omitted**, not sent as the string `"null"`. |
 
-**Two limits worth knowing**, both inherent to posting from a static page rather than
-a server, and neither fixable client-side:
+`form` distinguishes the four paths, `pageUrl` distinguishes the two pages. Which paths
+exist where:
 
-- **The URL is public.** It sits in the page source, so anyone can post fabricated
-  leads to it. The receiver needs its own spam handling — Zapier and Make both offer
-  filter steps.
-- **Delivery is fire-and-forget.** A cross-origin response is opaque, so the page
-  cannot tell whether the lead was accepted, and nothing is retried. If a lead must
-  never be lost, put a small server in front: an Amplify function that holds the real
-  endpoint plus a shared secret, with the page posting to that instead.
+| | `/` | `/lp` |
+| --- | --- | --- |
+| inline forms | `end-of-page` | `mid-page`, `end-of-page` |
+| tour modal | `modal` | — |
+| chat | `chat` | `chat` |
+
+**Delivery.** `navigator.sendBeacon` first — the browser takes ownership of the request,
+so it completes even though the page navigates a moment later — with `fetch(keepalive)`
+as fallback.
+
+The body is **form-encoded rather than JSON**, and that reverses an earlier choice worth
+explaining. `application/json` would make this a preflighted cross-origin request and
+sendBeacon cannot preflight, so JSON was previously sent under a `text/plain` content
+type, on the stated assumption that "Zapier, Make and n8n all parse a JSON body
+regardless of the stated type". That assumption was never verified, and if it is wrong
+for a given receiver **the failure is completely silent**: the response is opaque, so a
+Zap storing the whole payload as one unusable blob looks exactly like success from here.
+`application/x-www-form-urlencoded` is CORS-safelisted too, so it stays a simple request
+and sendBeacon still works — and every webhook receiver parses it into named fields with
+no interpretation required. The question is removed rather than answered.
+
+### Spam protection
+
+The webhook URL ships in the page source. That is unavoidable for a static site posting
+directly, so anything that can read the page can also post to the endpoint. Two guards,
+both at `window.__onSendLead` — the one seam all four paths share:
+
+- **An interaction gate.** Document-level `pointerdown` / `keydown` / `touchstart`
+  listeners, registered in `<head>` so React's re-renders cannot orphan them. A lead that
+  arrives with no trusted interaction ever having happened is dropped. A person cannot
+  fill a form without interacting, so the false-positive risk is close to nil — the
+  number that matters, since a dropped real lead costs far more than a spam one that gets
+  through.
+- **A honeypot** in the tour modal: a "Company website" field parked off-screen, out of
+  the tab order and out of the accessibility tree. Off-screen rather than `display:none`,
+  which the more careful bots test for. Only the modal has one — the two inline forms are
+  React-rendered from the read-only export, and a field injected into them would be wiped
+  on the next re-render.
+
+Both fail **silently**: the caller still redirects to `/thank-you`, so a bot is never told
+it was caught, and the drop happens *before* the `dataLayer` push so spam cannot inflate
+the conversion count.
+
+**What this cannot do.** A bot that scrapes the URL from page source and posts straight
+to the endpoint never loads the page, so no client-side check can see it. Keeping the URL
+in the Amplify console rather than this repo removes the larger exposure — the repo is
+public, and `hooks.zapier.com/hooks/catch/…` is a pattern bots harvest from public repos
+— but it cannot remove that one. If it ever becomes a problem the backstop is a receiver-
+side filter, with a tradeoff that is real: **the site can never learn that a lead was
+filtered**, so a filter that misfires loses leads invisibly.
+
+**Two limits worth knowing**, both inherent to posting from a static page rather than a
+server, and neither fixable client-side:
+
+- **The URL is public**, as above.
+- **Delivery is fire-and-forget.** A cross-origin response is opaque, so the page cannot
+  tell whether the lead was accepted, and nothing is retried. **The receiver must return
+  2xx and must never reject a well-formed lead** — a rejection is a lead you will never
+  learn about. If a lead must never be lost, put a small server in front: an Amplify
+  function that holds the real endpoint plus a shared secret, with the page posting to
+  that instead.
+
+One more window, inherited from the export's UX and upstream of all of this: the two
+inline forms wait 1.5s on a simulated "Sending…" before assembling the lead. A visitor who
+closes the tab during that second and a half is lost before anything is sent. The modal
+and the chat fire immediately.
 
 ## Analytics — Google Tag Manager
 
@@ -1056,14 +1122,17 @@ Nothing here provisions AWS resources or sets environment variables.
 
 These are behaviours of the design prototype, left alone deliberately:
 
-- **Both lead forms are still simulated.** `submit()` validates, waits 1.5s, and
-  redirects to `/thank-you`. Nothing is sent anywhere and nothing is stored — the
-  name and phone live only in that visitor's own `sessionStorage` and are cleared on
-  render. The funnel now *looks* complete end to end, which makes this more
-  dangerous than before, not less: every lead is still dropped. Wire the submit to a
-  real endpoint before driving traffic here. Google Tag Manager now fires a
-  `generate_lead` event on every submission, which raises the stakes again: a
-  conversion tag built on it will report conversions for leads nobody received.
+- **The lead pipeline is wired but not yet switched on.** All four paths POST to
+  `LEAD_WEBHOOK_URL`, verified end to end against a local receiver — but the variable
+  is set in the Amplify console, not in this repo, so until someone adds it and
+  redeploys **every lead is still discarded**, and Google Tag Manager still reports a
+  `generate_lead` conversion for each one. The build now says so in an unmissable
+  warning. This is the single most important outstanding step; see **Lead webhook**.
+- **Delivery is unverified against the real endpoint.** The payload shape and every
+  path were proven against a local receiver, but the sandbox this was built in has no
+  network route to `hooks.zapier.com`, so nobody has yet confirmed the live Zap parses
+  it into named fields. `scripts/test-webhook.sh` sends a byte-identical test payload
+  for exactly that purpose.
 - **Every phone number on the site is commented out.** `(844) 435-1255` appears 40 times
   across the repo — 10 `PHONE CTA` blocks and 4 inline fragments per landing page, plus the
   export — and **all 40 are inside HTML comments**. There is no clickable `tel:` link on any
@@ -1211,6 +1280,23 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   browser with a live `dataLayer` — including a nested `site/__probe/deep.html` with no
   viewport meta, which exercised the charset fallback anchor. This is the guarantee the
   design exists for, tested rather than argued.
+- **The lead webhook, all four paths, against a real receiver.** Built with a live URL
+  and driven with genuine browser input — real clicks, real keystrokes — the end-of-page
+  form and the modal and a full chat conversation on `/`, and the mid-page form on `/lp`.
+  Each produced exactly one POST, `application/x-www-form-urlencoded`, parsed into
+  separate named fields: the right `form` tag on each, `note` only from the chat,
+  `business` omitted when blank, and `utm_source` / `utm_medium` / `utm_campaign` /
+  `gclid` captured from the landing URL while the absent ones were omitted rather than
+  sent as the string `"null"`. **21 assertions.**
+- **The spam gate, including the half that matters more.** A lead dispatched with no
+  interaction is dropped: nothing reaches the receiver and no `generate_lead` is pushed.
+  The honeypot filled → same, and the page still redirects to `/thank-you` so a bot is
+  never told. The honeypot is off-screen, out of the tab order (12 tab presses never
+  land on it), out of the accessibility tree, and deliberately not `display:none`. Then
+  the important half: **no false positives** — all four paths, driven by genuine input,
+  still deliver. **13 assertions.**
+- **Unset stays safe:** no request is attempted, nothing errors, no live URL is baked
+  into the shipping build, and the four non-landing pages are byte-identical.
 - **The tagging refactor changed nothing else, proved by diff.** `dist/` was snapshotted
   before the change and compared file by file after: the container script and `<noscript>`
   land byte-for-byte where they already were on all four pages. The only differences in the

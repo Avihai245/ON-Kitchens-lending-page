@@ -32,8 +32,14 @@ customHeaders:
   #   img-src 'self' data: https://*.tile.openstreetmap.org
   #           https://www.googletagmanager.com;
   #   connect-src 'self' https://nominatim.openstreetmap.org
-  #               https://www.googletagmanager.com;
+  #               https://www.googletagmanager.com
+  #               https://hooks.zapier.com;
   #   frame-src 'self' https://player.vimeo.com https://www.googletagmanager.com;
+  #
+  # hooks.zapier.com is where a submitted lead is POSTed, so it needs connect-src:
+  # sendBeacon and fetch are both governed by that directive. Change it if
+  # LEAD_WEBHOOK_URL ever points somewhere else — the origin is not read from the
+  # environment here, so this comment cannot follow the variable automatically.
   #
   # The googletagmanager.com entries are Google Tag Manager: script-src for gtm.js,
   # frame-src for the <noscript> ns.html iframe, and img-src/connect-src for the
