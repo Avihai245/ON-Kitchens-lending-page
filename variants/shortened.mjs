@@ -162,48 +162,66 @@ const LP2_CSS = `
 
 /* ---- the mid-page lead form ----
    Dark, because #tour at the foot of the page is dark and this is the same ask; the
-   site already reads a dark band as "a form you are meant to fill in". It also
-   continues the black of the .lp2-could photograph directly above, so the picture and
-   the ask land as one block before handing off to the light reviews below.
+   site already reads a dark band as "a form you are meant to fill in". The black also
+   frames the photograph this section now contains, and hands off cleanly to the light
+   reviews below.
 
-   Two columns on desktop deliberately. The export's own mid-page form was 1,142px of
-   stacked fields, which is most of a viewport spent on a second copy of the closing
-   ask; side by side it costs about a third of that, and the copy stays beside the
-   fields where it can still do some work. Below 760px — the same breakpoint the rest
-   of the page turns on — it stacks. */
+   Two columns on desktop deliberately, and the photograph is one of them. It shipped
+   for a while as a full-bleed band of its own directly above this section, and that
+   was wrong twice over: 932px of picture with nothing to do next, and a headline
+   underneath that looked unrelated to it. The picture is the argument for the form —
+   "this could be you" is a reason to book a tour — so the two belong in one frame,
+   sized against each other. Below 760px — the same breakpoint the rest of the page
+   turns on — it stacks, photograph first. */
 .lp2-mid {
   background: #141414; color: #FAF8F5;
   padding: clamp(40px, 5.5vw, 72px) 0;
 }
+/* The photograph and the ask are one frame, sized against each other. Equal columns:
+   the picture is the argument for the form, so neither should look like the other's
+   decoration — and at 5fr/6fr the image was short enough to leave a visible run of
+   empty black beneath it, since the form column's height is set by four fields and a
+   button rather than by anything the image can match. */
 .lp2-mid > div {
   max-width: clamp(1240px, 90vw, 1760px); margin: 0 auto; padding: 0 var(--edge);
-  display: grid; grid-template-columns: 1fr 1fr; gap: 32px clamp(40px, 6vw, 88px);
-  align-items: start;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 32px clamp(36px, 4.5vw, 72px);
+  align-items: stretch;
+}
+/* contain, never cover. The whole argument of this photograph is burned into it as
+   text — THIS COULD BE YOU across the cook, AND THIS COULD BE YOUR KITCHEN across the
+   line, YOUR LOGO COULD BE HERE on the bag — and those sit at the frame's edges, so
+   cover ate them: at 5fr of a 1240px grid the first two words of each line were gone.
+   contain fits the whole picture and centres it, and because the leftover space is the
+   section's own #141414 there is nothing to see where the image is not. The column
+   still stretches, so the two halves stay the same height. */
+.lp2-mid-shot { margin: 0; min-height: 0; display: flex; }
+.lp2-mid-shot img {
+  display: block; width: 100%; height: 100%; min-height: 300px;
+  /* Top, not centre: the column stretches to the form's height, so centring floated the
+     picture ~84px below the eyebrow and the two halves stopped looking like one block.
+     Aligned to the top the eye gets a single clean edge across both columns, and the
+     leftover below is the section's own black, which reads as nothing at all. */
+  object-fit: contain; object-position: 50% 0;
 }
 .lp2-mid-eyebrow {
   display: block; font-family: var(--font-heading); font-weight: 600;
   font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--color-accent); margin-bottom: 14px;
+  color: var(--color-accent); margin-bottom: 12px;
 }
+/* Sized to sit beside a photograph, not to carry a section on its own. At the previous
+   clamp(28px, 3.4vw, 42px) it broke to three lines in this column and read as a banner
+   with nothing under it. */
 .lp2-mid h2 {
   font-family: var(--font-heading); font-weight: 600;
-  font-size: clamp(28px, 3.4vw, 42px); line-height: 1.06; letter-spacing: 0.01em;
-  text-transform: uppercase; margin: 0; max-width: 16ch;
+  font-size: clamp(24px, 2.3vw, 32px); line-height: 1.08; letter-spacing: 0.01em;
+  text-transform: uppercase; margin: 0;
 }
 .lp2-mid p {
-  margin: 18px 0 0; max-width: 46ch;
-  font-size: 16px; line-height: 26px;
+  margin: 12px 0 22px; max-width: 48ch;
+  font-size: 15px; line-height: 24px;
   color: color-mix(in srgb, #FAF8F5 82%, transparent);
 }
-.lp2-mid ul {
-  list-style: none; margin: 26px 0 0; padding: 18px 0 0;
-  border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent);
-  display: flex; flex-wrap: wrap; gap: 10px 26px;
-  font-family: var(--font-heading); font-weight: 600; font-size: 15px;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  color: color-mix(in srgb, #FAF8F5 82%, transparent);
-}
-.lp2-mid form { display: grid; gap: 16px; }
+.lp2-mid form { display: grid; gap: 14px; }
 .lp2-mid label {
   display: block; font-family: var(--font-heading); font-weight: 600;
   font-size: 13px; line-height: 1.35; letter-spacing: 0.1em; text-transform: uppercase;
@@ -224,9 +242,13 @@ const LP2_CSS = `
   text-transform: uppercase; letter-spacing: 0.06em; font-size: 16px;
 }
 @media (max-width: 760px) {
-  .lp2-mid > div { grid-template-columns: 1fr; gap: 26px; }
-  .lp2-mid h2 { max-width: none; }
-  .lp2-mid ul { margin-top: 20px; }
+  /* Stacked, and the photograph keeps its own proportions rather than being cropped to
+     a column height that no longer exists. 220px of it is enough to carry the idea
+     above the form without pushing the fields off the first screenful. */
+  .lp2-mid > div { grid-template-columns: 1fr; gap: 22px; }
+  /* Stacked, the photograph has the full column width, so its natural proportions fit
+     without any crop or any leftover — no object-fit needed at all. */
+  .lp2-mid-shot img { height: auto; min-height: 0; }
 }
 
 /* ---- the sticky bar stands down while this form is on screen ----
@@ -422,11 +444,7 @@ html[data-lp2-modal] body { overflow: hidden; }
    afford to look cheap. */
 /* Flush against its neighbours: a full-bleed image does not also need a full
    section's padding above and below it — the picture is its own separator. */
-.lp2-could { display: block; margin: -28px 0; background: #141414; }
-.lp2-could img {
-  display: block; width: 100%; height: auto;
-  max-width: 1200px; margin: 0 auto;
-}
+/* could-be-you.webp lives inside the lead form section now — see .lp2-mid-shot. */
 
 /* ---- the edge fade, shared by every horizontal scroller on the page ----
    A row that runs past the screen has to say so. The partner marquee already
@@ -996,28 +1014,22 @@ export function transform(html, { replaceExactly }) {
     out = replaceExactly(out, from, to, 1, `dedupe: ${label}`);
   }
 
-  // ---- 12. the "this could be you" photograph moves to the pivot -------------
+  // ---- 12. the "this could be you" photograph is checked out of the way -------
   // could-be-you.webp is the one asset that asks the reader to picture themselves in
   // the space rather than telling them about it — THIS COULD BE YOU over the cook,
   // AND THIS COULD BE YOUR KITCHEN over the line, YOUR LOGO COULD BE HERE over a
-  // blank kraft bag. On / it sits inside the mid-page lead form, under a headline
-  // that already says "Seen enough?" — by then the reader has decided, and the image
-  // is decoration beside a form rather than the thing that got them there. Step 4
-  // above then dropped that form from this page, and the image went with it.
+  // blank kraft bag. In the export it sits inside the mid-page lead form; step 4
+  // dropped that form from this page, and the image went with it.
   //
-  // It belongs at the pivot: pain, then this, then process. "This could be you" only
-  // lands once there is a reason to want to be someone else, and the section above
-  // has just spent four cards establishing one. The hero is protected, so this is the
-  // earliest position on the page where the picture can do its work.
+  // It comes back in step 15, beside the form rather than as a band of its own. It
+  // was a full-bleed band here for a while and that was wrong: 932px of photograph
+  // with nothing to do next, then a separate headline underneath that read as
+  // unrelated to it. The picture is an argument for the form, so it belongs in the
+  // same frame as the form. Only the "is it gone?" assertion stays here, next to the
+  // step whose removal it is checking.
   {
     const IMG = out.match(/<img src="assets\/could-be-you\.webp"[^>]*>/);
     if (IMG) throw new Error('[lp2] could-be-you: already on the page — step 4 should have removed it.');
-    const ALT = 'A cook plating bowls in a stainless commercial kitchen, annotated: this could be you, and this could be your kitchen, your logo could be here';
-    const band =
-      '<div class="lp2-could">\n' +
-      `      <img src="assets/could-be-you.webp" alt="${ALT}" loading="lazy" width="1200" height="932" />\n` +
-      '    </div>\n\n  ';
-    out = replaceExactly(out, OPEN.howItWorks, band + OPEN.howItWorks, 1, 'could-be-you band');
   }
 
   // ---- 13. the proof moves up behind the photograph --------------------------
@@ -1076,6 +1088,7 @@ export function transform(html, { replaceExactly }) {
   // observer never sees would stay at opacity 0 forever, which has already happened
   // once on this page.
   {
+    const ALT = 'A cook plating bowls in a stainless commercial kitchen, annotated: this could be you, and this could be your kitchen, your logo could be here';
     const section =
       // id="tour-form", not "tour-mid": the export's #tour-mid was cut by step 4, and
       // reusing the name would silently revive two stale href="#tour-mid" buttons that
@@ -1083,21 +1096,23 @@ export function transform(html, { replaceExactly }) {
       // two are repointed at the modal just below instead.
       '<section id="tour-form" class="lp2-mid" data-band="dark" aria-labelledby="lp2-mid-title">\n' +
       '    <div>\n' +
-      '      <div>\n' +
+      // The photograph is the left column, not a band above. It is the argument for the
+      // form — "this could be you" is a reason to book a tour — so the two belong in one
+      // frame, sized against each other, rather than as a 932px picture followed by an
+      // unrelated-looking headline.
+      '      <figure class="lp2-mid-shot">\n' +
+      `        <img src="assets/could-be-you.webp" alt="${ALT}" loading="lazy" width="1200" height="932" />\n` +
+      '      </figure>\n' +
+      '      <div class="lp2-mid-ask">\n' +
       '        <span class="lp2-mid-eyebrow">Book a tour</span>\n' +
-      '        <h2 id="lp2-mid-title">See it before you commit to anything.</h2>\n' +
-      '        <p>Walk the line, open the walk-in, meet the people already cooking here. ' +
+      '        <h2 id="lp2-mid-title">Come see it for yourself.</h2>\n' +
+      '        <p>No build-out, already permitted, month to month. ' +
       'Leave your details and we&rsquo;ll call to set a time at Van Nuys or Washington Blvd.</p>\n' +
-      '        <ul>\n' +
-      '          <li>No build-out</li>\n' +
-      '          <li>Already permitted</li>\n' +
-      '          <li>Month to month</li>\n' +
-      '        </ul>\n' +
-      '      </div>\n' +
-      '      <form id="lp2-mid-form" noValidate>\n' +
+      '        <form id="lp2-mid-form" noValidate>\n' +
       leadFields('lp2-mid-') +
       '        <button type="submit" class="btn btn-primary blueprint">Book My Tour</button>\n' +
-      '      </form>\n' +
+      '        </form>\n' +
+      '      </div>\n' +
       '    </div>\n' +
       '  </section>\n\n  ';
     // Anchored on the reviews rather than on the photograph, and placed after step 13
