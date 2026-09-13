@@ -838,12 +838,28 @@ Which a receiver parses into named fields:
 
 | field | notes |
 | --- | --- |
-| `name` `phone` `email` | always present. **`phone` is the raw human string** — `(310) 555-1234`, not digits. Normalise downstream. |
+| `name` `phone` `email` | always present. **`phone` is the raw human string**, `(310) 555-1234`, not digits. Normalise downstream. |
 | `business` | optional on every path, never validated. Omitted when blank. |
-| `form` | `mid-page`, `end-of-page`, `modal` or `chat`. |
-| `note` | **chat only** — neither HTML form has a message field. |
+| `form` | `mid-page`, `end-of-page`, `modal` or `chat`. Stable identifiers: filter and branch on these. |
+| `form_name` | the same thing for a person reading the lead: `Form 1 (top)`, `Form 2 (bottom)`, `Button (popup)`, `Chat`. |
+| `note` | **chat only**, neither HTML form has a message field. |
 | `submittedAt` `pageUrl` `referrer` | `referrer` omitted on a direct visit. |
-| `utm_source` … `gclid` `fbclid` | read off the landing URL. **Absent ones are omitted**, not sent as the string `"null"`. |
+| `utm_source` … `gclid` `fbclid` | captured at landing, see below. **Absent ones are omitted**, not sent as the string `"null"`. |
+
+Two fields for the same fact on purpose. `form` never changes, so anything downstream that
+filters or branches on it keeps working; `form_name` is what someone reading a lead in an
+inbox actually wants to see, and can be reworded any time without breaking a Zap.
+
+**Campaign attribution is captured when the page loads, not when the form is submitted.**
+Those look equivalent and are not: a visitor who arrives on `/?utm_source=facebook` and then
+moves to `/lp`, or comes back through the browser's history, submits from a URL with no
+campaign on it, and the lead would arrive with the attribution silently blank. Stored on the
+first page of the visit it survives all of that, which is what "where they came from"
+actually means. `pageUrl` still records where they really submitted from, so nothing is lost.
+
+`sessionStorage`, not `localStorage`: this is one visit, not one browser. A campaign click
+three weeks ago should not be credited with today's lead. A later landing that carries its
+own campaign overwrites it, so the most recent real referral wins.
 
 `form` distinguishes the four paths, `pageUrl` distinguishes the two pages. Which paths
 exist where:
