@@ -1110,18 +1110,13 @@ export function transform(html, { replaceExactly }) {
       `        <img src="assets/could-be-you.webp" alt="${ALT}" loading="lazy" width="1200" height="932" />\n` +
       '      </figure>\n' +
       '      <div class="lp2-mid-ask">\n' +
-      // The headline is the instruction, which is what makes this a call to action
-      // rather than a description of the offer — the previous copy explained the
-      // kitchens and never asked for anything. The body then removes the two unknowns
-      // that stop people filling a form: what happens next, and what it commits them to.
-      //
-      // "the same day", not "today": today is simply false for anyone who submits on a
-      // Saturday evening, and a promise that visibly breaks on first contact costs more
-      // than the conversions it buys.
+      // A question the reader is already asking, then the instruction. Short on purpose:
+      // two earlier drafts explained the offer here and the page has already made that
+      // case three times by this point, so anything past the ask is delay. No promise
+      // about call timing either, which is one less thing for someone to have to keep.
       '        <span class="lp2-mid-eyebrow">Book a tour</span>\n' +
-      '        <h2 id="lp2-mid-title">Leave your number. We&rsquo;ll call you back the same day.</h2>\n' +
-      '        <p>Tell us what you cook and we&rsquo;ll show you the suite that fits &mdash; ' +
-      'sizes, terms and pricing on the call. No build-out, month to month, no obligation.</p>\n' +
+      '        <h2 id="lp2-mid-title">Ready to see your kitchen?</h2>\n' +
+      '        <p>Leave your details and we&rsquo;ll call you to schedule a tour.</p>\n' +
       '        <form id="lp2-mid-form" noValidate>\n' +
       leadFields('lp2-mid-') +
       '        <button type="submit" class="btn btn-primary blueprint">Book My Tour</button>\n' +

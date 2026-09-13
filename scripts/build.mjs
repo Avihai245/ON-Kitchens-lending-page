@@ -1764,6 +1764,100 @@ function insertAfter(html, anchors, addition, page, what) {
   );
 }
 
+/** Sentences rewritten to get the spaced long dash out of the reader-facing copy.
+ *
+ *  It is a tell. Whatever else it signals, it now reads to a lot of people as text a
+ *  machine wrote, which is the last thing a landing page for a real kitchen should look
+ *  like. Two thirds of these are the original design copy rather than anything added
+ *  here, so this is not tidying up after the build — it is a copy pass over the site.
+ *
+ *  Each one is a judgement call, which is why this is a table of whole sentences and not
+ *  a regex. Swapping every dash for a comma produces splices ("dock, everything a
+ *  production kitchen runs on"); the right answer is a colon where the second half
+ *  explains the first, a comma where it is a plain coordination, and a full stop where
+ *  they are two independent clauses that were only ever glued together.
+ *
+ *  Page titles are deliberately left alone — brand-dash-descriptor is the standard shape
+ *  for a browser tab and a search result, and reads as neither AI nor error. The on-page
+ *  eyebrow gets a middot instead, which is already this page's own convention for the
+ *  same job ("01 · Why operators call us"). */
+const COPY_DASHES = [
+  // -- colon: the second half is a list or a gloss of the first --
+  ['dish pit, dock &mdash; everything', 'dish pit, dock: everything'],
+  ['Health Department approval &mdash; handled.', 'Health Department approval: handled.'],
+  ['A short look inside &mdash; the line', 'A short look inside: the line'],
+  ['A short look inside — the line', 'A short look inside: the line'],
+  ['certified unit — cooking, sanitation', 'certified unit: cooking, sanitation'],
+  ['required setup step — onboarding, permitting', 'required setup step: onboarding, permitting'],
+
+  // -- comma: a plain coordination that never needed the emphasis --
+  ['are the ceiling &mdash; and the accounts', 'are the ceiling, and the accounts'],
+  ['your range and your fridge — and the accounts', 'your range and your fridge, and the accounts'],
+  ['the business actually is — not where', 'the business actually is, not where'],
+  ['Thanks — we have your details.', 'Thanks, we have your details.'],
+  ['Thanks — we', 'Thanks, we'],
+
+  // -- full stop: two independent clauses, joined for no reason --
+  ['Los Angeles — already built, already equipped.', 'Los Angeles. Already built, already equipped.'],
+  ['the space and the location — both are covered', 'the space and the location. Both are covered'],
+  // "Which makes sense" alone is a fragment, so the split needs the extra word.
+  ['Both are available — which makes sense', 'Both are available. Which one makes sense'],
+  ['what setup looks like — sizes, terms and pricing included.',
+   'what setup looks like. Sizes, terms and pricing included.'],
+
+  // -- the on-page eyebrow, to the page's own separator --
+  ['ŌN Kitchens — The Easy Upgrade', 'ŌN Kitchens · The Easy Upgrade'],
+];
+
+/** Everything a reader or a screen reader actually receives: markup minus the machinery,
+ *  minus <title>, which is allowlisted. Attribute values stay in scope on purpose — alt
+ *  and aria-label are read aloud. */
+function readerFacing(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/g, '')
+    .replace(/<style[\s\S]*?<\/style>/g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<title>[\s\S]*?<\/title>/g, '');
+}
+
+/** Applies COPY_DASHES across dist/, then proves none is left.
+ *
+ *  A final sweep rather than fixes at the point each sentence is written, for one
+ *  concrete reason: most of these live in the read-only export and are quoted verbatim as
+ *  replaceExactly anchors by the variant's TRIMS and DEDUPE passes. Rewriting them any
+ *  earlier breaks those anchors and the build with them. By here every pass has run and
+ *  there is nothing left to disturb.
+ *
+ *  Occurrences are not asserted per sentence: / and /lp legitimately carry different copy,
+ *  so most of these apply to one page and not the other. The assertion that matters is the
+ *  one at the end, and it is absolute — a re-export that brings in new dash-joined copy
+ *  fails the build rather than quietly shipping it. */
+async function removeCopyDashes() {
+  let changed = 0;
+  for (const page of await htmlPages()) {
+    const file = join(OUT, page);
+    let html = await readFile(file, 'utf8');
+    const before = html;
+    for (const [find, replacement] of COPY_DASHES) {
+      if (html.includes(find)) {
+        html = html.split(find).join(replacement);
+        changed++;
+      }
+    }
+
+    const left = readerFacing(html).match(/[^<>"]{0,60}(?:—|&mdash;)[^<>"]{0,60}/g);
+    if (left) {
+      throw new Error(
+        `[build] ${page}: ${left.length} long dash(es) left in reader-facing copy. Add the ` +
+          `sentence to COPY_DASHES with a rewrite that reads as English — a blind swap to a ` +
+          `comma makes a splice. Found:\n    ` + left.map((s) => s.replace(/\s+/g, ' ').trim()).join('\n    ')
+      );
+    }
+    if (html !== before) await writeFile(file, html);
+  }
+  console.log(`  copy pass          <- ${changed} sentence rewrite(s); no long dash left in reader-facing copy`);
+}
+
 /** Puts Google Tag Manager on every page in dist/, then proves it.
  *
  *  This runs once, last, over the finished output rather than being threaded through
@@ -1985,7 +2079,8 @@ async function main() {
   await buildMap();
   await buildThankYou();
 
-  // Last, over the finished output: puts GTM on every page in dist/ and proves it.
+  // Last, over the finished output: the copy pass, then GTM on every page in dist/.
+  await removeCopyDashes();
   await tagEveryPage();
 
   // Loud when unset, because the failure is silent everywhere else: the forms validate,
