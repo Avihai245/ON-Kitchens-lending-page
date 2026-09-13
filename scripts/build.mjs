@@ -193,8 +193,7 @@ function leadSenderScript(url) {
   // was unset — which it was — so a push written inside that branch would never have
   // fired on the live site at all.
   const deliver = url
-    ? `    var q = new URLSearchParams(location.search);
-    var body = new URLSearchParams();
+    ? `    var body = new URLSearchParams();
     var put = function (k, v) { if (v !== null && v !== undefined && v !== '') body.set(k, v); };
 
     put('name', lead.name);
@@ -202,13 +201,14 @@ function leadSenderScript(url) {
     put('email', lead.email);
     put('business', lead.business);
     put('form', lead.form);
+    put('form_name', FORM_NAMES[lead.form] || lead.form);
     // Only the chat sends this — neither HTML form has a message field.
     put('note', lead.note);
     put('submittedAt', new Date().toISOString());
     put('pageUrl', location.href);
     put('referrer', document.referrer);
-    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid']
-      .forEach(function (k) { put(k, q.get(k)); });
+    var c = campaign();
+    CAMPAIGN.forEach(function (k) { put(k, c[k]); });
 
     var url = ${JSON.stringify(url)};
     if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;
@@ -236,6 +236,47 @@ function leadSenderScript(url) {
   ['pointerdown', 'keydown', 'touchstart'].forEach(function (t) {
     document.addEventListener(t, mark, { capture: true, passive: true });
   });
+
+  // Where the visit came from, captured the moment the page loads rather than read off
+  // the URL at submit time.
+  //
+  // Reading it at submit looks equivalent and is not. A visitor who lands on
+  // /?utm_source=facebook and then moves to /lp, or comes back through the browser's
+  // history, is submitting from a URL with no campaign on it — and the lead would arrive
+  // with the attribution silently blank. Stored on the first page of the visit it
+  // survives all of that, and it is what "where they came from" actually means.
+  //
+  // sessionStorage, not localStorage: this is one visit, not one browser. A campaign
+  // click three weeks ago should not be credited with today's lead. Overwrites on a
+  // later landing that carries its own campaign, so the most recent real referral wins.
+  var CAMPAIGN = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid'];
+  var CAMPAIGN_KEY = 'on-campaign';
+  (function () {
+    try {
+      var q = new URLSearchParams(location.search);
+      var found = {};
+      CAMPAIGN.forEach(function (k) { if (q.get(k)) found[k] = q.get(k); });
+      if (Object.keys(found).length) sessionStorage.setItem(CAMPAIGN_KEY, JSON.stringify(found));
+    } catch (err) { /* private mode — the submit path falls back to the live URL */ }
+  })();
+  function campaign() {
+    var q = new URLSearchParams(location.search);
+    var stored = {};
+    try { stored = JSON.parse(sessionStorage.getItem(CAMPAIGN_KEY) || '{}') || {}; } catch (err) { /* as above */ }
+    var out = {};
+    CAMPAIGN.forEach(function (k) { out[k] = q.get(k) || stored[k] || null; });
+    return out;
+  }
+
+  // What each form is called for someone reading the lead, rather than for the code.
+  // The form field keeps its own stable values: anything downstream that filters or
+  // branches on it goes on working, and this rides alongside as the human-readable one.
+  var FORM_NAMES = {
+    'mid-page': 'Form 1 (top)',
+    'end-of-page': 'Form 2 (bottom)',
+    'modal': 'Button (popup)',
+    'chat': 'Chat'
+  };
 
   window.__onSendLead = function (lead) {
     // Dropped submissions fail silently: the caller still redirects to /thank-you, so a
