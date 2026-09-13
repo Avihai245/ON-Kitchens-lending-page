@@ -160,6 +160,101 @@ const LP2_CSS = `
 }
 .lp2-cta .btn { flex: none; }
 
+/* ---- the mid-page lead form ----
+   Dark, because #tour at the foot of the page is dark and this is the same ask; the
+   site already reads a dark band as "a form you are meant to fill in". It also
+   continues the black of the .lp2-could photograph directly above, so the picture and
+   the ask land as one block before handing off to the light reviews below.
+
+   Two columns on desktop deliberately. The export's own mid-page form was 1,142px of
+   stacked fields, which is most of a viewport spent on a second copy of the closing
+   ask; side by side it costs about a third of that, and the copy stays beside the
+   fields where it can still do some work. Below 760px — the same breakpoint the rest
+   of the page turns on — it stacks. */
+.lp2-mid {
+  background: #141414; color: #FAF8F5;
+  padding: clamp(40px, 5.5vw, 72px) 0;
+}
+.lp2-mid > div {
+  max-width: clamp(1240px, 90vw, 1760px); margin: 0 auto; padding: 0 var(--edge);
+  display: grid; grid-template-columns: 1fr 1fr; gap: 32px clamp(40px, 6vw, 88px);
+  align-items: start;
+}
+.lp2-mid-eyebrow {
+  display: block; font-family: var(--font-heading); font-weight: 600;
+  font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--color-accent); margin-bottom: 14px;
+}
+.lp2-mid h2 {
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: clamp(28px, 3.4vw, 42px); line-height: 1.06; letter-spacing: 0.01em;
+  text-transform: uppercase; margin: 0; max-width: 16ch;
+}
+.lp2-mid p {
+  margin: 18px 0 0; max-width: 46ch;
+  font-size: 16px; line-height: 26px;
+  color: color-mix(in srgb, #FAF8F5 82%, transparent);
+}
+.lp2-mid ul {
+  list-style: none; margin: 26px 0 0; padding: 18px 0 0;
+  border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent);
+  display: flex; flex-wrap: wrap; gap: 10px 26px;
+  font-family: var(--font-heading); font-weight: 600; font-size: 15px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: color-mix(in srgb, #FAF8F5 82%, transparent);
+}
+.lp2-mid form { display: grid; gap: 16px; }
+.lp2-mid label {
+  display: block; font-family: var(--font-heading); font-weight: 600;
+  font-size: 13px; line-height: 1.35; letter-spacing: 0.1em; text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.lp2-mid label i {
+  font-style: normal; font-weight: 400; letter-spacing: 0.04em;
+  /* 82% of #FAF8F5 on #141414 clears AA for this size; the modal's 70%-of-text value
+     is tuned for a light panel and would not. */
+  color: color-mix(in srgb, #FAF8F5 82%, transparent);
+}
+.lp2-mid .input {
+  min-height: 48px; font-size: 16px; width: 100%; box-sizing: border-box;
+  background: #FAF8F5; color: #141414;
+}
+.lp2-mid button[type="submit"] {
+  width: 100%; min-height: 52px; margin-top: 4px;
+  text-transform: uppercase; letter-spacing: 0.06em; font-size: 16px;
+}
+@media (max-width: 760px) {
+  .lp2-mid > div { grid-template-columns: 1fr; gap: 26px; }
+  .lp2-mid h2 { max-width: none; }
+  .lp2-mid ul { margin-top: 20px; }
+}
+
+/* ---- the sticky bar stands down while this form is on screen ----
+   On a phone the bar covers the bottom ~76px of the viewport, which is exactly where
+   the submit button sits while someone is filling the form in. Worse than covering it:
+   the bar's own "Schedule a Tour" opens the modal, so a thumb aiming for BOOK MY TOUR
+   can land on a control that throws a third form over the one being typed into.
+
+   Hidden with CSS, not by unmounting it. The export used to drop the bar when #tour was
+   visible and that caused a documented feedback loop — the bar's in-flow spacer changed
+   the document height, which moved the scroll position, which re-crossed the observer
+   threshold. Here the bar is position:fixed and the spacer is untouched, so visibility
+   costs no layout at all and the loop cannot come back. pointer-events goes too, or an
+   invisible bar would still swallow the tap. */
+html[data-lp2-atform] [data-band="dark"][style*="position: fixed; left: 0px; right: 0px; bottom: 0px"] {
+  opacity: 0; pointer-events: none;
+}
+/* The chat launcher goes with it, on phones only. Measured at 320 and 390: with the
+   button near the foot of the viewport the two floating launchers cover 21-32% of its
+   width — its ends, not its middle, so it stays tappable, and five of six scroll
+   positions are completely clear. Worth fixing anyway for the chat, because it is a
+   competing lead path sitting on top of a lead form, which is the same objection as the
+   sticky bar. The accessibility launcher stays: hiding an accessibility affordance to
+   tidy a layout is the wrong trade, and on the left it clips the button's edge only. */
+@media (max-width: 760px) {
+  html[data-lp2-atform] .on-chat-fab { opacity: 0; pointer-events: none; }
+}
+
 /* ---- locations: the two 300px maps were most of the section ----
    The addresses and the two "Tour X" buttons are what a landing page needs; the
    map is for someone who has already booked. Dropping both also drops two Leaflet
@@ -476,22 +571,62 @@ const LP2_MODAL_JS = String.raw`
     else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
   });
 
-  var IDS = { fullName: 'lp2-name', phone: 'lp2-phone', email: 'lp2-email' };
+  // Two forms share this handler: the modal (lp2-) and the mid-page section
+  // (lp2-mid-). Both are built by the same field() helper and differ only in their id
+  // prefix and the tag they send, so one validator serves both. That is the whole
+  // point — the rules below are copied from validate() in the page's own runtime, and
+  // a form that rejected input differently would be worse than not having it.
+  var FORMS = {
+    'lp2-form': { prefix: 'lp2-', tag: 'modal' },
+    'lp2-mid-form': { prefix: 'lp2-mid-', tag: 'mid-page' }
+  };
+
+  // While the mid-page form is on screen, stand the sticky bar down — see the
+  // [data-lp2-atform] rule for why. The flag lives on <html>, the one node the DC
+  // runtime's re-render cannot reach.
+  //
+  // Deliberately a scroll listener re-querying the element, not an IntersectionObserver
+  // holding a reference to it. This script runs before the runtime mounts, so the node
+  // it would observe is the one inside <x-dc> — which React then replaces, leaving the
+  // observer watching a detached element that never intersects anything. Measured: the
+  // flag never fired. Re-reading the rect each time is the same approach the sticky bar
+  // itself takes in build.mjs, and for the same reason.
+  (function () {
+    var ticking = false;
+    function measure() {
+      ticking = false;
+      var el = document.getElementById('tour-form');
+      if (!el) return;
+      var r = el.getBoundingClientRect();
+      var on = r.bottom > 0 && r.top < (window.innerHeight || 0);
+      if (on) root.setAttribute('data-lp2-atform', '');
+      else root.removeAttribute('data-lp2-atform');
+    }
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(measure);
+    }
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    measure();
+  })();
   function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
 
   document.addEventListener('submit', function (ev) {
     var form = ev.target;
-    if (!form || form.id !== 'lp2-form') return;
+    var spec = form && FORMS[form.id];
+    if (!spec) return;
     ev.preventDefault();
 
+    var p = spec.prefix;
+    var IDS = { fullName: p + 'name', phone: p + 'phone', email: p + 'email' };
+
     var f = {
-      fullName: val('lp2-name'), phone: val('lp2-phone'),
-      email: val('lp2-email'), business: val('lp2-business')
+      fullName: val(IDS.fullName), phone: val(IDS.phone),
+      email: val(IDS.email), business: val(p + 'business')
     };
 
-    // Copied from validate() in the page's own runtime — same rules, same four
-    // messages. A second form that rejected input differently would be worse than no
-    // modal at all.
     var e = {};
     if (!f.fullName.trim() || f.fullName.trim().length < 2) e.fullName = 'Please enter your full name.';
     var digits = f.phone.replace(/[^0-9]/g, '');
@@ -518,15 +653,15 @@ const LP2_MODAL_JS = String.raw`
 
     // The same three steps the inline form takes, so the lead lands in the same place:
     // the thank-you page reads on-lead to greet the visitor, __onSendLead carries the
-    // payload and its UTM capture to the webhook, then the redirect. "form: modal"
-    // is the one difference, so modal leads can be told apart downstream.
+    // payload and its UTM capture to the webhook, then the redirect. The tag is the one
+    // difference, so each form can be told apart downstream.
     var lead = {
       name: f.fullName.trim(), phone: f.phone.trim(), email: f.email.trim(),
-      business: (f.business || '').trim(), form: 'modal',
+      business: (f.business || '').trim(), form: spec.tag,
       // The honeypot travels with the lead rather than being checked here, so the drop
       // happens at the one seam every path shares — and so this handler keeps behaving
       // identically either way: sessionStorage, redirect, no hint that anything differed.
-      trap: val('lp2-website')
+      trap: val(p + 'website')
     };
     try {
       sessionStorage.setItem('on-lead', JSON.stringify({ name: lead.name, phone: lead.phone }));
@@ -537,6 +672,41 @@ const LP2_MODAL_JS = String.raw`
 })();
 </script>
 `;
+
+/** One field, for either of the two forms this file builds — the tour modal and the
+ *  mid-page section. Both go through here so their markup cannot drift apart: the same
+ *  label/input/error triple, the same ids relative to their prefix, which is what lets
+ *  a single delegated handler in LP2_MODAL_JS validate both.
+ *
+ *  aria-required rather than required — `required` would hand validation to the browser,
+ *  whose bubbles would pre-empt the messages the rest of the page uses. */
+const leadField = (prefix, id, label, type, auto, optional) =>
+  '        <div>\n' +
+  `          <label for="${prefix}${id}">${label}${optional ? ' <i>(optional)</i>' : ''}</label>\n` +
+  `          <input class="input" id="${prefix}${id}" name="${id}" type="${type}" autoComplete="${auto}"` +
+  (optional ? '' : ' aria-required="true"') +
+  (optional ? '' : ` aria-describedby="${prefix}${id}-err"`) + ' />\n' +
+  (optional ? '' : `          <p class="lp2-err" id="${prefix}${id}-err" role="alert"></p>\n`) +
+  '        </div>\n';
+
+/** The four fields plus the honeypot, in order. Sharing this is the point: a form that
+ *  asked for different things, or protected itself differently, would be a second thing
+ *  to keep in sync.
+ *
+ *  The honeypot is never shown, never focusable and never announced, so a person cannot
+ *  fill it and a form-filling bot usually will. Off-screen rather than display:none,
+ *  which the cruder bots check for. "Company website" is plausible on purpose — exactly
+ *  the kind of field an autofiller reaches for. It is read into the lead's `trap` key and
+ *  dropped at __onSendLead, the one seam every path shares. */
+const leadFields = (prefix) =>
+  leadField(prefix, 'name', 'Full name', 'text', 'name') +
+  leadField(prefix, 'phone', 'Phone', 'tel', 'tel') +
+  leadField(prefix, 'email', 'Email', 'email', 'email') +
+  leadField(prefix, 'business', 'Business name', 'text', 'organization', true) +
+  '        <div class="lp2-hp" aria-hidden="true">\n' +
+  `          <label for="${prefix}website">Company website</label>\n` +
+  `          <input id="${prefix}website" name="website" type="text" tabindex="-1" autoComplete="off" />\n` +
+  '        </div>\n';
 
 export function transform(html, { replaceExactly }) {
   let out = html;
@@ -601,11 +771,16 @@ export function transform(html, { replaceExactly }) {
   }
 
   // ---- 4. the duplicate mid-page form becomes a CTA strip --------------------
-  // tour-mid carried a second copy of the whole lead form — 1,142px, four fields,
-  // the same headline promise as the closing form. One form on a landing page is
-  // enough; what the middle of the page needs is a way in, not a second identical
-  // ask. It also moves up to sit before the film section, which brings the first
-  // conversion point from 72% of the scroll to roughly half.
+  // tour-mid carried a second copy of the whole lead form — 1,142px, four fields, the
+  // same headline promise as the closing form — sitting where the reader had not yet
+  // been given a reason to act. What that position needs is a way in, not a second
+  // identical ask, so it becomes a CTA strip and moves up before the film section.
+  //
+  // This page does now carry a second real form: step 15 puts one at the pivot,
+  // between the "this could be you" photograph and the reviews. That is not this one
+  // coming back. It is 550px rather than 1,142px, it earns its place by sitting
+  // between the want and the proof rather than ahead of both, and its headline is
+  // deliberately not the closing form's — which was the actual objection here.
   {
     const [before, , after] = slice(out, OPEN.tourMid, 'tour-mid');
     out = before + after;
@@ -880,21 +1055,71 @@ export function transform(html, { replaceExactly }) {
     out = replaceExactly(out, FACTS, rating + FACTS, 1, 'hero rating');
   }
 
-  // ---- 15. the form comes to the CTA ----------------------------------------
+  // ---- 15. a place to convert at the pivot ------------------------------------
+  // Step 4 took the export's mid-page form out, and its reasoning still holds for the
+  // form it removed: 1,142px of stacked fields repeating the closing ask, at a point
+  // the reader had not yet been given a reason to act. This is not that form back.
+  //
+  // It sits at the pivot instead — straight after the "this could be you" photograph
+  // and straight before 380 people saying they did exactly that. The picture creates
+  // the want and the proof answers the doubt; the ask belongs between them, not after
+  // both. It is also the only real form in the top two-thirds of the page: everything
+  // else up here is a CTA that opens the modal, which is a fine way in for someone who
+  // has decided and a worse one for someone who is merely persuaded.
+  //
+  // The copy deliberately differs from the closing form's "Come see the kitchen you'd
+  // be cooking in." Two identical promises on one page is the thing step 4 objected to,
+  // and the objection was right.
+  //
+  // Deliberately no data-rev: this file runs after addScrollMotion(), so an injected
+  // section is never staged for reveal. That is the safe direction — a section the
+  // observer never sees would stay at opacity 0 forever, which has already happened
+  // once on this page.
+  {
+    const section =
+      // id="tour-form", not "tour-mid": the export's #tour-mid was cut by step 4, and
+      // reusing the name would silently revive two stale href="#tour-mid" buttons that
+      // sit BELOW this section — clicking them would scroll the visitor backwards. Those
+      // two are repointed at the modal just below instead.
+      '<section id="tour-form" class="lp2-mid" data-band="dark" aria-labelledby="lp2-mid-title">\n' +
+      '    <div>\n' +
+      '      <div>\n' +
+      '        <span class="lp2-mid-eyebrow">Book a tour</span>\n' +
+      '        <h2 id="lp2-mid-title">See it before you commit to anything.</h2>\n' +
+      '        <p>Walk the line, open the walk-in, meet the people already cooking here. ' +
+      'Leave your details and we&rsquo;ll call to set a time at Van Nuys or Washington Blvd.</p>\n' +
+      '        <ul>\n' +
+      '          <li>No build-out</li>\n' +
+      '          <li>Already permitted</li>\n' +
+      '          <li>Month to month</li>\n' +
+      '        </ul>\n' +
+      '      </div>\n' +
+      '      <form id="lp2-mid-form" noValidate>\n' +
+      leadFields('lp2-mid-') +
+      '        <button type="submit" class="btn btn-primary blueprint">Book My Tour</button>\n' +
+      '      </form>\n' +
+      '    </div>\n' +
+      '  </section>\n\n  ';
+    // Anchored on the reviews rather than on the photograph, and placed after step 13
+    // has moved them: steps 12 and 13 both hang off OPEN.howItWorks, so anchoring there
+    // would make the result depend on their ordering. This lands between the two
+    // whatever those steps do.
+    out = replaceExactly(out, OPEN.reviews, section + OPEN.reviews, 1, 'mid-page lead form');
+
+    // Two dead CTAs, found while placing this section. Step 4 removed #tour-mid from
+    // this page but left two buttons pointing at it — one under the benefits band, one
+    // under "Who it's for" — so both have been doing nothing at all. They cannot be
+    // pointed at the new form either: both sit below it, so the page would scroll
+    // backwards. #tour is what every other CTA on the page uses, and the delegated
+    // handler turns it into the modal.
+    out = replaceExactly(out, 'href="#tour-mid"', 'href="#tour"', 2, 'dead tour-mid CTAs');
+  }
+
+  // ---- 16. the form comes to the CTA ----------------------------------------
   // The inline #tour form stays exactly where it is: it is the no-JS fallback and the
   // natural close of the page. This is a second, focused copy that opens on the spot.
-  // Its fields carry their own ids so nothing collides with the m- and f- fields, and
-  // aria-required rather than required — `required` would hand validation to the
-  // browser, whose bubbles would pre-empt the messages the rest of the page uses.
+  // Its fields carry the lp2- prefix so nothing collides with the m- and f- fields.
   {
-    const field = (id, label, type, auto, optional) =>
-      '        <div>\n' +
-      `          <label for="lp2-${id}">${label}${optional ? ' <i>(optional)</i>' : ''}</label>\n` +
-      `          <input class="input" id="lp2-${id}" name="${id}" type="${type}" autoComplete="${auto}"` +
-      (optional ? '' : ' aria-required="true"') +
-      (optional ? '' : ` aria-describedby="lp2-${id}-err"`) + ' />\n' +
-      (optional ? '' : `          <p class="lp2-err" id="lp2-${id}-err" role="alert"></p>\n`) +
-      '        </div>\n';
     const modal =
       '<div class="lp2-modal">\n' +
       '    <div class="lp2-modal-back" data-lp2-close></div>\n' +
@@ -906,18 +1131,7 @@ export function transform(html, { replaceExactly }) {
       '      <h2 id="lp2-modal-title">Come see the kitchen you&rsquo;d be cooking in.</h2>\n' +
       '      <p>Leave your details and we&rsquo;ll call to set a time at Van Nuys or Washington Blvd.</p>\n' +
       '      <form id="lp2-form" noValidate>\n' +
-      field('name', 'Full name', 'text', 'name') +
-      field('phone', 'Phone', 'tel', 'tel') +
-      field('email', 'Email', 'email', 'email') +
-      field('business', 'Business name', 'text', 'organization', true) +
-      // Honeypot. Never shown, never focusable, never announced — so a person cannot
-      // fill it and a form-filling bot usually will. Positioned off-screen rather than
-      // display:none, which the cruder bots check for. The name is plausible on purpose:
-      // "company website" is exactly the kind of field an autofiller reaches for.
-      '        <div class="lp2-hp" aria-hidden="true">\n' +
-      '          <label for="lp2-website">Company website</label>\n' +
-      '          <input id="lp2-website" name="website" type="text" tabindex="-1" autoComplete="off" />\n' +
-      '        </div>\n' +
+      leadFields('lp2-') +
       '        <button type="submit" class="btn btn-primary blueprint">Schedule My Tour</button>\n' +
       '      </form>\n' +
       '    </div>\n' +

@@ -618,9 +618,13 @@ and carries its own noindex for the same reason `/lp` does.
 
 ### What / has that /lp doesn't
 
-Measured against `/lp` at 390px: **15,674px → 10,714px, −31.6%**, on 867 rendered words
+Measured against `/lp` at 390px: **15,674px → 11,391px, −27.3%**, on 867 rendered words
 instead of 1,084. The hero (617px) and the reviews section (1,371px) come out
 byte-identical — asserted, not assumed.
+
+That figure was −31.6% (10,714px) before the mid-page lead form was added; the form is
+799px of it on a phone. The trade is deliberate — a page 4% longer with a place to
+convert two-thirds earlier.
 
 The diagnosis behind it was that the page's problem was not length but repetition:
 `certified` ×7, `permitting` ×7, `24/7` ×5, `construction` ×4, `hood` ×4, `walk-in` ×4.
@@ -631,8 +635,8 @@ Almost everything cut was already stated somewhere else; the counts are now 5 / 
 Structurally: the pain section moves above "How it works", so the problem is established
 before the process (the export had them the other way round); "Our mission" comes out;
 the facility list folds into the kitchens section as four labelled lines instead of four
-bordered cards; the duplicate mid-page lead form becomes a CTA strip and moves up ahead
-of the film section; the FAQ drops from eight questions to four, with "What does it
+bordered cards; the export's duplicate mid-page lead form becomes a CTA strip and moves
+up ahead of the film section, with a purpose-built one added later at the pivot (below); the FAQ drops from eight questions to four, with "What does it
 cost?" moving from last to first; and both location maps come out of the markup, which
 also drops two Leaflet iframes and their OpenStreetMap tile traffic.
 
@@ -722,6 +726,54 @@ risk-reversal line on the tour.
 
 Both pages submit to the same `/thank-you`. If you later want to tell which page a lead came
 from, the place to add it is the payload in `leadSenderScript()`.
+
+### The mid-page lead form
+
+`/` carries a second real form, at `#tour-form`, between the "this could be you"
+photograph and the reviews. Until it existed the only way to convert above the footer was
+a CTA that opened the modal, which is a fine way in for someone who has decided and a
+worse one for someone merely persuaded.
+
+It sits at the pivot on purpose: the photograph creates the want, 380 reviews answer the
+doubt, and the ask belongs between them rather than after both. On a phone that moves the
+first place a visitor can leave their details from roughly 100% of the scroll to about
+30%.
+
+**This is not the form step 4 removed**, though it is worth reading that step's comment,
+which argued a landing page needs one form and the middle needs a way in rather than a
+second identical ask. Three things answer it: 550px on desktop instead of 1,142px, a
+position between the want and the proof rather than ahead of both, and a headline that is
+deliberately not the closing form's.
+
+**It shares the modal's machinery rather than copying it.** `leadField()` / `leadFields()`
+build both forms' markup, and one delegated `submit` handler in `LP2_MODAL_JS` validates
+both — keyed by a `FORMS` map from form id to `{ prefix, tag }`. The file's own rule is
+that a form rejecting input differently would be worse than not having it, so the
+validator is shared rather than duplicated. Fields are prefixed `lp2-mid-` so nothing
+collides; the honeypot comes with them.
+
+Leads are tagged `mid-page`, the same value `/lp`'s own mid-page form sends, so nothing
+downstream needed changing — `pageUrl` tells the two apart.
+
+**Two competing controls stand down while it is on screen.** The sticky CTA bar covers the
+bottom ~76px of a phone viewport, which is where the submit button sits while someone is
+typing, and its own "Schedule a Tour" opens the modal — so a thumb aiming for BOOK MY TOUR
+could throw a third form over the one being filled in. The chat launcher is the same
+problem in miniature. Both are hidden by CSS under a `data-lp2-atform` flag on `<html>`;
+the accessibility launcher stays, because hiding an accessibility affordance to tidy a
+layout is the wrong trade.
+
+Hidden with CSS, never unmounted: the export used to drop the bar when `#tour` was visible
+and that caused a documented feedback loop, because the bar's in-flow spacer changed the
+document height, which moved the scroll position, which re-crossed the threshold. The bar
+is `position: fixed` and the spacer is untouched, so visibility costs no layout — asserted
+by measuring the document height through the toggle.
+
+The flag is set by a scroll listener that re-queries `#tour-form` each time, **not** by an
+IntersectionObserver holding a reference to it. The variant's script runs before the DC
+runtime mounts, so an observer would be watching the node inside `<x-dc>` — which React
+then replaces, leaving it observing a detached element. That was measured failing before it
+was fixed.
 
 ## Lead webhook
 
@@ -1222,7 +1274,8 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   a strip of dimmed page above it, that strip is the backdrop and closes on tap, and X,
   Escape and focus return all still work.
 - The reviews section is moved, not rebuilt: 35,335 bytes byte-identical to `/lp`'s, still
-  1,371px tall, now fifth on the page instead of eleventh.
+  1,371px tall, now sixth on the page instead of eleventh — the mid-page lead form sits
+  between it and the photograph.
 - The footer credit: 90 assertions across `/`, `/lp2` (now `/lp`) and `/thank-you` at
   390 and 1440 —
   the exact sentence from the rendered text, only the company name inside the anchor, the
@@ -1280,6 +1333,22 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   browser with a live `dataLayer` — including a nested `site/__probe/deep.html` with no
   viewport meta, which exercised the charset fallback anchor. This is the guarantee the
   design exists for, tested rather than argued.
+- **The mid-page lead form: 20 + 25 + 6 assertions.** Position asserted structurally — one
+  `#tour-form`, directly after `div.lp2-could` and directly before `section#reviews`, at
+  320 / 390 / 1440; two columns on desktop, one on a phone; no horizontal overflow; nothing
+  under 24x24; 16px inputs so iOS does not zoom on focus. `/lp` and the four non-landing
+  pages come out **byte-identical**, so the change is `/`-only by proof rather than intent.
+- **Validation parity with the other three forms**, case by case: all-empty, a 1-character
+  name, a 9-digit phone and `dana@example` each produce the same four messages, move focus
+  to the first bad field, and do not navigate. Valid input reaches `/thank-you` and is
+  greeted by name. The honeypot drops the lead with no POST and still redirects.
+- **The competing controls stand down.** The sticky bar and the chat launcher are visible
+  away from the form, hidden (opacity 0, `pointer-events: none`) while it is on screen, and
+  back afterwards — and the **document height is constant through the toggle**, which is
+  what the old `!tourVisible` feedback loop failed at. The submit button is fully on screen
+  and topmost when scrolled to. Hit-tested across every scroll position that keeps it
+  visible: 5 of 6 fully clear, worst case 16% of its width clipped at the very bottom of the
+  viewport, down from 32% before the chat launcher was included.
 - **The lead webhook, all four paths, against a real receiver.** Built with a live URL
   and driven with genuine browser input — real clicks, real keystrokes — the end-of-page
   form and the modal and a full chat conversation on `/`, and the mid-page form on `/lp`.
