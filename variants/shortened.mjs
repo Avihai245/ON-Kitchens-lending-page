@@ -242,10 +242,16 @@ const LP2_CSS = `
   text-transform: uppercase; letter-spacing: 0.06em; font-size: 16px;
 }
 @media (max-width: 760px) {
-  /* Stacked, and the photograph keeps its own proportions rather than being cropped to
-     a column height that no longer exists. 220px of it is enough to carry the idea
-     above the form without pushing the fields off the first screenful. */
   .lp2-mid > div { grid-template-columns: 1fr; gap: 22px; }
+  /* The ask comes first on a phone and the photograph follows it. Stacked, the picture
+     costs a whole screenful before the reader reaches anything they can act on, so it
+     goes below: the ask lands immediately and the picture reinforces it underneath.
+     Only the order property moves, so the desktop layout cannot be affected by this.
+
+     Reordering visually matters when it scrambles focus sequence; it does not here.
+     The element that moves is a non-focusable <figure><img>, and everything interactive
+     stays inside .lp2-mid-ask in DOM order. */
+  .lp2-mid-shot { order: 2; }
   /* Stacked, the photograph has the full column width, so its natural proportions fit
      without any crop or any leftover — no object-fit needed at all. */
   .lp2-mid-shot img { height: auto; min-height: 0; }
@@ -1104,10 +1110,18 @@ export function transform(html, { replaceExactly }) {
       `        <img src="assets/could-be-you.webp" alt="${ALT}" loading="lazy" width="1200" height="932" />\n` +
       '      </figure>\n' +
       '      <div class="lp2-mid-ask">\n' +
+      // The headline is the instruction, which is what makes this a call to action
+      // rather than a description of the offer — the previous copy explained the
+      // kitchens and never asked for anything. The body then removes the two unknowns
+      // that stop people filling a form: what happens next, and what it commits them to.
+      //
+      // "the same day", not "today": today is simply false for anyone who submits on a
+      // Saturday evening, and a promise that visibly breaks on first contact costs more
+      // than the conversions it buys.
       '        <span class="lp2-mid-eyebrow">Book a tour</span>\n' +
-      '        <h2 id="lp2-mid-title">Come see it for yourself.</h2>\n' +
-      '        <p>No build-out, already permitted, month to month. ' +
-      'Leave your details and we&rsquo;ll call to set a time at Van Nuys or Washington Blvd.</p>\n' +
+      '        <h2 id="lp2-mid-title">Leave your number. We&rsquo;ll call you back the same day.</h2>\n' +
+      '        <p>Tell us what you cook and we&rsquo;ll show you the suite that fits &mdash; ' +
+      'sizes, terms and pricing on the call. No build-out, month to month, no obligation.</p>\n' +
       '        <form id="lp2-mid-form" noValidate>\n' +
       leadFields('lp2-mid-') +
       '        <button type="submit" class="btn btn-primary blueprint">Book My Tour</button>\n' +

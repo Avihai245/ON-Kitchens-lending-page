@@ -744,8 +744,22 @@ persuaded.
 
 **The "this could be you" photograph is the section's left column**, not a band above it.
 The picture is the argument for the form, so they share a frame and are sized against each
-other — equal columns, top edges aligned, stacking photograph-first below 760px. See the
-`could-be-you.webp` note above for why it is `contain` and never `cover`.
+other — equal columns, top edges aligned. See the `could-be-you.webp` note above for why it
+is `contain` and never `cover`.
+
+**Below 760px the ask comes first and the photograph follows it**, via a single `order` on
+the figure. Stacked, the picture costs a whole screenful before the reader reaches anything
+they can act on; underneath, it reinforces an ask they have already read. Only the order
+property moves, so the desktop layout cannot be affected — and the reordered element is a
+non-focusable `<figure><img>`, with everything interactive staying inside `.lp2-mid-ask` in
+DOM order, so nothing about focus sequence changes.
+
+The headline is the instruction — *Leave your number. We'll call you back the same day.* —
+which is what makes the section a call to action rather than a description of the offer; the
+body then removes the two unknowns that stop people filling a form: what happens next, and
+what it commits them to. **"The same day", not "today"**, because today is simply false for
+anyone who submits on a Saturday evening, and a promise that visibly breaks on first contact
+costs more than the conversions it buys. It is still a promise someone has to keep.
 
 It sits at the pivot on purpose: the photograph creates the want, 380 reviews answer the
 doubt, and the ask belongs between them rather than after both. On a phone that moves the
