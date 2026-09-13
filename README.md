@@ -618,13 +618,15 @@ and carries its own noindex for the same reason `/lp` does.
 
 ### What / has that /lp doesn't
 
-Measured against `/lp` at 390px: **15,674px → 11,391px, −27.3%**, on 867 rendered words
+Measured against `/lp` at 390px: **15,674px → 11,282px, −28.0%**, on 867 rendered words
 instead of 1,084. The hero (617px) and the reviews section (1,371px) come out
 byte-identical — asserted, not assumed.
 
-That figure was −31.6% (10,714px) before the mid-page lead form was added; the form is
-799px of it on a phone. The trade is deliberate — a page 4% longer with a place to
-convert two-thirds earlier.
+That figure was −31.6% (10,714px) before the lead form. Folding the photograph into the
+form as a column rather than a full-bleed band above it gave most of the difference back:
+the section carries a form and a picture in 885px on a phone, where the band alone used to
+cost 932px. The trade is deliberate — a page 5% longer than the leanest version, with a
+place to convert two-thirds earlier.
 
 The diagnosis behind it was that the page's problem was not length but repetition:
 `certified` ×7, `permitting` ×7, `24/7` ×5, `construction` ×4, `hood` ×4, `walk-in` ×4.
@@ -648,16 +650,22 @@ moved, not rebuilt: it still measures 1,371px and its text is byte-identical to 
 which the build proves rather than assumes.
 
 `assets/could-be-you.webp` — the photograph with **THIS COULD BE YOU**, **AND THIS COULD
-BE YOUR KITCHEN** and **YOUR LOGO COULD BE HERE** burned into it — moves to the pivot.
-On `/lp` it sits inside the mid-page lead form, under a headline that already says "Seen
-enough?": by then the reader has decided, and the image is decoration beside a form rather
-than the thing that got them there. (Replacing that section here had also dropped
-the image off the page entirely, which is how the placement came up.) It now sits
-full-bleed between the pain section and the reviews, so the page reads *here is your
-problem* -> *here is the alternative, as a photograph rather than a claim* -> *here are the
-people who took it*. No heading above it: the annotations are the headline. Capped at the
-file's own 1200px above that width, since stretched to the page's 1760px content width it
-visibly softens, and carrying `width`/`height` so the browser reserves the space.
+BE YOUR KITCHEN** and **YOUR LOGO COULD BE HERE** burned into it — moves to the pivot,
+where it is the left column of the lead form section. The page reads *here is your
+problem* -> *here is the alternative, as a photograph rather than a claim, with the form
+beside it* -> *here are the people who took it*.
+
+It shipped full-bleed between the pain section and the reviews for a while, and that was
+wrong twice over: 932px of photograph with nothing to do next, and a headline underneath
+that read as unrelated to it. The picture is the argument for the form, so the two belong
+in one frame, sized against each other. It carries `width`/`height` so the browser
+reserves the space, and no heading of its own — the annotations are the headline.
+
+**`object-fit: contain`, never `cover`.** The whole argument is text burned into the
+frame's edges, so cropping eats it: at `cover` the first two words of each annotation were
+gone. `contain` fits the whole picture and centres it, and the leftover is the section's
+own `#141414`, so there is nothing to see where the image is not. Asserted, because a
+future tweak to `cover` would look fine in a thumbnail and silently destroy the point.
 
 For interactivity, three stacked lists — the pain cards, the audience rows and the
 process steps — become horizontal scroll-snap tracks, and the five equipment tabs scroll
@@ -729,10 +737,15 @@ from, the place to add it is the payload in `leadSenderScript()`.
 
 ### The mid-page lead form
 
-`/` carries a second real form, at `#tour-form`, between the "this could be you"
-photograph and the reviews. Until it existed the only way to convert above the footer was
-a CTA that opened the modal, which is a fine way in for someone who has decided and a
-worse one for someone merely persuaded.
+`/` carries a second real form, at `#tour-form`, between the pain section and the reviews.
+Until it existed the only way to convert above the footer was a CTA that opened the modal,
+which is a fine way in for someone who has decided and a worse one for someone merely
+persuaded.
+
+**The "this could be you" photograph is the section's left column**, not a band above it.
+The picture is the argument for the form, so they share a frame and are sized against each
+other — equal columns, top edges aligned, stacking photograph-first below 760px. See the
+`could-be-you.webp` note above for why it is `contain` and never `cover`.
 
 It sits at the pivot on purpose: the photograph creates the want, 380 reviews answer the
 doubt, and the ask belongs between them rather than after both. On a phone that moves the
@@ -1274,8 +1287,8 @@ Against the built `dist/`, in headless Chromium at 390 / 768 / 1440 px:
   a strip of dimmed page above it, that strip is the backdrop and closes on tap, and X,
   Escape and focus return all still work.
 - The reviews section is moved, not rebuilt: 35,335 bytes byte-identical to `/lp`'s, still
-  1,371px tall, now sixth on the page instead of eleventh — the mid-page lead form sits
-  between it and the photograph.
+  1,371px tall, now sixth on the page instead of eleventh — the lead form section, which
+  contains the photograph, sits directly before it.
 - The footer credit: 90 assertions across `/`, `/lp2` (now `/lp`) and `/thank-you` at
   390 and 1440 —
   the exact sentence from the rendered text, only the company name inside the anchor, the
