@@ -32,11 +32,18 @@
  *
  *  Every string here is literal text, never an HTML entity: the transcript is written
  *  with `textContent`, so `&rsquo;` would reach the reader as five characters. The
- *  typographic marks are the real ones the rest of the page uses — U+2019, U+2014. */
+ *  apostrophe is the real typographic one the rest of the page uses, U+2019.
+ *
+ *  NO EM DASH (U+2014) in any string in this file. The chat is the one piece of
+ *  reader-facing copy that lives inside a <script>, and removeCopyDashes()'s guard runs
+ *  readerFacing() over the built page, which strips <script> blocks before looking — so
+ *  three dashes sat in the visitor's first, last and closing messages for months while
+ *  every other page of copy was swept clean. assertChatCopy() in scripts/build.mjs now
+ *  checks this file directly, because the sweep structurally cannot see it. */
 export const CHAT_STEPS = [
   {
     key: 'note',
-    ask: 'We\u2019re \u014cN Kitchens. Tell us what you cook and how much of it \u2014 we\u2019ll point you at the kitchen that fits.',
+    ask: 'We\u2019re \u014cN Kitchens. Tell us what you cook and how much of it. We\u2019ll point you at the kitchen that fits.',
     placeholder: 'What you cook, and how much',
   },
   {
@@ -58,7 +65,7 @@ export const CHAT_STEPS = [
   },
   {
     key: 'business',
-    ask: 'Last one \u2014 your business name, if you have one.',
+    ask: 'Last one: your business name, if you have one.',
     placeholder: 'Business name',
     optional: true,
   },
@@ -257,7 +264,7 @@ export const CHAT_JS = String.raw`
     // which is also the graceful failure the visitor should get.
     try { window.__onSendLead(lead); } catch (err) { /* never leave the visitor stuck */ }
     var first = lead.name.split(/\s+/)[0] || lead.name;
-    say('Thanks, ' + first + ' — request received. One of our team will call you shortly to set a time at our Central Los Angeles kitchen.', 'bot');
+    say('Thanks, ' + first + '. Request received. One of our team will call you shortly to set a time at our Central Los Angeles kitchen.', 'bot');
     foot.textContent = '';
     var back = document.createElement('button');
     back.type = 'button';
