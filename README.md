@@ -36,7 +36,9 @@ palette-and-photography-decisions/ The Claude Design export — treat as read-on
     assets/                          21 WebP images used by the page
     uploads/                         23 MB of design-tool source material, unused
 dist/                              Build output (gitignored)
-  index.html  lp.html  lp2.html  thank-you.html  404.html  map.html  assets/  _ds/  vendor/  …
+  index.html  ghost-kitchen.html  catering-health-permit.html
+  fda-food-facility-registration.html  lp.html  lp2.html  thank-you.html
+  404.html  map.html  assets/  _ds/  vendor/  …
 ```
 
 ## Build and preview
@@ -459,7 +461,7 @@ term in `showSticky`.
 
 ## The chat widget
 
-`scripts/chat-widget.mjs` holds a floating chat, injected into both landing pages by
+`scripts/chat-widget.mjs` holds a floating chat, injected into every landing page by
 `addChatWidget()`. It is **a conversational lead form, not a chatbot**: a fixed sequence
 of five questions, validated the way the page's own form validates them, submitted through
 `window.__onSendLead` — the same seam the inline form and the lead modal on `/` use. Only the
@@ -560,6 +562,62 @@ goes.
 The pass runs after `widenDesktopLayout`, so its markup is never seen by the passes that
 assert counts against the pristine export, and it anchors on `</footer>` — which occurs
 exactly once, a fact `replaceExactly` proves on every build rather than assuming.
+
+## The campaign landing pages
+
+`/ghost-kitchen`, `/catering-health-permit` and `/fda-food-facility-registration` are `/`
+itself, cloned for three searches it does not open by talking about: someone running
+delivery brands, someone whose catering health permit is blocked on an approved kitchen,
+and someone who needs an FDA-registered facility. The page already answers all three. Only
+the hero and the two SEO tags differ, so each visitor arrives at a page written for what
+they typed and then reads the page that already converts.
+
+**They are three entries in `PAGES`, not three copies of anything.** That registry exists
+for exactly this, and everything else rides `buildLandingPage()`: Google Tag Manager, the
+favicon, the `/thank-you` redirect, the lead sender, the chat widget, the mobile nav, the
+sticky CTA, the footer credit and the accessibility launcher. The proof is the diff — each
+page differs from `index.html` by five things and nothing else:
+
+```
+<title>                       the page's own
+<meta name="description">     the page's own
+var PAGE = "…"                the slug it sends with every lead
+the eyebrow span              copy, plus a wrap-safe line-height
+the three <h1> spans          copy, accent on line three preserved
+```
+
+| page | slug | H1 |
+| --- | --- | --- |
+| `/` | `main` | A certified kitchen. / No construction. / **No waiting.** |
+| `/ghost-kitchen` | `ghost-kitchen` | A delivery-ready kitchen. / Run your brands. / **No dining room.** |
+| `/catering-health-permit` | `catering-health-permit` | A catering kitchen. / Health Dept. approved. / **Permit-ready today.** |
+| `/fda-food-facility-registration` | `fda-food-facility-registration` | A registered facility. / FDA and organic. / **Ready to produce.** |
+
+Bold is the third line, which the export paints in `--color-accent-400`. `heroOverride()`
+keeps that span's style verbatim while swapping its text: a clone that lost the accent would
+read as a different design rather than the same one.
+
+**Routing.** Flat files, so Amplify serves `ghost-kitchen.html` at `/ghost-kitchen` with no
+redirect hop and no trailing slash — the same mechanism `/lp` and `/thank-you` use. Nothing
+to configure in the console.
+
+**The eyebrow's line-height is raised from 12px to 18px on these pages and only these
+pages.** The export sets `line-height: 12px` against `font-size: 13px`, which is fine for
+the one line it was written for; every campaign eyebrow names the location, so all of them
+wrap on a phone, and 13px glyphs on 12px leading collide. Raising it in the shared pipeline
+would have pushed `/`'s own headline down six pixels on desktop, and `/` does not move.
+
+**All three are indexable**, which is a decision and not the safe default. Four near-
+identical pages compete with each other in search; the reason to accept that here is that
+each targets a phrase the others do not rank for and carries its own `<title>` saying so.
+If Google collapses them, the fix is self-referencing canonical tags and a sitemap — see
+"Known gaps".
+
+**Guards.** `heroOverride()` uses `replaceExactly`, so a re-export that changes the hero
+fails the build with the anchor quoted rather than silently shipping the old headline; a
+`hero` with other than three lines, or a `PAGES` entry with no `slug`, fails with a sentence
+saying which. The meta descriptions are reader-facing text, so the existing copy sweep
+applies to them too: an em dash or a closed location in one of them fails the build.
 
 ## The /lp duplicate
 
@@ -731,8 +789,8 @@ Still missing, and only the client can supply them: a price (the page has no num
 anywhere), the phone number (present in the code, commented out in 40 places) and a
 risk-reversal line on the tour.
 
-Both pages submit to the same `/thank-you`. If you later want to tell which page a lead came
-from, the place to add it is the payload in `leadSenderScript()`.
+Every page submits to the same `/thank-you`, and which page a lead came from now travels
+with it as the `page` field — see "The campaign landing pages" and the payload table below.
 
 ### The mid-page lead form
 
@@ -873,7 +931,8 @@ and the very first Amplify build both legitimately run before the variable exist
 
 ```
 name=Sarah+Mitchell&phone=%28310%29+555-1234&email=sarah%40bakery.example
-&business=Mitchell+Bakehouse&form=end-of-page
+&business=Mitchell+Bakehouse&form=end-of-page&form_name=Form+2+%28bottom%29
+&page=ghost-kitchen
 &submittedAt=2026-09-02T20%3A50%3A33.402Z&pageUrl=https%3A%2F%2F…%3Futm_source%3Dgoogle
 &utm_source=google&utm_medium=cpc&utm_campaign=kitchens_la&gclid=XYZ123
 ```
@@ -886,6 +945,7 @@ Which a receiver parses into named fields:
 | `business` | optional on every path, never validated. Omitted when blank. |
 | `form` | `mid-page`, `end-of-page`, `modal` or `chat`. Stable identifiers: filter and branch on these. |
 | `form_name` | the same thing for a person reading the lead: `Form 1 (top)`, `Form 2 (bottom)`, `Button (popup)`, `Chat`. |
+| `page` | which landing page took the lead: `main`, `ghost-kitchen`, `catering-health-permit`, `fda-food-facility-registration` or `lp`. Comes from the page's own `slug` in `PAGES`, not from the URL — see below. |
 | `note` | **chat only**, neither HTML form has a message field. |
 | `submittedAt` `pageUrl` `referrer` | `referrer` omitted on a direct visit. |
 | `utm_source` … `gclid` `fbclid` | captured at landing, see below. **Absent ones are omitted**, not sent as the string `"null"`. |
@@ -905,14 +965,24 @@ actually means. `pageUrl` still records where they really submitted from, so not
 three weeks ago should not be credited with today's lead. A later landing that carries its
 own campaign overwrites it, so the most recent real referral wins.
 
-`form` distinguishes the four paths, `pageUrl` distinguishes the two pages. Which paths
-exist where:
+`form` distinguishes the four paths and `page` distinguishes the five pages. Every path
+exists on every page except `/lp`, which predates the tour modal:
 
-| | `/` | `/lp` |
+| | `/` and the three campaign pages | `/lp` |
 | --- | --- | --- |
-| inline forms | `end-of-page` | `mid-page`, `end-of-page` |
+| inline forms | `mid-page`, `end-of-page` | `mid-page`, `end-of-page` |
 | tour modal | `modal` | — |
 | chat | `chat` | `chat` |
+
+**`page`, not `pageUrl`, is the field to key on.** `pageUrl` is still sent and is still the
+record of where the visitor really submitted from, campaign query string and all — but it is
+a URL, so it changes if a page is renamed or moved behind a redirect, and it carries a
+leading slash and no name at all for the home page. The slug is written down in `PAGES` next
+to the URL it belongs to, reads the same in a spreadsheet as in the code, and survives both.
+
+**A new field does not break an existing Zap**, but it will not appear in the Zap editor
+until the catch hook sees a payload containing it. Re-sample the trigger in Zapier once
+after this deploys and `page` becomes mappable.
 
 **Delivery.** `navigator.sendBeacon` first — the browser takes ownership of the request,
 so it completes even though the page navigates a moment later — with `fetch(keepalive)`
@@ -1281,9 +1351,11 @@ and off: exactly two boxes differ, and they are the two links.
    `X-Frame-Options` is `SAMEORIGIN` rather than `DENY` on purpose — the page
    iframes `map.html` from this same origin for the location map, and `DENY`
    would blank both.
-5. `/lp` needs no rule of its own — Amplify resolves `<path>.html` before
-   `<path>/index.html`, which is the same mechanism that serves `/thank-you`. Neither
-   does `/lp2`: it's `site/lp2.html`, a static redirect to `/`, served the same flat way.
+5. `/lp`, `/ghost-kitchen`, `/catering-health-permit` and
+   `/fda-food-facility-registration` need no rules of their own — Amplify resolves
+   `<path>.html` before `<path>/index.html`, which is the same mechanism that serves
+   `/thank-you`. Neither does `/lp2`: it's `site/lp2.html`, a static redirect to `/`,
+   served the same flat way.
 6. Attach the custom domain, then add the `Sitemap:` line to `site/robots.txt` and
    consider adding `og:`/`twitter:` tags and a `<link rel="canonical">` to
    `scripts/build.mjs` — those need the final domain, so they were left out.
@@ -1328,6 +1400,13 @@ These are behaviours of the design prototype, left alone deliberately:
   loads, not what it does. Anything added in the console runs on the page with full
   DOM access and no deploy, no diff and no review. Keep the list of people with publish
   rights short, and prefer GTM's built-in tag templates over Custom HTML tags.
+- **Four indexable pages share ~95% of their content, with nothing telling Google how
+  they relate.** `/` and the three campaign pages differ only in their hero and their two
+  SEO tags; each targets a phrase the others do not rank for, which is the case for keeping
+  all four indexable, but there are no self-referencing `<link rel="canonical">` tags and no
+  sitemap, so Google is free to pick one and ignore the rest. Both need the production
+  domain, which is why they are not here yet — add them when it is attached. See
+  **The campaign landing pages**.
 - **Cache lifetimes are short** (one day for images, revalidate for HTML) because no
   filename carries a content hash. Fingerprint the assets and these can go to a
   year.
