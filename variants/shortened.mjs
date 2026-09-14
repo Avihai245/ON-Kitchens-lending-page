@@ -303,10 +303,6 @@ html[data-lp2-atform] [data-band="dark"][style*="position: fixed; left: 0px; rig
    to two lines and the button losing some of its horizontal padding; both are cheap
    against the height this section was taking. */
 @media (max-width: 760px) {
-  #locations > div[style*="grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr))"] {
-    grid-template-columns: 1fr 1fr !important;
-    gap: 20px !important;
-  }
   #locations h3 { font-size: 21px !important; line-height: 24px !important; }
   #locations address { font-size: 15px !important; line-height: 22px !important; }
   #locations .btn { padding: 12px 14px !important; font-size: 13px !important; }
@@ -891,8 +887,10 @@ export function transform(html, { replaceExactly }) {
   // licensing risk on OpenStreetMap's public servers for commercial use.
   {
     const MAP = /<div class="blueprint" style="margin-bottom: 22px;">\s*<iframe[\s\S]*?<\/iframe>\s*<\/div>\s*/g;
+    // One map, not two: build.mjs's singleLocation() runs before this and collapses the
+    // two facilities into one before the variant ever sees the page.
     const found = (out.match(MAP) || []).length;
-    if (found !== 2) throw new Error(`[lp2] locations: expected 2 maps, found ${found}.`);
+    if (found !== 1) throw new Error(`[lp2] locations: expected 1 map, found ${found}.`);
     out = out.replace(MAP, '');
   }
 
@@ -1000,8 +998,6 @@ export function transform(html, { replaceExactly }) {
   // sections earlier already covers, and only the last item on each line actually
   // distinguishes one site from the other.
   const DEDUPE = [
-    ['Open 24/7/365 · Free gated parking · Two loading docks', 'Two loading docks', '24/7 in Van Nuys'],
-    ['Open 24/7/365 · Free gated parking · Food delivery pickup area', 'Food delivery pickup area', '24/7 in LA'],
     ['Onboarding, permitting, Health Department support.', 'We handle the paperwork.', 'permitting in step 03'],
     ['Hood capacity sized for real production, with the extraction and cooling to keep the room workable through a full service.',
      'Sized for real production, and the cooling to keep the room workable through a full service.', 'hood in the tab intro'],
@@ -1153,7 +1149,7 @@ export function transform(html, { replaceExactly }) {
       '</button>\n' +
       '      <span class="lp2-modal-eyebrow">Schedule a tour</span>\n' +
       '      <h2 id="lp2-modal-title">Come see the kitchen you&rsquo;d be cooking in.</h2>\n' +
-      '      <p>Leave your details and we&rsquo;ll call to set a time at Van Nuys or Washington Blvd.</p>\n' +
+      '      <p>Leave your details and we&rsquo;ll call to set a time at our Central Los Angeles kitchen.</p>\n' +
       '      <form id="lp2-form" noValidate>\n' +
       leadFields('lp2-') +
       '        <button type="submit" class="btn btn-primary blueprint">Schedule My Tour</button>\n' +

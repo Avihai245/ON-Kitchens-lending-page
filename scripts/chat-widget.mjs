@@ -257,7 +257,7 @@ export const CHAT_JS = String.raw`
     // which is also the graceful failure the visitor should get.
     try { window.__onSendLead(lead); } catch (err) { /* never leave the visitor stuck */ }
     var first = lead.name.split(/\s+/)[0] || lead.name;
-    say('Thanks, ' + first + ' — request received. One of our team will call you shortly to set a time at Van Nuys or Washington Blvd.', 'bot');
+    say('Thanks, ' + first + ' — request received. One of our team will call you shortly to set a time at our Central Los Angeles kitchen.', 'bot');
     foot.textContent = '';
     var back = document.createElement('button');
     back.type = 'button';
