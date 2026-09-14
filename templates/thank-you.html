@@ -302,6 +302,17 @@
 </main>
 
 <script>
+// Reads the ?leaddebug=1 trail left by the landing page's lead sender. The three form
+// paths land here about a second after submitting, so the console they wrote to is gone
+// by the time anyone looks — the trail is in sessionStorage and this is what reads it
+// back. Defined here and not in the sender because the sender does not run on this page.
+//
+// The key is spelled out in scripts/build.mjs too, exactly as 'on-lead' already is;
+// buildThankYou() asserts the two agree, so they cannot drift apart unnoticed.
+window.__leadTrace = function () {
+  try { return JSON.parse(sessionStorage.getItem('on-lead-trace') || '[]'); } catch (err) { return []; }
+};
+
 (function () {
   // The lead's name and phone are handed over in sessionStorage rather than in the
   // query string: a phone number in the URL would end up in browser history, in the
