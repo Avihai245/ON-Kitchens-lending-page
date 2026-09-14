@@ -75,6 +75,14 @@ const THANK_YOU_FILE = 'thank-you.html';
  *    title        \
  *    description  / override the shared PAGE_TITLE / PAGE_DESCRIPTION. A page written
  *                 for a different campaign almost certainly wants its own.
+ *    slug         required — the name this page sends with every lead it takes, in the
+ *                 webhook's `page` field. Not derived from outFile: a filename is a
+ *                 deployment detail and this is what someone reads in a spreadsheet of
+ *                 leads, so it is written down deliberately. See leadSenderScript().
+ *    hero         { eyebrow, lines: [a, b, c] } replacing the export's own eyebrow and
+ *                 three-line headline, and nothing else in the hero. This plus title and
+ *                 description is the entire difference between the campaign pages below
+ *                 and the page they were cloned from. See heroOverride().
  *
  *  Nothing else is needed to add a page. Google Tag Manager, the favicon, the
  *  /thank-you redirect and lead sender, the chat widget, the mobile nav, the sticky
@@ -84,10 +92,67 @@ const THANK_YOU_FILE = 'thank-you.html';
 const PAGES = [
   // /: the shortened, redesigned page. Page-specific overrides live in
   // variants/shortened.mjs, applied last — see buildLandingPage()'s own doc comment.
-  { outFile: 'index.html', variant: 'shortened' },
+  { outFile: 'index.html', slug: 'main', variant: 'shortened' },
+
+  // The three below are / itself, cloned for a different search. Same variant, same
+  // sections, same photographs, same reviews, same four forms, same thank-you page —
+  // the visitor arrives at a page written for what they typed and then reads the page
+  // that already converts. Only the hero and the two SEO tags differ, which is why they
+  // are three registry entries and not three copies of anything.
+  //
+  // All three are indexable. That is a deliberate answer and not the safe default: four
+  // near-identical pages compete with each other, and the reason to accept that here is
+  // that each one targets a phrase the others do not rank for and carries its own title
+  // saying so. If Google ever collapses them, the fix is canonical tags and a sitemap,
+  // neither of which this site has yet.
+  {
+    outFile: 'ghost-kitchen.html',
+    slug: 'ghost-kitchen',
+    variant: 'shortened',
+    title: 'Ghost Kitchen & Virtual Restaurant Space For Rent In LA | ŌN Kitchens',
+    // The en dash in 200–600 is the same character the page's own "Private kitchen
+    // space, 200–600 sq ft." headline uses. It is a range, which is what an en dash is
+    // for; the copy guard below is about em dashes joining clauses.
+    description:
+      'Run delivery brands from a certified kitchen. Private 200–600 sq ft space, ' +
+      '24/7 access, no build-out. USC / Central Los Angeles.',
+    hero: {
+      eyebrow: 'Commercial kitchen rental · USC / Central Los Angeles',
+      lines: ['A delivery-ready kitchen.', 'Run your brands.', 'No dining room.'],
+    },
+  },
+  {
+    outFile: 'catering-health-permit.html',
+    slug: 'catering-health-permit',
+    variant: 'shortened',
+    title: 'Approved Kitchen For Your LA Catering Health Permit | ŌN Kitchens',
+    description:
+      'A catering health permit needs an approved commercial kitchen. Ours is ' +
+      'inspected, equipped and ready: private space, monthly or hourly, in Central ' +
+      'Los Angeles.',
+    hero: {
+      eyebrow: 'Commercial kitchen rental · USC / Central Los Angeles',
+      lines: ['A catering kitchen.', 'Health Dept. approved.', 'Permit-ready today.'],
+    },
+  },
+  {
+    outFile: 'fda-food-facility-registration.html',
+    slug: 'fda-food-facility-registration',
+    variant: 'shortened',
+    title: 'FDA-Registered & Organic-Ready Commercial Kitchen | ŌN Kitchens',
+    description:
+      'Need an FDA-registered or organic-certified facility to produce from? Private, ' +
+      'inspected commercial kitchen space in Los Angeles. Monthly or hourly, ' +
+      '24/7 access.',
+    hero: {
+      eyebrow: 'Commercial kitchen rental · USC / Central Los Angeles',
+      lines: ['A registered facility.', 'FDA and organic.', 'Ready to produce.'],
+    },
+  },
+
   // /lp: the original page, kept at a secondary URL so nothing that already linked to
   // it breaks. Carries noindex so it doesn't compete with / in search.
-  { outFile: LP_FILE, robots: 'noindex, nofollow' },
+  { outFile: LP_FILE, slug: 'lp', robots: 'noindex, nofollow' },
 ];
 
 /** Google Tag Manager container. A plain constant, not an env var like
@@ -186,7 +251,7 @@ const LEAD_WEBHOOK_URL = process.env.LEAD_WEBHOOK_URL || '';
  * because URLSearchParams would otherwise stringify null into the literal text "null",
  * which is worse than a missing field.
  */
-function leadSenderScript(url) {
+function leadSenderScript(url, slug) {
   // Only DELIVERY is conditional on the webhook. The dataLayer push and the spam gate
   // below are not: tracking and delivery are independent concerns, and the shape this
   // replaced compiled __onSendLead down to an empty function whenever LEAD_WEBHOOK_URL
@@ -202,6 +267,7 @@ function leadSenderScript(url) {
     put('business', lead.business);
     put('form', lead.form);
     put('form_name', FORM_NAMES[lead.form] || lead.form);
+    put('page', PAGE);
     // Only the chat sends this — neither HTML form has a message field.
     put('note', lead.note);
     put('submittedAt', new Date().toISOString());
@@ -277,6 +343,18 @@ function leadSenderScript(url) {
     'modal': 'Button (popup)',
     'chat': 'Chat'
   };
+
+  // Which landing page this lead came from, baked in at build time from the page's own
+  // PAGES entry rather than derived from the URL at submit time.
+  //
+  // location.pathname is already sent as pageUrl and would look like the obvious source,
+  // but it is the wrong one to key on downstream: it changes if a page is ever renamed
+  // or moved behind a redirect, it arrives with a leading slash and no value for the
+  // home page, and a visitor who lands on /ghost-kitchen is submitting from whatever URL
+  // they are on by then. The slug is a stable name for the campaign, decided in the
+  // registry next to the URL it belongs to, and it reads the same in a spreadsheet as it
+  // does in the code.
+  var PAGE = ${JSON.stringify(slug)};
 
   window.__onSendLead = function (lead) {
     // Dropped submissions fail silently: the caller still redirects to /thank-you, so a
@@ -1627,6 +1705,69 @@ function singleLocation(html, label) {
   return html;
 }
 
+
+/**
+ * Rewrites the hero's eyebrow and three-line headline for one page.
+ *
+ * Three landing pages clone / for a different search intent — ghost kitchens, catering
+ * health permits, FDA registration — and the ONLY thing that differs between them and the
+ * page they were cloned from is this block and the two SEO tags. Everything below the hero
+ * is byte-identical by construction, because it comes out of the same pipeline.
+ *
+ * Runs early, right after singleLocation() and before addScrollMotion(), so the anchors
+ * below are matched against near-pristine export markup. That is safe in both directions:
+ * the hero strings occur exactly once each and nowhere else in the repo, so nothing else
+ * anchors on them; and every later pass keys on structure rather than on this copy, so
+ * swapping the words cannot shift a single count.
+ *
+ * The third line keeps its accent colour. It is the one piece of the headline that is not
+ * just text — the export paints line three in --color-accent-400, and a cloned page that
+ * lost it would read as a different design rather than the same one.
+ *
+ * @param hero  { eyebrow, lines: [a, b, c] }, or null to leave the export's own hero alone
+ */
+function heroOverride(html, hero, label) {
+  if (!hero) return html;
+  const { eyebrow, lines } = hero;
+  if (!eyebrow || !Array.isArray(lines) || lines.length !== 3) {
+    throw new Error(
+      `[build] ${label}: hero needs an eyebrow and exactly three headline lines — the ` +
+        `export's h1 is three block spans and the third one carries the accent colour.`
+    );
+  }
+
+  // The eyebrow span is replaced whole rather than by its text, because its line-height
+  // has to move with the copy. The export sets line-height: 12px against font-size: 13px,
+  // which is fine for the one line it was written for and overlaps the moment it wraps —
+  // and every one of these eyebrows names the location, so all of them wrap on a phone.
+  // Widened here and not in the shared pipeline on purpose: raising it site-wide would
+  // push / 's own headline down six pixels on desktop, and / does not move.
+  const EYEBROW_STYLE =
+    'display: block; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; ' +
+    'font-weight: 600; color: var(--color-accent-400); margin-bottom: 12px;';
+  html = replaceExactly(
+    html,
+    `<span style="display: block; font-size: 13px; line-height: 12px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--color-accent-400); margin-bottom: 12px;">Commercial kitchen rental \u00b7 Los Angeles</span>`,
+    `<span style="${EYEBROW_STYLE} line-height: 18px;">${eyebrow}</span>`,
+    1,
+    `${label}: hero eyebrow`
+  );
+
+  const H1 = [
+    ['<span style="display: block;">A certified kitchen.</span>', '<span style="display: block;">'],
+    ['<span style="display: block;">No construction.</span>', '<span style="display: block;">'],
+    [
+      '<span style="display: block; color: var(--color-accent-400);">No waiting.</span>',
+      '<span style="display: block; color: var(--color-accent-400);">',
+    ],
+  ];
+  H1.forEach(([anchor, open], i) => {
+    html = replaceExactly(html, anchor, `${open}${lines[i]}</span>`, 1, `${label}: hero line ${i + 1}`);
+  });
+
+  return html;
+}
+
 /**
  * Builds a landing page from the design export.
  *
@@ -1641,6 +1782,8 @@ function singleLocation(html, label) {
  * @param robots       value for a <meta name="robots">, or '' for none
  * @param title        <title> text; defaults to the shared PAGE_TITLE
  * @param description  meta description; defaults to the shared PAGE_DESCRIPTION
+ * @param slug         the name this page sends with every lead; see leadSenderScript()
+ * @param hero         optional per-page hero copy; see heroOverride()
  * @param variant      optional { transform(html, { replaceExactly }) }, applied LAST —
  *                     see variants/shortened.mjs for why it runs after everything else.
  */
@@ -1650,8 +1793,16 @@ async function buildLandingPage({
   robots = '',
   title = PAGE_TITLE,
   description = PAGE_DESCRIPTION,
+  slug = '',
+  hero = null,
   variant = null,
 }) {
+  if (!slug) {
+    throw new Error(
+      `[build] ${label}: no slug. Every page names itself on the leads it sends, so the ` +
+        `PAGES entry needs one — see the registry at the top of this file.`
+    );
+  }
   let html = await readFile(join(SRC, ENTRY), 'utf8');
 
   const dsHref = html.match(
@@ -1703,7 +1854,7 @@ async function buildLandingPage({
     `<!-- Hoisted out of <helmet> so the browser actually applies it. See buildIndex(). -->`,
     `<link rel="stylesheet" href="${dsHref[1]}">`,
     `<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high">`,
-    leadSenderScript(LEAD_WEBHOOK_URL),
+    leadSenderScript(LEAD_WEBHOOK_URL, slug),
     `<script defer src="${REACT}"></script>`,
     `<script defer src="${REACT_DOM}"></script>`,
   ].join('\n');
@@ -1750,6 +1901,7 @@ async function buildLandingPage({
   );
 
   html = singleLocation(html, label);
+  html = heroOverride(html, hero, label);
   html = addScrollMotion(html, label);
   html = improveReadability(html, label);
   html = addMobileNav(html, label);
