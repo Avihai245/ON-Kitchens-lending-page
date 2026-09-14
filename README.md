@@ -531,8 +531,7 @@ with the company name linking to the studio's Instagram. It runs inside
 same line as a `.credit` rule in its own template, since that page has no `<footer>` and
 is styled with classes rather than the export's inline styles. `/404` does not carry it.
 
-The export's footer is a four-column grid — brand, Van Nuys, Los Angeles, Contact — that
-simply stops. There is no copyright line, no legal row, nothing beneath it, so this is a
+The export's footer is a grid — brand, the location, Contact — that simply stops. There is no copyright line, no legal row, nothing beneath it, so this is a
 new row and it takes a hairline above it to read as one rather than as a fifth orphan
 column. Nothing else in it is a new decision: `grid-column: 1 / -1` spans the grid the
 footer already has, so the row inherits its width clamp and `--edge` padding instead of
@@ -639,7 +638,7 @@ before the process (the export had them the other way round); "Our mission" come
 the facility list folds into the kitchens section as four labelled lines instead of four
 bordered cards; the export's duplicate mid-page lead form becomes a CTA strip and moves
 up ahead of the film section, with a purpose-built one added later at the pivot (below); the FAQ drops from eight questions to four, with "What does it
-cost?" moving from last to first; and both location maps come out of the markup, which
+cost?" moving from last to first; and the location map comes out of the markup, which
 also drops two Leaflet iframes and their OpenStreetMap tile traffic.
 
 The reviews section moves from roughly 70% of the scroll to fifth block on the page,
@@ -803,6 +802,51 @@ IntersectionObserver holding a reference to it. The variant's script runs before
 runtime mounts, so an observer would be watching the node inside `<x-dc>` — which React
 then replaces, leaving it observing a detached element. That was measured failing before it
 was fixed.
+
+### One location
+
+The site advertised two facilities, Van Nuys and Washington Blvd, and the business now runs
+one in **USC / Central Los Angeles**. That is not a find-and-replace: the second location
+card, its map, its footer column and its tour button all come out, and every sentence that
+said "two facilities", "both locations" or "at Van Nuys or Washington Blvd" is rewritten for
+a single place.
+
+**`singleLocation()` in `scripts/build.mjs`, not in the variant.** That is the part worth
+remembering: `/lp` renders the read-only export verbatim, so a fix in `variants/shortened.mjs`
+would have corrected `/` and left `/lp` advertising an address the business has left. Both
+pages go through the shared pipeline.
+
+Three things in the variant were hard-coupled to there being two and had to move with it:
+step 7's `expected 2 maps` assertion, the `DEDUPE` entry quoting the second card's amenity
+line, and a `grid-template-columns: 1fr 1fr` phone override that existed only to sit two
+cards side by side — with one card it left a half-width orphan. The first two threw on the
+next build, which is the safety net working; the third degraded silently and had to be found
+by looking.
+
+**No street address is shown**, and none is invented. The business gave a neighbourhood, so
+the card names the area and stops: no `<address>` element, and the amenity line keeps only
+what the page already claims site-wide. "Two loading docks" was a fact about a building they
+no longer occupy, and it was trimmed in the shared pass precisely so `/lp` lost it too.
+
+**The map is an area pin, and the geocoder is gone.** `map.html`'s `LOCS` collapses to one
+entry at 34.0224, -118.2851 with a wider zoom. The Nominatim lookup existed to sharpen a
+hardcoded guess against a real street address; given a neighbourhood it would "refine" the
+pin to whatever single point OSM returns for it, which is a worse answer than a deliberate
+one. Removing it also takes the site's only call to OSM's geocoding service, which **Known
+gaps** flags as a commercial-use risk.
+
+**`STALE_LOCATIONS` keeps it true.** No build may ship `Van Nuys`, `Washington Blvd`,
+`Stagg St`, `91405`, `90007`, `Two facilities`, `loc=vannuys` or `loc=la` in reader-facing
+text on any page; a re-export that reintroduces them fails the build naming the page. The
+list is deliberately only identifiers of the places themselves — "Two loading docks" was on
+it briefly and should not have been, since it also describes a facility feature in
+`#kitchens` that has nothing to do with which building the kitchens are in.
+
+**There is still no structured data.** No JSON-LD, no `LocalBusiness`, no Open Graph, no
+`geo.*`, no canonical, no sitemap — so the only machine-readable location signals are
+`<title>` and the meta description, both of which this change covers. For a business whose
+customers search locally, a `LocalBusiness` schema is the obvious next thing; it is a new
+feature rather than part of a location update, which is why it is not here.
 
 ## Lead webhook
 
@@ -1235,7 +1279,7 @@ and off: exactly two boxes differ, and they are the two links.
 4. `customHttp.yml` is picked up automatically from the repo root. It sets HSTS,
    `nosniff`, `Referrer-Policy`, a `Permissions-Policy`, and cache lifetimes.
    `X-Frame-Options` is `SAMEORIGIN` rather than `DENY` on purpose — the page
-   iframes `map.html` from this same origin for the two location maps, and `DENY`
+   iframes `map.html` from this same origin for the location map, and `DENY`
    would blank both.
 5. `/lp` needs no rule of its own — Amplify resolves `<path>.html` before
    `<path>/index.html`, which is the same mechanism that serves `/thank-you`. Neither

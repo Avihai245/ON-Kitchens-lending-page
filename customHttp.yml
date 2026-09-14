@@ -11,7 +11,7 @@ customHeaders:
       - key: 'X-Content-Type-Options'
         value: 'nosniff'
       # SAMEORIGIN, not DENY: the landing page embeds map.html in an iframe from
-      # this same origin for the two location maps. DENY would blank both of them.
+      # this same origin for the location map. DENY would blank it.
       - key: 'X-Frame-Options'
         value: 'SAMEORIGIN'
       - key: 'Referrer-Policy'

@@ -725,7 +725,9 @@ function improveReadability(html, label) {
   // They collapse onto one 70% tier (6.66:1) instead of being nudged
   // individually: no reader distinguishes 4.01 from 5.05, and the hierarchy that
   // does carry meaning is the one above — 70 < 72 < 78 < 80 < 86 < 100.
-  for (const [pct, n] of [['55', 2], ['58', 12], ['60', 3], ['62', 2]]) {
+  // 60% is 2, not 3: singleLocation() runs before this and removes the second
+  // location's footer column, which carried one of them.
+  for (const [pct, n] of [['55', 2], ['58', 12], ['60', 2], ['62', 2]]) {
     out = replaceExactly(
       out,
       `color-mix(in srgb, var(--color-text) ${pct}%, transparent)`,
@@ -1558,6 +1560,73 @@ function replaceExactly(text, find, replacement, expected, label) {
  * normally and applies. The helmet copy is left in place so the file still round-
  * trips through Claude Design; it resolves to the same URL and is served from cache.
  */
+/** Two facilities become one, in USC / Central Los Angeles.
+ *
+ *  In the shared pipeline rather than in variants/shortened.mjs, and that is the whole
+ *  point: /lp renders the export verbatim, so a fix in the variant would leave that page
+ *  still advertising an address the business has moved out of. Both pages go through
+ *  here.
+ *
+ *  No street address is shown. The business gave a neighbourhood and nothing else, so the
+ *  card names the area and stops — an <address> element with a street line invented for it
+ *  would be worse than none. Same reasoning for the amenity line: "Two loading docks" was
+ *  a claim about a specific building, and nothing is known about this one, so only what
+ *  the page already asserts site-wide survives. */
+function singleLocation(html, label) {
+  // The second card, whole: map wrapper, heading, address, amenities, button, dead tel.
+  const CARD2_START = '      <div>\n        <div class="blueprint" style="margin-bottom: 22px;">';
+  const i = html.indexOf('<h3', html.indexOf('Tour Van Nuys'));
+  if (i === -1) throw new Error(`[build] ${label}: locations — the second card is not where it was.`);
+  const cardOpen = html.lastIndexOf('<div>', i);
+  const cardEnd = html.indexOf('</div>\n    </div>', i);
+  if (cardOpen === -1 || cardEnd === -1) {
+    throw new Error(`[build] ${label}: locations — could not bound the second card.`);
+  }
+  html = html.slice(0, cardOpen) + html.slice(cardEnd + '</div>\n    '.length);
+
+  // What is left is the first card, rewritten for the new place.
+  html = replaceExactly(html, 'map.html?loc=vannuys', 'map.html?loc=usc', 1, `${label}: map src`);
+  html = replaceExactly(
+    html,
+    'title="Street map of \u014cN Kitchens Van Nuys, 15136 Stagg St"',
+    'title="Map of the \u014cN Kitchens kitchen in Central Los Angeles, near USC"',
+    1,
+    `${label}: map title`
+  );
+  html = replaceExactly(html, '>Van Nuys</h3>', '>USC / Central Los Angeles</h3>', 1, `${label}: card heading`);
+  html = replaceExactly(
+    html,
+    '<address style="font-style: normal; font-size: 17px; line-height: 27px; margin: 0 0 6px;">15136 Stagg St<br />Van Nuys, CA 91405</address>\n        ',
+    '',
+    1,
+    `${label}: card address`
+  );
+  html = replaceExactly(html, 'Tour Van Nuys', 'Book a tour', 1, `${label}: card button`);
+  // "Two loading docks" is a claim about the building they have left. Trimmed here, in the
+  // shared pipeline, and not in the variant — the variant only runs for /, and this line
+  // is rendered verbatim from the export on /lp, where it would otherwise have survived.
+  html = replaceExactly(
+    html,
+    'Open 24/7/365 · Free gated parking · Two loading docks',
+    'Open 24/7/365 · Free gated parking',
+    1,
+    `${label}: card amenities`
+  );
+
+  // The footer carried a column per location. One place, one column.
+  html = replaceExactly(
+    html,
+    '>Van Nuys</span>\n        <address style="font-style: normal; font-size: 15px; line-height: 24px; margin: 0;">15136 Stagg St<br />Van Nuys, CA 91405</address>',
+    '>Where</span>\n        <address style="font-style: normal; font-size: 15px; line-height: 24px; margin: 0;">USC / Central Los Angeles</address>',
+    1,
+    `${label}: footer column`
+  );
+  const f2 = '      <div>\n        <span style="display: block; font-family: var(--font-heading); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 60%, transparent); margin-bottom: 10px;">Los Angeles</span>\n        <address style="font-style: normal; font-size: 15px; line-height: 24px; margin: 0;">1870 W Washington Blvd<br />Los Angeles, CA 90007</address>\n      </div>\n';
+  html = replaceExactly(html, f2, '', 1, `${label}: second footer column`);
+
+  return html;
+}
+
 /**
  * Builds a landing page from the design export.
  *
@@ -1680,6 +1749,7 @@ async function buildLandingPage({
     'lead form redirect'
   );
 
+  html = singleLocation(html, label);
   html = addScrollMotion(html, label);
   html = improveReadability(html, label);
   html = addMobileNav(html, label);
@@ -1850,6 +1920,56 @@ const COPY_DASHES = [
   ['ŌN Kitchens — The Easy Upgrade', 'ŌN Kitchens · The Easy Upgrade'],
 ];
 
+/** Every remaining sentence that names where the business is.
+ *
+ *  The structural half of the move — two cards to one, two maps to one — happens in
+ *  singleLocation() before the page is transformed. This is the prose that survives it,
+ *  scattered across the hero, the sticky bar, the benefits sheet, three form
+ *  confirmations and an FAQ answer. It is applied in the same final sweep as the dash
+ *  rewrites, for the same reason: after every producer has run there is no replaceExactly
+ *  anchor left anywhere for it to disturb, and one pass reaches /, /lp and /thank-you.
+ *
+ *  Entries are not asserted per page. / and /lp legitimately carry different copy — the
+ *  FAQ answer exists only on /lp, the variant rewrites the form intro only on / — so most
+ *  of these apply to one page and not the other. The guard below is what makes it
+ *  complete. */
+const LOCATION_COPY = [
+  ['Two facilities in Los Angeles', 'One kitchen, in Central Los Angeles'],
+  ['space in Van Nuys and Los Angeles.', 'space in Central Los Angeles.'],
+  ['Private kitchens in Van Nuys &amp; Los Angeles', 'Private kitchens in Central Los Angeles'],
+  ['Private kitchens in Van Nuys & Los Angeles', 'Private kitchens in Central Los Angeles'],
+  // The sheet header is a narrow cell. "USC · Central Los Angeles" is three characters
+  // longer than the two-location string it replaces, and measured at 320px with the
+  // webfonts blocked that was 16px of horizontal overflow on the whole document. USC is
+  // already named in the location card, the footer and the FAQ, so this one carries the
+  // area alone.
+  ['Van Nuys &middot; Los Angeles', 'Central Los Angeles'],
+  ['Van Nuys · Los Angeles', 'Central Los Angeles'],
+  ['set a time at Van Nuys or Washington Blvd.', 'set a time at our Central Los Angeles kitchen.'],
+  ['call to set a time at Van Nuys or Washington Blvd', 'call to set a time at our Central Los Angeles kitchen'],
+  // /lp only: the variant cuts this question from /.
+  ['Two facilities: Van Nuys at 15136 Stagg St, and Los Angeles at 1870 W Washington Blvd. Both are on the map above.',
+   'One kitchen, in Central Los Angeles, near USC. It is on the map above.'],
+  // "your preferred location" was a real choice when there were two. With one it reads
+  // as though the reader is being asked something nobody asked them.
+  ['be in touch to set a time at your preferred location.', 'be in touch to set a time.'],
+];
+
+/** Nothing on any page may still advertise where the business used to be.
+ *
+ *  A table of rewrites is only as complete as whoever wrote it. This is the part that
+ *  does not depend on that: if a re-export, a new section or a copy edit reintroduces an
+ *  old address, the build fails with the sentence quoted rather than quietly putting a
+ *  closed facility back on the page. */
+// Only identifiers of the places themselves. "Two loading docks" and "Food delivery
+// pickup area" were briefly on this list and should not have been: they also describe
+// facility features in #kitchens, which are general claims about the kitchens and have
+// nothing to do with which building they are in. The old card's copy of that line is
+// handled by an exact rewrite in singleLocation(), which throws on its own if the export
+// ever changes underneath it.
+const STALE_LOCATIONS = ['Van Nuys', 'Washington Blvd', 'Stagg St', '91405', '90007',
+  'Two facilities', 'loc=vannuys', 'loc=la'];
+
 /** Everything a reader or a screen reader actually receives: markup minus the machinery,
  *  minus <title>, which is allowlisted. Attribute values stay in scope on purpose — alt
  *  and aria-label are read aloud. */
@@ -1879,11 +1999,19 @@ async function removeCopyDashes() {
     const file = join(OUT, page);
     let html = await readFile(file, 'utf8');
     const before = html;
-    for (const [find, replacement] of COPY_DASHES) {
+    for (const [find, replacement] of COPY_DASHES.concat(LOCATION_COPY)) {
       if (html.includes(find)) {
         html = html.split(find).join(replacement);
         changed++;
       }
+    }
+
+    const stale = STALE_LOCATIONS.filter((w) => readerFacing(html).includes(w));
+    if (stale.length) {
+      throw new Error(
+        `[build] ${page} still names a location the business has left: ${stale.join(', ')}. ` +
+          `Add the sentence to LOCATION_COPY, or remove the markup in singleLocation().`
+      );
     }
 
     const left = readerFacing(html).match(/[^<>"]{0,60}(?:—|&mdash;)[^<>"]{0,60}/g);
@@ -2070,8 +2198,54 @@ async function buildMap() {
     'leaflet js'
   );
 
+  // One location, pinned as an area rather than a door.
+  //
+  // The business gave a neighbourhood and no street address, so there is nothing for the
+  // geocoder to sharpen. Nominatim is dropped along with the second entry: given a
+  // neighbourhood query it would "refine" the pin to whatever single point OSM happens to
+  // return for it, which is a worse answer than a deliberate one. A fixed centre and a
+  // wider zoom say "this area" honestly. It also removes the site's only call to OSM's
+  // geocoding service, which the README flags as a commercial-use risk.
+  html = replaceExactly(
+    html,
+    `  const LOCS = {
+    vannuys: { q: '15136 Stagg St, Van Nuys, CA 91405', fb: [34.2065, -118.4685], label: 'Van Nuys' },
+    la:      { q: '1870 W Washington Blvd, Los Angeles, CA 90007', fb: [34.0300, -118.2930], label: 'Los Angeles' }
+  };
+  const key = new URLSearchParams(location.search).get('loc') || 'vannuys';
+  const loc = LOCS[key] || LOCS.vannuys;`,
+    `  const LOCS = {
+    usc: { q: '\u014cN Kitchens \u2014 USC / Central Los Angeles', fb: [34.0224, -118.2851], label: 'USC / Central Los Angeles' }
+  };
+  const key = new URLSearchParams(location.search).get('loc') || 'usc';
+  const loc = LOCS[key] || LOCS.usc;`,
+    1,
+    'map: single location'
+  );
+  html = replaceExactly(html, 'center: loc.fb, zoom: 15,', 'center: loc.fb, zoom: 13,', 1, 'map: area zoom');
+  html = replaceExactly(
+    html,
+    `  // Refine the pinned point against real OSM geocoding when the network allows;
+  // the hard-coded fallback above keeps the map correct in the neighborhood either way.
+  fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(loc.q))
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(j => {
+      if (!j || !j.length) return;
+      const p = [parseFloat(j[0].lat), parseFloat(j[0].lon)];
+      if (!isFinite(p[0]) || !isFinite(p[1])) return;
+      marker.setLatLng(p);
+      map.setView(p, 16);
+    })
+    .catch(() => {});
+
+`,
+    '',
+    1,
+    'map: drop the geocoder'
+  );
+
   await writeFile(join(OUT, 'map.html'), html);
-  console.log('  map.html        <- map.html (Leaflet vendored)');
+  console.log('  map.html        <- map.html (Leaflet vendored, single area pin, no geocoder)');
 }
 
 async function main() {
