@@ -251,6 +251,12 @@ const LEAD_WEBHOOK_URL = process.env.LEAD_WEBHOOK_URL || '';
  * because URLSearchParams would otherwise stringify null into the literal text "null",
  * which is worse than a missing field.
  */
+/** Where the ?leaddebug=1 trail is kept. sessionStorage rather than a variable because
+ *  the three form paths navigate to /thank-you a second after submitting; the trail has
+ *  to outlive that. templates/thank-you.html spells the same key to read it back, and
+ *  buildThankYou() checks the two still agree. */
+const TRACE_KEY = 'on-lead-trace';
+
 function leadSenderScript(url, slug) {
   // Only DELIVERY is conditional on the webhook. The dataLayer push and the spam gate
   // below are not: tracking and delivery are independent concerns, and the shape this
@@ -277,10 +283,34 @@ function leadSenderScript(url, slug) {
     CAMPAIGN.forEach(function (k) { put(k, c[k]); });
 
     var url = ${JSON.stringify(url)};
-    if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return;
+    // Guarded rather than left to trace(): its arguments would otherwise be built on
+    // every real submission just to be thrown away.
+    if (DEBUG) trace('payload built', { fields: Array.from(body.keys()), bytes: body.toString().length });
+
+    // The order here is load-bearing and unchanged: ONE delivery, with fetch as the
+    // fallback only when sendBeacon refuses the payload. Sending by both paths would
+    // be a tempting belt-and-braces and is actually a bug — it puts the same lead in
+    // the receiver twice.
+    //
+    // What cannot be fixed from here: sendBeacon returning true means the browser
+    // QUEUED the request, not that it sent one, and a queue the browser later discards
+    // is indistinguishable from a delivery. trace() reports the return value so a
+    // debug run can at least tell "the page never tried" from "the page tried and the
+    // browser said yes" — the difference between a bug in this code and a bug past it.
+    if (navigator.sendBeacon) {
+      var queued = false;
+      try { queued = navigator.sendBeacon(url, body); } catch (err) { trace('sendBeacon threw', String(err)); }
+      trace('sendBeacon', queued ? 'accepted (queued — not proof of delivery)' : 'refused, falling back to fetch');
+      if (queued) return;
+    } else {
+      trace('sendBeacon', 'unavailable in this browser, using fetch');
+    }
     fetch(url, { method: 'POST', mode: 'no-cors', keepalive: true, body: body })
-      .catch(function () {});`
-    : `    /* LEAD_WEBHOOK_URL unset at build time — the lead is not delivered anywhere. */`;
+      .then(function () { trace('fetch', 'completed (opaque — the reply cannot be read cross-origin)'); })
+      .catch(function (err) { trace('fetch FAILED', String(err)); });`
+    : `    trace('DROPPED: no webhook URL was baked into this page at build time',
+      'LEAD_WEBHOOK_URL was unset when Amplify built it');
+    /* LEAD_WEBHOOK_URL unset at build time — the lead is not delivered anywhere. */`;
 
   return `<script>
 (function () {
@@ -297,6 +327,42 @@ function leadSenderScript(url, slug) {
   // Note what this cannot do: a bot that scrapes the URL and posts straight to the
   // endpoint never loads the page at all, so no client-side check can see it. That is a
   // property of static-site webhooks, not a gap in this code. See the README.
+  // Diagnostics, off unless the URL carries ?leaddebug=1.
+  //
+  // Every way a lead can fail to arrive is silent by design: two spam gates return
+  // without a word, an unset webhook compiles to a comment, a cross-origin reply is
+  // opaque, and both delivery calls swallow their errors so nothing can block the
+  // redirect. Individually each is right. Together they meant a real lead could vanish
+  // with no way for anyone — the site owner included — to find out where.
+  //
+  // Records go to the console AND to sessionStorage, because the three form paths
+  // navigate to /thank-you about a second after submitting and take the console with
+  // them unless "Preserve log" happens to be ticked. sessionStorage survives a
+  // same-origin navigation, so the trail can be read on the other side.
+  //
+  // Not on by default and not shown on the page: the honeypot and the interaction gate
+  // only work while nobody knows they are there.
+  var DEBUG = false;
+  try { DEBUG = /(^|[?&])leaddebug=1(&|$)/.test(location.search); } catch (err) { /* ignore */ }
+  var TRACE_KEY = ${JSON.stringify(TRACE_KEY)};
+  function trace(step, detail) {
+    if (!DEBUG) return;
+    try { console.info('[lead] ' + step, detail === undefined ? '' : detail); } catch (err) { /* ignore */ }
+    try {
+      var log = JSON.parse(sessionStorage.getItem(TRACE_KEY) || '[]');
+      log.push({ at: new Date().toISOString(), step: step, detail: detail === undefined ? null : detail });
+      sessionStorage.setItem(TRACE_KEY, JSON.stringify(log.slice(-40)));
+    } catch (err) { /* private mode — the console half still works */ }
+  }
+  if (DEBUG) {
+    try { sessionStorage.removeItem(TRACE_KEY); } catch (err) { /* ignore */ }
+    trace('lead debug on', 'submit the form, then read window.__leadTrace() here or on /thank-you');
+  }
+  // Readable from the console on either side of the redirect.
+  window.__leadTrace = function () {
+    try { return JSON.parse(sessionStorage.getItem(TRACE_KEY) || '[]'); } catch (err) { return []; }
+  };
+
   var human = false;
   var mark = function (ev) { if (!ev || ev.isTrusted !== false) human = true; };
   ['pointerdown', 'keydown', 'touchstart'].forEach(function (t) {
@@ -357,11 +423,25 @@ function leadSenderScript(url, slug) {
   var PAGE = ${JSON.stringify(slug)};
 
   window.__onSendLead = function (lead) {
+    trace('submit', { form: (lead && lead.form) || 'unknown', page: PAGE });
+
     // Dropped submissions fail silently: the caller still redirects to /thank-you, so a
     // bot is never told it was caught. The drop happens before the dataLayer push too —
     // spam that inflated the conversion count would defeat the point of tracking it.
-    if (lead && lead.trap) return;
-    if (!human) return;
+    //
+    // Silent to the VISITOR, that is. trace() is off unless the URL asks for it, so a
+    // bot still learns nothing, while someone testing their own form can see which gate
+    // fired. Before this, a caught lead and a delivered one looked identical from
+    // outside, which is fine against bots and useless when a real lead goes missing.
+    if (lead && lead.trap) {
+      trace('DROPPED: honeypot was filled',
+        'the hidden "Company website" field had a value — usually browser autofill, not a bot');
+      return;
+    }
+    if (!human) {
+      trace('DROPPED: no pointer, key or touch event was seen on this page before submit');
+      return;
+    }
 
     // GTM first, in its own try/catch, for two reasons. The delivery path below returns
     // early on a successful sendBeacon, so a push placed after it would be skipped on
@@ -2260,6 +2340,18 @@ async function tagEveryPage() {
 
 async function buildThankYou() {
   const src = await readFile(join(SRC, ENTRY), 'utf8');
+
+  // The template reads back the ?leaddebug=1 trail the landing pages leave behind, which
+  // only works while both spell the key the same way. A table of two strings in two files
+  // is exactly the kind of thing that rots silently, so it is checked rather than trusted.
+  const tpl = await readFile(join(ROOT, 'templates', THANK_YOU_FILE), 'utf8');
+  if (!tpl.includes(`sessionStorage.getItem('${TRACE_KEY}')`)) {
+    throw new Error(
+      `[build] thank-you: the template does not read sessionStorage['${TRACE_KEY}']. ` +
+        `It is where the ?leaddebug=1 trail is read back after the redirect — see ` +
+        `TRACE_KEY in this file and window.__leadTrace in templates/${THANK_YOU_FILE}.`
+    );
+  }
   const star = (n) =>
     `<svg width="${n}" height="${n}" viewBox="0 0 24 24" fill="var(--color-accent)" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`;
 

@@ -999,6 +999,63 @@ Zap storing the whole payload as one unusable blob looks exactly like success fr
 and sendBeacon still works — and every webhook receiver parses it into named fields with
 no interpretation required. The question is removed rather than answered.
 
+### When a lead does not arrive: `?leaddebug=1`
+
+Every way a lead can fail to reach the webhook is silent. Each silence is individually
+right and together they meant a real lead could vanish with nobody — the site owner
+included — able to find out where:
+
+| what stops it | why it says nothing |
+| --- | --- |
+| the honeypot was filled | never tell a bot it was caught |
+| no pointer, key or touch event was seen | same |
+| `LEAD_WEBHOOK_URL` was unset at build | the build warns; the built page cannot |
+| `sendBeacon` queued it and the browser dropped it | a queued beacon and a delivered one are indistinguishable from script |
+| the `fetch` fallback threw | errors are swallowed so delivery never blocks the redirect |
+| the receiver answered 4xx/5xx | an opaque cross-origin response cannot be read |
+
+So the page can be asked to narrate instead. Load any landing page with **`?leaddebug=1`**,
+submit the form, and read the trail:
+
+```
+/ghost-kitchen?leaddebug=1     ->  fill the form  ->  console, or __leadTrace()
+
+  lead debug on
+  submit          {"form":"mid-page","page":"ghost-kitchen"}
+  payload built   {"fields":["name","phone","email","form","form_name","page",…],"bytes":228}
+  sendBeacon      "accepted (queued — not proof of delivery)"
+```
+
+and when something stops it, the trail names which one:
+
+```
+  DROPPED: honeypot was filled
+      the hidden "Company website" field had a value — usually browser autofill, not a bot
+  DROPPED: no pointer, key or touch event was seen on this page before submit
+  DROPPED: no webhook URL was baked into this page at build time
+      LEAD_WEBHOOK_URL was unset when Amplify built it
+```
+
+The three form paths navigate to `/thank-you` about a second after submitting and take the
+console with them, so the trail is also written to `sessionStorage` under `on-lead-trace` and
+`window.__leadTrace()` reads it back — **on `/thank-you` as well**, which is where the visitor
+actually ends up. `templates/thank-you.html` defines that reader; `buildThankYou()` asserts it
+still spells the key the same way `TRACE_KEY` does, so the two cannot drift apart.
+
+Off unless the URL asks for it: no console output, no storage write, no behaviour change, and
+the built page is byte-identical outside `leadSenderScript()`. Deliberately not on by default
+and deliberately not shown on the page — the honeypot and the interaction gate only work while
+nobody knows they are there.
+
+**What it still cannot tell you** is whether a request the browser said it sent actually
+arrived. Nothing client-side can: the response is opaque. That half is
+`scripts/test-webhook.sh`, run from your own machine against the real endpoint. Between the
+two, every case above is distinguishable — the trail says whether the page tried, the script
+says whether the endpoint accepts.
+
+**One delivery, not two.** `sendBeacon` first, `fetch` only when it refuses. Sending by both
+looks like sensible redundancy and is a bug: it puts the same lead in the receiver twice.
+
 ### Spam protection
 
 The webhook URL ships in the page source. That is unavoidable for a static site posting
