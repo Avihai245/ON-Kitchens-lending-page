@@ -921,7 +921,26 @@ log, which prints the origin with the path redacted — catch-hook URLs carry th
 in the path and build logs are not a private place. Locally:
 `LEAD_WEBHOOK_URL=https://… node scripts/build.mjs`.
 
-**Unset is a silent failure, and the build now says so loudly.** Every lead is validated,
+**An Amplify build without it now FAILS.** Amplify sets `AWS_APP_ID`/`AWS_BRANCH`; a local
+build sets neither, so the check is strict in the one place that ships to real visitors and
+permissive everywhere else. A failed deploy leaves the previous working site serving, which
+is strictly better than a green deploy that discards every lead. The value is also validated
+— it must be an absolute `https://` URL (http is allowed only for a loopback test receiver,
+which in turn is rejected on Amplify), and it is trimmed, because a value pasted into the
+console with a trailing space would otherwise be baked in verbatim and POST to a URL ending
+in `%20`.
+
+**The build log prints a fingerprint**, because a *wrong* URL loses leads as completely as a
+missing one and is far harder to notice:
+
+```
+[build] lead webhook: hooks.zapier.com/…0wj1/  <- check this matches your Zap
+```
+
+Host plus the last four characters of the path: enough to confirm the right hook at a
+glance, not enough to reconstruct the secret in a build log.
+
+**Unset is otherwise a silent failure, and the build says so loudly.** Every lead is validated,
 the visitor still reaches `/thank-you`, and Google Tag Manager still fires
 `generate_lead` — so from outside nothing looks wrong while every lead is dropped on the
 floor. The build prints an unmissable warning rather than failing, because local builds
@@ -945,6 +964,7 @@ Which a receiver parses into named fields:
 | `business` | optional on every path, never validated. Omitted when blank. |
 | `form` | `mid-page`, `end-of-page`, `modal` or `chat`. Stable identifiers: filter and branch on these. |
 | `form_name` | the same thing for a person reading the lead: `Form 1 (top)`, `Form 2 (bottom)`, `Button (popup)`, `Chat`. |
+| `spam_suspected` | `honeypot` or `no-interaction`, **present only when something looked off**. The lead is delivered either way — filter on this key's existence in the Zap. |
 | `page` | which landing page took the lead: `main`, `ghost-kitchen`, `catering-health-permit`, `fda-food-facility-registration` or `lp`. Comes from the page's own `slug` in `PAGES`, not from the URL — see below. |
 | `note` | **chat only**, neither HTML form has a message field. |
 | `submittedAt` `pageUrl` `referrer` | `referrer` omitted on a direct visit. |
@@ -1074,9 +1094,22 @@ both at `window.__onSendLead` — the one seam all four paths share:
   React-rendered from the read-only export, and a field injected into them would be wiped
   on the next re-render.
 
-Both fail **silently**: the caller still redirects to `/thank-you`, so a bot is never told
-it was caught, and the drop happens *before* the `dataLayer` push so spam cannot inflate
-the conversion count.
+**Neither drops a lead. Both flag it and deliver it anyway**, tagged `spam_suspected`, and
+you filter in the Zap.
+
+That is a deliberate reversal. Both gates used to `return` — the lead ceased to exist, with
+no delivery, no record, and no way for anyone including the site owner to learn it had
+happened. The honeypot is a field named `website`; browser autofill and password managers
+fill fields named that routinely, and ignore `autocomplete="off"` while doing it. So a false
+positive cost a real inquiry, invisibly, with no trail to even notice the pattern. Filtering
+in the receiver costs one row to ignore instead of one lost customer — and you can *see*
+what was filtered.
+
+What has not changed: a flagged lead is still kept out of the `dataLayer`, so spam cannot
+inflate the conversion count. Analytics drops it; delivery never does. Those were always two
+separate concerns and only one of them needed the silence. The visitor and any bot still see
+exactly the same thing either way — the caller redirects to `/thank-you` regardless — so the
+gates still give nothing away.
 
 **What this cannot do.** A bot that scrapes the URL from page source and posts straight
 to the endpoint never loads the page, so no client-side check can see it. Keeping the URL

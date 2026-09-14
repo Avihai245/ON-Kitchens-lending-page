@@ -223,7 +223,82 @@ const FONT_CSS =
  * A server-side relay (an Amplify function, or a receiver that accepts a shared
  * secret) is the fix for both; the README says so.
  */
-const LEAD_WEBHOOK_URL = process.env.LEAD_WEBHOOK_URL || '';
+// Trimmed: a value pasted into the Amplify console arrives with a trailing space or
+// newline more often than anyone would like, and untrimmed it is baked into the page
+// verbatim — POSTing to a URL ending in %20, which fails for a reason nobody can see.
+const LEAD_WEBHOOK_URL = (process.env.LEAD_WEBHOOK_URL || '').trim();
+
+/** True when this build is running on AWS Amplify, which sets these itself. A local
+ *  build sets neither, which is how the check below can be strict in the one place that
+ *  ships to real visitors and stay permissive everywhere else. */
+const ON_AMPLIFY = Boolean(process.env.AWS_APP_ID || process.env.AWS_BRANCH);
+
+/**
+ * Refuses to produce a deployable site that cannot deliver a lead.
+ *
+ * An unset variable used to produce a SUCCESSFUL build whose every lead was dropped on
+ * the floor, with a warning in a log that nobody reads because the build passed. That is
+ * the worst shape available: the forms validate, the visitor reaches /thank-you, Google
+ * Tag Manager reports a conversion, and the inquiry is gone.
+ *
+ * Failing the build inverts it. A failed deploy leaves the previous, working site serving
+ * — strictly better than a green deploy that silently discards everything. Local builds
+ * and the very first Amplify build (which legitimately runs before the variable exists)
+ * are unaffected, because neither is what ships to visitors.
+ *
+ * The fingerprint exists because a WRONG url is as damaging as a missing one and far
+ * harder to notice. Host plus the last four characters of the path is enough to confirm
+ * at a glance that the intended hook is wired, and not enough to reconstruct a secret in
+ * a build log — which, as the README says, is not a private place.
+ */
+function checkWebhook(url) {
+  if (!url) {
+    if (!ON_AMPLIFY) return null;
+    throw new Error(
+      `[build] LEAD_WEBHOOK_URL is not set, and this is an Amplify build.\n` +
+        `[build] Refusing to publish a site that would discard every lead it takes.\n` +
+        `[build] Fix: Amplify console -> App settings -> Environment variables ->\n` +
+        `[build] LEAD_WEBHOOK_URL = your endpoint, then redeploy. The previous deploy\n` +
+        `[build] stays live until this succeeds, so no lead is lost in the meantime.`
+    );
+  }
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch (err) {
+    throw new Error(
+      `[build] LEAD_WEBHOOK_URL is not a valid absolute URL. A stray quote or a leading ` +
+        `space in the console value is the usual cause.`
+    );
+  }
+  // https everywhere except a loopback receiver. A lead carries a name, a phone number
+  // and an email and does not travel in clear text over a network — but 127.0.0.1 is not
+  // a network, and the whole local test battery points the build at an http receiver on
+  // localhost. An https-only rule silently broke every one of those tests the first time
+  // it ran: the build failed, the previous dist/ stayed in place, and the suite reported
+  // "0 POSTs received" as though the sender were broken.
+  const loopback = parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost' || parsed.hostname === '[::1]';
+  if (parsed.protocol !== 'https:' && !loopback) {
+    throw new Error(
+      `[build] LEAD_WEBHOOK_URL must be https — got ${parsed.protocol.replace(':', '')}. ` +
+        `A lead carries a name, a phone number and an email; it does not travel in clear ` +
+        `text. (http is allowed only for a loopback receiver, for local testing.)`
+    );
+  }
+  if (loopback && ON_AMPLIFY) {
+    throw new Error(
+      `[build] LEAD_WEBHOOK_URL points at ${parsed.hostname}, which is a local test ` +
+        `receiver, and this is an Amplify build. Every lead would be posted to an address ` +
+        `that does not exist for a visitor. Set the real endpoint and redeploy.`
+    );
+  }
+  const path = parsed.pathname.replace(/\/+$/, '');
+  return `${parsed.host}/…${path.slice(-4)}/`;
+}
+// Assigned at the top of main() rather than here. Thrown at module load, the message
+// below would be buried under a Node stack trace — and it is the single most important
+// message this build can print.
+let WEBHOOK_FINGERPRINT = null;
 
 /**
  * Inline sender, injected into <head>.
@@ -274,6 +349,9 @@ function leadSenderScript(url, slug) {
     put('form', lead.form);
     put('form_name', FORM_NAMES[lead.form] || lead.form);
     put('page', PAGE);
+    // Present only when something looked off, so a clean lead carries no such field at
+    // all and a filter in the receiver is a simple "does this key exist".
+    put('spam_suspected', suspect);
     // Only the chat sends this — neither HTML form has a message field.
     put('note', lead.note);
     put('submittedAt', new Date().toISOString());
@@ -425,22 +503,34 @@ function leadSenderScript(url, slug) {
   window.__onSendLead = function (lead) {
     trace('submit', { form: (lead && lead.form) || 'unknown', page: PAGE });
 
-    // Dropped submissions fail silently: the caller still redirects to /thank-you, so a
-    // bot is never told it was caught. The drop happens before the dataLayer push too —
-    // spam that inflated the conversion count would defeat the point of tracking it.
+    // Suspicious leads are FLAGGED AND DELIVERED, never dropped.
     //
-    // Silent to the VISITOR, that is. trace() is off unless the URL asks for it, so a
-    // bot still learns nothing, while someone testing their own form can see which gate
-    // fired. Before this, a caught lead and a delivered one looked identical from
-    // outside, which is fine against bots and useless when a real lead goes missing.
-    if (lead && lead.trap) {
-      trace('DROPPED: honeypot was filled',
-        'the hidden "Company website" field had a value — usually browser autofill, not a bot');
-      return;
-    }
-    if (!human) {
-      trace('DROPPED: no pointer, key or touch event was seen on this page before submit');
-      return;
+    // Both gates used to return here, and a returned lead ceased to exist — no delivery,
+    // no record, no way for anyone including the site owner to learn it had happened. The
+    // honeypot is a field named "website"; browser autofill and password managers fill
+    // fields named that, routinely, and ignore autocomplete="off" while doing it. So the
+    // cost of a false positive was a real inquiry vanishing in total silence, and there
+    // was no evidence trail to even notice the pattern.
+    //
+    // Flagging inverts that. Every lead reaches the receiver; a suspicious one carries
+    // spam_suspected, and the receiver filters — where a person can SEE what was filtered
+    // and unfilter it. A false positive costs one row to ignore instead of one lost
+    // customer.
+    //
+    // What does NOT change: a flagged lead is still kept out of the dataLayer below, so
+    // spam cannot inflate the conversion count. Analytics drops it; delivery never does.
+    // Those were always two separate concerns and only one of them needed the silence.
+    //
+    // The visitor and any bot still see exactly the same thing either way — the caller
+    // redirects to /thank-you regardless — so the gates give nothing away.
+    var suspect = null;
+    if (lead && lead.trap) suspect = 'honeypot';
+    else if (!human) suspect = 'no-interaction';
+    if (suspect) {
+      trace('FLAGGED as ' + suspect + ' — delivered anyway, filter it in the receiver',
+        suspect === 'honeypot'
+          ? 'the hidden "Company website" field had a value — usually browser autofill, not a bot'
+          : 'no pointer, key or touch event was seen on this page before submit');
     }
 
     // GTM first, in its own try/catch, for two reasons. The delivery path below returns
@@ -452,12 +542,16 @@ function leadSenderScript(url, slug) {
     // sessionStorage design exists so that analytics can never capture a phone number.
     // Lead source and path only — enough to trigger a conversion, nothing personal.
     try {
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push({
-        event: 'generate_lead',
-        form: (lead && lead.form) || 'unknown',
-        page: location.pathname
-      });
+      // Flagged leads are delivered but not counted: a conversion number inflated by spam
+      // is worse than no number. This is the only thing the flag still suppresses.
+      if (!suspect) {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: 'generate_lead',
+          form: (lead && lead.form) || 'unknown',
+          page: location.pathname
+        });
+      }
     } catch (err) { /* never let a tag break the lead */ }
     try {
 ${deliver}
@@ -2493,6 +2587,9 @@ async function buildMap() {
 }
 
 async function main() {
+  // First, before anything is written: refuse to build a site that cannot deliver a lead.
+  WEBHOOK_FINGERPRINT = checkWebhook(LEAD_WEBHOOK_URL);
+
   if (!existsSync(SRC)) throw new Error('[build] design export not found at ' + SRC);
 
   await rm(OUT, { recursive: true, force: true });
@@ -2547,9 +2644,11 @@ async function main() {
   // dropped on the floor. Not a hard failure, though: local builds and the very first
   // Amplify build both legitimately run before the variable exists.
   if (LEAD_WEBHOOK_URL) {
-    // Origin only. Catch-hook URLs carry their secret in the path, and build logs are
-    // not a private place.
-    console.log(`\n[build] lead webhook: ${LEAD_WEBHOOK_URL.replace(/^(https?:\/\/[^/]+).*$/, '$1/…')}`);
+    // Host plus the last four characters of the path. Catch-hook URLs carry their secret
+    // in the path and build logs are not a private place — but an origin alone cannot
+    // tell a correct hook from a typo'd one, and a typo'd hook loses every lead just as
+    // completely as a missing variable. Four characters distinguishes them.
+    console.log(`\n[build] lead webhook: ${WEBHOOK_FINGERPRINT}  <- check this matches your Zap`);
   } else {
     console.log(
       `\n[build] ⚠  LEAD_WEBHOOK_URL is not set — EVERY LEAD THIS BUILD TAKES IS DISCARDED.\n` +
