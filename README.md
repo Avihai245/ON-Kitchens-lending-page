@@ -1019,6 +1019,29 @@ Zap storing the whole payload as one unusable blob looks exactly like success fr
 and sendBeacon still works — and every webhook receiver parses it into named fields with
 no interpretation required. The question is removed rather than answered.
 
+### The chat's copy is guarded separately, and here is why
+
+`removeCopyDashes()` proves no em dash survives in reader-facing text, and for months it
+was wrong about one place. It asks `readerFacing()`, which strips `<script>` blocks before
+looking — correct for every other page, where script content is machinery rather than
+prose. **The chat widget is the exception.** Its whole transcript is string literals
+injected as JavaScript, so it reads as machinery to the guard and as English to the
+visitor. Three em dashes sat in the opening question, the last question and the
+confirmation while every other line of copy on the site was swept clean.
+
+Worse, two of them were written `\u2014` rather than as the literal character, so even a
+manual search for `—` in that file missed them.
+
+`assertChatCopy()` checks `scripts/chat-widget.mjs` directly, since the sweep structurally
+cannot. It strips comments — those are for whoever maintains this — and rejects both
+spellings in anything left. That file contains no `throw` and no `console`, so everything
+outside a comment is text somebody reads on the page, which makes the rule exact rather
+than heuristic. `v-chat` guards the other end, asserting no dash in the *rendered*
+transcript.
+
+The validator messages in `variants/shortened.mjs` sit inside a `<script>` for the same
+reason and were checked at the same time: clean, no dashes.
+
 ### When a lead does not arrive: `?leaddebug=1`
 
 Every way a lead can fail to reach the webhook is silent. Each silence is individually

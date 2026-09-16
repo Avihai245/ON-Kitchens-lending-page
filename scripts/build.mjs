@@ -2307,6 +2307,43 @@ function readerFacing(html) {
     .replace(/<title>[\s\S]*?<\/title>/g, '');
 }
 
+/**
+ * The chat's copy, checked at its source, because the sweep below structurally cannot
+ * see it.
+ *
+ * removeCopyDashes() proves no em dash survives in reader-facing text — but it asks
+ * readerFacing(), which strips <script> blocks first. That is right for every other
+ * page: what is inside a script tag there is machinery, not prose. The chat widget is
+ * the one exception. Its entire transcript is string literals injected as JavaScript,
+ * so it reads as machinery to the guard and as English to the visitor, and three em
+ * dashes sat in the opening question, the last question and the confirmation for months
+ * while every other line of copy on the site was swept clean. The reader saw them; the
+ * assertion could not.
+ *
+ * Checking the source file directly is what closes that. Comments are exempt — they are
+ * for whoever maintains this — and scripts/chat-widget.mjs contains no developer-facing
+ * strings at all (no throw, no console), so everything left after the comments come out
+ * is text somebody reads on the page.
+ */
+async function assertChatCopy() {
+  const src = await readFile(join(ROOT, 'scripts', 'chat-widget.mjs'), 'utf8');
+  const prose = src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/\s\/\/.*$/gm, '');
+  // Both spellings: the file writes its typographic marks as \u escapes, which is
+  // exactly why a search for the literal character missed two of the original three.
+  const found = prose.match(/[^\n]{0,60}(?:\\u2014|—|&mdash;)[^\n]{0,60}/g);
+  if (found) {
+    throw new Error(
+      `[build] scripts/chat-widget.mjs: ${found.length} em dash(es) in chat copy. The ` +
+        `chat is injected as JavaScript, so the dist/ sweep cannot see it — rewrite here, ` +
+        `the way COPY_DASHES rewrites the rest (a colon, a comma, or a full stop). Found:` +
+        found.map((f) => `\n[build]   …${f.trim()}…`).join('')
+    );
+  }
+}
+
 /** Applies COPY_DASHES across dist/, then proves none is left.
  *
  *  A final sweep rather than fixes at the point each sentence is written, for one
@@ -2636,6 +2673,7 @@ async function main() {
   await buildThankYou();
 
   // Last, over the finished output: the copy pass, then GTM on every page in dist/.
+  await assertChatCopy();
   await removeCopyDashes();
   await tagEveryPage();
 
