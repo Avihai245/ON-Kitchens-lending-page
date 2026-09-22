@@ -343,6 +343,7 @@ html[data-lp2-modal] body { overflow: hidden; }
 .lp2-modal-panel {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: min(520px, calc(100vw - 32px));
+  max-height: min(88vh, 760px);
   max-height: min(88dvh, 760px); overflow-y: auto; overscroll-behavior: contain;
   background: var(--color-bg); color: var(--color-text);
   /* The hairline is drawn here rather than by adding .blueprint: that class also sets
@@ -404,13 +405,13 @@ html[data-lp2-modal] body { overflow: hidden; }
    to edge, the page gone behind it — so the only way back was a 44px X in the
    corner and nothing on screen said the site was still there. Capped at 86dvh it
    leaves a band of the dimmed page above it, which is both the signal that the
-   page is still there and the tap target that closes the form: the backdrop
-   handler already closes on any click outside the panel, there was simply no
-   backdrop left to click. */
+   page is still there and the tap target that closes the form: a tap that starts
+   and ends on that band closes it, once no field has focus. The vh line is for
+   browsers without dvh, which would otherwise drop the cap altogether. */
 @media (max-width: 760px) {
   .lp2-modal-panel {
     left: 0; right: 0; top: auto; bottom: 0; transform: none;
-    width: auto; max-height: 86dvh; padding: 20px 20px 28px;
+    width: auto; max-height: 86vh; max-height: 86dvh; padding: 20px 20px 28px;
   }
 }
 @media (prefers-reduced-motion: reduce) { .lp2-modal-panel { scroll-behavior: auto; } }
@@ -537,8 +538,8 @@ section[aria-label="Our partners"] > div {
 
 /** The modal's behaviour. Delegated on `document` throughout, because the DC runtime
  *  re-renders the whole tree on every scroll threshold and per-element listeners would
- *  be attached to nodes React can replace. Same reasoning — and the same capture-phase
- *  care — as the mobile menu's outside-click handler. */
+ *  be attached to nodes React can replace. Same reasoning as the mobile menu's
+ *  outside-click handler. */
 const LP2_MODAL_JS = String.raw`
 <script>
 (function () {
@@ -565,6 +566,27 @@ const LP2_MODAL_JS = String.raw`
     opener = null;
   }
 
+  // Where the current press started. A click's target is where the press ENDED, so a
+  // drag that began in a field (selecting its text, scrolling the sheet) and was
+  // released over the backdrop used to count as a click on the backdrop and close the
+  // modal on someone halfway through it. Only a press that starts AND ends on the
+  // backdrop closes it now. Recorded in the capture phase from both pointer and touch
+  // events, and read from the event each time rather than from a stored node, because
+  // the modal's markup lives inside the React tree.
+  var pressedBackdrop = false, pressedWhileTyping = false;
+  function isBackdrop(el) { return !!(el && el.classList && el.classList.contains('lp2-modal-back')); }
+  function notePress(ev) {
+    pressedBackdrop = isBackdrop(ev.target);
+    // Read now, not at click time. In most browsers pressing anything that cannot take
+    // focus moves focus off the field during the press itself, so by the time the click
+    // arrives the field no longer looks focused, and a check made then would close the
+    // modal every time.
+    var f = document.activeElement;
+    pressedWhileTyping = !!(f && /^(INPUT|TEXTAREA|SELECT)$/.test(f.tagName) && f.closest && f.closest('[data-lp2-panel]'));
+  }
+  document.addEventListener('pointerdown', notePress, true);
+  document.addEventListener('touchstart', notePress, { capture: true, passive: true });
+
   // Every CTA on the page is an <a href="#tour">, the sticky bar's included, so one
   // delegated handler covers all of them and anything added later. preventDefault only
   // fires once the modal is actually going to open, so with JS off every CTA is still
@@ -572,10 +594,28 @@ const LP2_MODAL_JS = String.raw`
   document.addEventListener('click', function (ev) {
     var t = ev.target;
     if (!t || !t.closest) return;
-    if (t.closest('[data-lp2-close]')) { ev.preventDefault(); closeModal(); return; }
+    // The X button. The backdrop carries the same data-lp2-close attribute, so it is
+    // left out here and handled on its own below.
+    var x = t.closest('[data-lp2-close]');
+    if (x && !isBackdrop(x)) { ev.preventDefault(); closeModal(); return; }
     var cta = t.closest('a[href="#tour"]');
     if (cta) { ev.preventDefault(); openModal(cta); return; }
-    if (root.hasAttribute('data-lp2-modal') && !t.closest('[data-lp2-panel]')) closeModal();
+    if (!root.hasAttribute('data-lp2-modal')) return;
+    // The backdrop is the only thing outside the panel that closes it. There used to be
+    // a fallback for any click whose target was outside the panel, and that is what a
+    // mis-resolved tap on a phone fell into.
+    if (!isBackdrop(t) || !pressedBackdrop) return;
+    ev.preventDefault();
+    // A press that began while a field was focused puts the keyboard away and leaves the
+    // modal open. On a phone the keyboard itself moves the sheet, so the tap after it
+    // opens is the one most likely to land on the backdrop by accident. iOS can keep
+    // the field focused through a tap on something unfocusable, hence the explicit blur.
+    if (pressedWhileTyping) {
+      var f = document.activeElement;
+      if (f && f !== document.body && f.blur) f.blur();
+      return;
+    }
+    closeModal();
   });
 
   document.addEventListener('keydown', function (ev) {
