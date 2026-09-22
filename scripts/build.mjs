@@ -757,6 +757,15 @@ const READABILITY_CSS = `
   [data-siteheader] a.btn-primary { display: none !important; }
 }
 
+/* An in-page link used to stop a section's top edge behind the sticky header, which
+   is 69px tall (a 68px row plus its 1px border) at every width, and a link to #top
+   left the page 69px down instead of at the top. scroll-margin-top is honoured by
+   the browser's own fragment navigation, so every link to these targets now stops
+   just below the header. Listed by id rather than as a blanket [id] rule, so that
+   input elements, which carry ids too, keep their own focus scrolling as it was. */
+#top, #kitchens, #included, #reviews, #locations, #faq, #film,
+#tour, #tour-form, #tour-mid { scroll-margin-top: 69px; }
+
 /* The closing form's fields are near-black; its placeholders need the band's ink,
    not the page's. Higher specificity than the bare ::placeholder rule above, so
    order does not matter. */
