@@ -97,7 +97,7 @@ function hintAfter(html, open, close, label, cls = '') {
   if (j === -1) throw new Error(`[lp2] ${label}: no ${close} after the anchor.`);
   const at = j + close.length;
   return html.slice(0, at) +
-    `\n      <p class="lp2-hint${cls ? ' ' + cls : ''}">Swipe for more &rarr;</p>` +
+    `\n      <p class="lp2-hint${cls ? ' ' + cls : ''}" aria-hidden="true">Swipe for more &rarr;</p>` +
     html.slice(at);
 }
 
@@ -526,11 +526,17 @@ section[aria-label="Our partners"] > div {
   .lp2-track [data-step][data-hide]::after,
   .lp2-track [data-step][data-hide] > span[aria-hidden="true"] { transform: none !important; }
 }
+/* The hint is an instruction, not a control, and it used to be dressed as one: the
+   accent colour every link on the page uses, in the tabs' uppercase type, with an
+   arrow. Visitors tapped it, nothing happened, and session recordings showed the
+   dead taps. It now takes the page's own secondary-text colour, the 70% mix used for
+   27 other pieces of supporting copy, and is hidden from screen readers, which reach
+   every card and tab directly and gain nothing from being told to swipe. */
 .lp2-hint {
   display: none;
   font-family: var(--font-heading); font-weight: 600; font-size: 13px;
   letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--color-accent-700); margin: 10px 0 0;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent); margin: 10px 0 0;
 }
 @media (prefers-reduced-motion: reduce) { .lp2-track { scroll-behavior: auto; } }
 </style>
@@ -982,7 +988,7 @@ export function transform(html, { replaceExactly }) {
   {
     const i = out.indexOf('<div class="lp2-track" style="display: grid');
     const j = out.indexOf('</section>', i);
-    out = out.slice(0, j) + '  <p class="lp2-hint">Swipe for more &rarr;</p>\n  ' + out.slice(j);
+    out = out.slice(0, j) + '  <p class="lp2-hint" aria-hidden="true">Swipe for more &rarr;</p>\n  ' + out.slice(j);
   }
 
   // ---- 10. the copy stops repeating itself -----------------------------------
