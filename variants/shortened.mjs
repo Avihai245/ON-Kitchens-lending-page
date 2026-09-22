@@ -764,7 +764,7 @@ export function transform(html, { replaceExactly }) {
       ['Support', 'Onboarding &middot; Permitting'],
     ];
     const block =
-      '<div class="lp2-also">\n' +
+      '<div class="lp2-also" id="included">\n' +
       '      <h3>Also included</h3>\n' +
       '      <dl>\n' +
       ALSO.map(([k, v]) => `        <div><dt>${k}</dt><dd>${v}</dd></div>\n`).join('') +
@@ -782,12 +782,12 @@ export function transform(html, { replaceExactly }) {
       1,
       'also-included block'
     );
-    // The nav still points "What's Included" at the section this step just removed —
-    // a real, currently-shipping dead link, found while chasing an unrelated bug in
-    // this same file. Both the desktop and mobile-panel copies of the link need it;
-    // /lp keeps id="included" as a real section, so this is a here-only fix, not a
-    // shared one — changing the nav itself would break the link there instead.
-    out = replaceExactly(out, 'href="#included"', 'href="#kitchens"', 2, 'nav target folded into kitchens');
+    // The nav's "What's Included" keeps its own href="#included". The section it named
+    // is gone from this page, and this list is what replaced it, so the list carries the
+    // id. The link used to be rewritten to #kitchens instead, which made it land exactly
+    // where "Kitchens" does: a visitor who clicked Kitchens and then What's Included saw
+    // nothing move, which session recordings show as a dead click. /lp is unaffected
+    // either way, since there #included is still a real section.
   }
 
   // ---- 4. the duplicate mid-page form becomes a CTA strip --------------------
