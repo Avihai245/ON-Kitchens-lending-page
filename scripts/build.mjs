@@ -1134,7 +1134,14 @@ function addMobileNav(html, label) {
     out,
     '  toggleReviews = () => this.setState(s => ({ moreReviews: !s.moreReviews }));',
     '  toggleReviews = () => this.setState(s => ({ moreReviews: !s.moreReviews }));\n' +
-      '  toggleNav = () => this.setState(s => ({ navOpen: !s.navOpen }));',
+      '  toggleNav = () => this.setState(s => ({ navOpen: !s.navOpen }));\n' +
+      // A link in the menu closes it one task later rather than at once. Closing at
+      // once removed the tapped <a> from the page (React flushes the update in a
+      // microtask, before the click's default action runs), so the browser was asked
+      // to follow a link that was no longer in the document. Chromium follows it
+      // anyway; nothing guarantees every engine will. Deferred, the jump starts while
+      // the link is still there and the menu closes a moment after.
+      '  closeNavDeferred = () => setTimeout(() => this.setState({ navOpen: false }), 0);',
     1,
     'nav handler'
   );
@@ -1144,7 +1151,8 @@ function addMobileNav(html, label) {
     '      toggleReviews: this.toggleReviews,\n' +
       '      navOpen: s.navOpen,\n' +
       '      navClosed: !s.navOpen,\n' +
-      '      toggleNav: this.toggleNav,',
+      '      toggleNav: this.toggleNav,\n' +
+      '      closeNavDeferred: this.closeNavDeferred,',
     1,
     'nav render values'
   );
@@ -1227,7 +1235,7 @@ function addMobileNav(html, label) {
     '<sc-if value="{{ navOpen }}">\n' +
     '      <nav id="site-nav" data-navpanel aria-label="Sections">\n' +
     NAV_LINKS.map(([href, text]) =>
-      `        <a href="${href}" onClick="{{ toggleNav }}">${text}</a>\n`).join('') +
+      `        <a href="${href}" onClick="{{ closeNavDeferred }}">${text}</a>\n`).join('') +
     '      </nav>\n' +
     '    </sc-if>\n';
   // After the CTA, not before it: the header reads wordmark, then Schedule a Tour,
