@@ -757,6 +757,15 @@ const READABILITY_CSS = `
   [data-siteheader] a.btn-primary { display: none !important; }
 }
 
+/* An in-page link used to stop a section's top edge behind the sticky header, which
+   is 69px tall (a 68px row plus its 1px border) at every width, and a link to #top
+   left the page 69px down instead of at the top. scroll-margin-top is honoured by
+   the browser's own fragment navigation, so every link to these targets now stops
+   just below the header. Listed by id rather than as a blanket [id] rule, so that
+   input elements, which carry ids too, keep their own focus scrolling as it was. */
+#top, #kitchens, #included, #reviews, #locations, #faq, #film,
+#tour, #tour-form, #tour-mid { scroll-margin-top: 69px; }
+
 /* The closing form's fields are near-black; its placeholders need the band's ink,
    not the page's. Higher specificity than the bare ::placeholder rule above, so
    order does not matter. */
@@ -1125,7 +1134,14 @@ function addMobileNav(html, label) {
     out,
     '  toggleReviews = () => this.setState(s => ({ moreReviews: !s.moreReviews }));',
     '  toggleReviews = () => this.setState(s => ({ moreReviews: !s.moreReviews }));\n' +
-      '  toggleNav = () => this.setState(s => ({ navOpen: !s.navOpen }));',
+      '  toggleNav = () => this.setState(s => ({ navOpen: !s.navOpen }));\n' +
+      // A link in the menu closes it one task later rather than at once. Closing at
+      // once removed the tapped <a> from the page (React flushes the update in a
+      // microtask, before the click's default action runs), so the browser was asked
+      // to follow a link that was no longer in the document. Chromium follows it
+      // anyway; nothing guarantees every engine will. Deferred, the jump starts while
+      // the link is still there and the menu closes a moment after.
+      '  closeNavDeferred = () => setTimeout(() => this.setState({ navOpen: false }), 0);',
     1,
     'nav handler'
   );
@@ -1135,7 +1151,8 @@ function addMobileNav(html, label) {
     '      toggleReviews: this.toggleReviews,\n' +
       '      navOpen: s.navOpen,\n' +
       '      navClosed: !s.navOpen,\n' +
-      '      toggleNav: this.toggleNav,',
+      '      toggleNav: this.toggleNav,\n' +
+      '      closeNavDeferred: this.closeNavDeferred,',
     1,
     'nav render values'
   );
@@ -1218,7 +1235,7 @@ function addMobileNav(html, label) {
     '<sc-if value="{{ navOpen }}">\n' +
     '      <nav id="site-nav" data-navpanel aria-label="Sections">\n' +
     NAV_LINKS.map(([href, text]) =>
-      `        <a href="${href}" onClick="{{ toggleNav }}">${text}</a>\n`).join('') +
+      `        <a href="${href}" onClick="{{ closeNavDeferred }}">${text}</a>\n`).join('') +
     '      </nav>\n' +
     '    </sc-if>\n';
   // After the CTA, not before it: the header reads wordmark, then Schedule a Tour,
