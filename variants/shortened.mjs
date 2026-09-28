@@ -688,8 +688,18 @@ const LP2_V2_CSS = `
      and stay visible everywhere, unlike the call/chat FABs the atform flag
      already stands down. Insetting the form's own fields — not the card, which
      keeps its full-width background — clears the launcher's column without
-     moving the control itself. */
-  .lp2-hero-form-card form { padding-left: 58px; }
+     moving the control itself. The same launcher lands on the full paragraph,
+     rating and badge row too once they're reordered below the form (confirmed:
+     these sit at the same unpadded left edge the phone line had before its own
+     fix moved it out of the launcher's reach) — same inset, same reasoning. */
+  .lp2-hero-form-card form,
+  .lp2-hero-sub-full,
+  .lp2-rating { padding-left: 58px; }
+  /* The badges row carries its own inline padding-left:0 (part of the export's
+     padding: 16px 0 0 shorthand, load-bearing for the divider's top spacing) —
+     inline styles win over a class rule at any specificity, so only this one
+     needs !important to actually apply. */
+  .lp2-hero-badges { padding-left: 58px !important; }
 }
 @media (min-width: 761px) {
   .lp2-hero-h1-mobile, .lp2-hero-sub-short { display: none; }
