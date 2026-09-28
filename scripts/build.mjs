@@ -109,6 +109,13 @@ const PAGES = [
     outFile: 'ghost-kitchen.html',
     slug: 'ghost-kitchen',
     variant: 'shortened',
+    // Phase 1 of the conversion update (popup fix, Hero lead form, phone rollout,
+    // email-optional, CTA copy, honeypot removal, funnel events, performance) is
+    // gated on this page only. Every other PAGES entry leaves v2 undefined, which
+    // is falsy, so buildLandingPage()/shortened.mjs's `if (v2)` branches never run
+    // for them — their output stays byte-for-byte what it is today. Flip this on
+    // the other shortened-variant entries below only once Phase 1 is approved.
+    v2: true,
     title: 'Ghost Kitchen & Virtual Restaurant Space For Rent In LA | ŌN Kitchens',
     // The en dash in 200–600 is the same character the page's own "Private kitchen
     // space, 200–600 sq ft." headline uses. It is a range, which is what an en dash is
@@ -116,9 +123,12 @@ const PAGES = [
     description:
       'Run delivery brands from a certified kitchen. Private 200–600 sq ft space, ' +
       '24/7 access, no build-out. USC / Central Los Angeles.',
+    // Rewritten descriptive-style for the v2 Hero (conversion update, section 2):
+    // what we rent and where, not a slogan. Keeps this page's ghost-kitchen /
+    // delivery topic. Unaffected by v2 — hero has always been per-page.
     hero: {
       eyebrow: 'Commercial kitchen rental · USC / Central Los Angeles',
-      lines: ['A delivery-ready kitchen.', 'Run your brands.', 'No dining room.'],
+      lines: ['Ghost Kitchen Space for Rent', 'in Central Los Angeles.', 'Built for Delivery Brands.'],
     },
   },
   {
@@ -1975,8 +1985,11 @@ function heroOverride(html, hero, label) {
  * @param description  meta description; defaults to the shared PAGE_DESCRIPTION
  * @param slug         the name this page sends with every lead; see leadSenderScript()
  * @param hero         optional per-page hero copy; see heroOverride()
- * @param variant      optional { transform(html, { replaceExactly }) }, applied LAST —
+ * @param variant      optional { transform(html, { replaceExactly, v2 }) }, applied LAST —
  *                     see variants/shortened.mjs for why it runs after everything else.
+ * @param v2           opt-in flag for the conversion-update rollout, passed straight
+ *                     through to the variant transform. Defaults false, so a page whose
+ *                     PAGES entry doesn't set it builds exactly as it does today.
  */
 async function buildLandingPage({
   outFile,
@@ -1987,6 +2000,7 @@ async function buildLandingPage({
   slug = '',
   hero = null,
   variant = null,
+  v2 = false,
 }) {
   if (!slug) {
     throw new Error(
@@ -2111,7 +2125,7 @@ async function buildLandingPage({
   let overridden = false;
   if (variant) {
     const before = out;
-    out = variant.transform(out, { replaceExactly });
+    out = variant.transform(out, { replaceExactly, v2 });
     if (typeof out !== 'string') {
       throw new Error(`[build] ${label}: the variant transform did not return HTML.`);
     }

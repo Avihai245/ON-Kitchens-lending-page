@@ -542,10 +542,232 @@ section[aria-label="Our partners"] > div {
 </style>
 `;
 
-/** The modal's behaviour. Delegated on `document` throughout, because the DC runtime
- *  re-renders the whole tree on every scroll threshold and per-element listeners would
- *  be attached to nodes React can replace. Same reasoning as the mobile menu's
- *  outside-click handler. */
+/** v2 only — everything this rollout adds, appended after LP2_CSS rather than mixed
+ *  into it so LP2_CSS itself never has to change for a page that hasn't opted in.
+ *  Grows through the rest of this file as each v2 feature below needs a rule; kept
+ *  as one constant so it is one injection point instead of several. */
+const LP2_V2_CSS = `
+<style>
+/* ---- the popup's fallback highlight ----
+   Briefly marks the form the popup's guaranteed-open check scrolled to, so a visitor
+   whose popup failed to render sees why the page just moved under them. */
+.lp2-highlight {
+  outline: 3px solid var(--color-accent-400);
+  outline-offset: 4px;
+  transition: outline-color 0.3s ease;
+}
+
+/* ---- the phone line under the mid-page and popup forms ---- */
+.lp2-mid-phone, .lp2-modal-phone {
+  margin: 4px 0 0; font-size: 14px; line-height: 22px; text-align: center;
+}
+.lp2-mid-phone { color: color-mix(in srgb, #FAF8F5 76%, transparent); }
+.lp2-mid-phone a, .lp2-modal-phone a { color: inherit; font-weight: 600; }
+.lp2-modal-phone { color: color-mix(in srgb, var(--color-text) 70%, transparent); }
+.lp2-modal-phone a { color: var(--color-accent-700); }
+
+/* ---- the hero's own inline form ----
+   Two columns from 761px up: copy on the left, the form card on the right, both
+   fitting above the fold at 1366x768 without the hero forcing extra height to do
+   it. Below 760px the two stack and the form sits inside the hero itself, not
+   after it — see the min-height/padding overrides at the bottom of this block for
+   how the hero gives up the room a headline-and-button version of it used to
+   reserve for its own sake. */
+.lp2-hero-copy { min-width: 0; }
+.lp2-hero-phone-line {
+  margin: 14px 0 0; font-size: 15px; line-height: 1.3;
+  font-family: var(--font-heading); font-weight: 600; letter-spacing: 0.02em;
+}
+.lp2-hero-phone-line a {
+  color: #FAF8F5; text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, #FAF8F5 50%, transparent);
+}
+.lp2-hero-facts {
+  list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px;
+  font-size: 13px; letter-spacing: 0.04em; color: color-mix(in srgb, #FAF8F5 76%, transparent);
+}
+.lp2-hero-facts li[aria-hidden] { color: var(--color-accent-400); }
+
+.lp2-hero-form-card {
+  background: var(--color-bg); color: var(--color-text);
+  border: 1px solid var(--color-divider); box-shadow: var(--shadow-lg);
+  padding: clamp(20px, 2.6vw, 28px); margin-top: clamp(22px, 4vw, 32px);
+}
+.lp2-hero-form-card h2 {
+  font-family: var(--font-heading); font-weight: 600;
+  font-size: clamp(19px, 2vw, 23px); line-height: 1.15; letter-spacing: 0.01em;
+  text-transform: uppercase; margin: 0 0 14px;
+}
+.lp2-hero-form-card form { display: grid; gap: 12px; }
+.lp2-hero-form-card label {
+  display: block; font-family: var(--font-heading); font-weight: 600;
+  font-size: 13px; line-height: 1.35; letter-spacing: 0.1em; text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.lp2-hero-form-card label i {
+  font-style: normal; font-weight: 400; letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.lp2-hero-form-card .input { min-height: 48px; font-size: 16px; width: 100%; box-sizing: border-box; }
+.lp2-hero-form-card button[type="submit"] {
+  margin-top: 4px; width: 100%; min-height: 52px;
+  text-transform: uppercase; letter-spacing: 0.06em; font-size: 16px;
+}
+.lp2-hero-form-phone {
+  margin: 10px 0 0; font-size: 14px; line-height: 20px; text-align: center;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.lp2-hero-form-phone a { color: var(--color-accent-700); font-weight: 600; }
+
+@media (min-width: 761px) {
+  .lp2-hero-wrap {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    gap: clamp(28px, 5vw, 64px); align-items: start;
+  }
+  .lp2-hero-form-card { margin-top: clamp(6px, 1vw, 10px); }
+}
+
+/* The export sized min-height and top padding for a headline-and-button hero that
+   only had to clear the sticky header. A hero that also holds a form has to end
+   where the form begins instead — min-height: 0 lets it size to its own content,
+   and the padding drops to what the sticky header actually needs, not what looked
+   right around three lines of display type on its own. */
+@media (max-width: 760px) {
+  [style*="min-height: clamp(600px, 82vh, 880px)"] { min-height: 0 !important; }
+  [style*="padding: clamp(88px, 11vh, 150px) var(--edge) clamp(44px, 6vw, 76px)"] {
+    padding-top: clamp(76px, 14vw, 96px) !important;
+    padding-bottom: 22px !important;
+  }
+  .lp2-hero-form-card { padding: 18px; margin-top: 20px; }
+}
+
+/* ---- the new floating call button, directly above the chat launcher ---- */
+.lp2-call-fab {
+  position: fixed; right: 16px; bottom: 166px; z-index: 95;
+  width: 54px; height: 54px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--color-accent-600); color: var(--color-bg);
+  border: 1px solid var(--color-accent-600);
+  box-shadow: var(--shadow-lg);
+}
+.lp2-call-fab:hover { background: var(--color-accent-700); border-color: var(--color-accent-700); }
+.lp2-call-fab:active { background: var(--color-accent-800); border-color: var(--color-accent-800); }
+.lp2-call-fab svg { display: block; }
+/* Stands down at a lead form on mobile, the same as the chat launcher next to it
+   — [data-lp2-atform]'s own rule already covers .on-chat-fab unconditionally
+   (every shortened-variant page), and now measures the hero and bottom forms too
+   on this page (see the atform measurer in LP2_MODAL_JS_V2). */
+@media (max-width: 760px) {
+  html[data-lp2-atform] .lp2-call-fab { opacity: 0; pointer-events: none; }
+}
+
+/* ---- safe-area clearance, every floating element ----
+   None of bottom:96px (the chat launcher, the accessibility launcher) or the new
+   call button's bottom:166px accounted for the iOS home-indicator band; env()
+   with a plain-px fallback already baked into the calc so a browser that doesn't
+   support env() still gets the value it has today. !important is required here
+   only because two of these three elements set their own bottom offset inline,
+   and an author stylesheet needs it to outrank an inline style at all. */
+.on-chat-fab,
+[style*="left: 16px; bottom: 96px; z-index: 90;"] {
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+}
+.lp2-call-fab { bottom: calc(166px + env(safe-area-inset-bottom, 0px)) !important; }
+[data-band="dark"][style*="position: fixed; left: 0px; right: 0px; bottom: 0px"] {
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+
+/* ---- every floating element stands down while the popup is open ----
+   A visible floating button over a modal backdrop is a second, disconnected
+   click target sitting on top of the one thing on screen that should get the
+   tap — and on a phone the call button in particular sits close enough to the
+   panel's own close button to invite a mis-tap. */
+html[data-lp2-modal] .lp2-call-fab,
+html[data-lp2-modal] .on-chat-fab,
+html[data-lp2-modal] [style*="left: 16px; bottom: 96px; z-index: 90;"] {
+  display: none !important;
+}
+
+/* ---- the equipment spec list, replacing the five tabs ---- */
+.lp2-spec-list {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: clamp(24px, 3vw, 36px);
+}
+.lp2-spec-group h3 {
+  font-family: var(--font-heading); font-weight: 600; font-size: 15px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-accent-700);
+  margin: 0 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--color-divider);
+}
+.lp2-spec-group ul { list-style: none; margin: 0; padding: 0; }
+.lp2-spec-group li {
+  font-size: 15px; line-height: 22px; padding: 5px 0;
+  color: color-mix(in srgb, var(--color-text) 84%, transparent);
+}
+
+/* ---- the locations card is a click target everywhere but its own buttons ---- */
+.lp2-loc-card { cursor: pointer; }
+.lp2-loc-card a { cursor: pointer; }
+</style>
+`;
+
+/** v2 only. Internal-traffic detection and the one funnel-event helper every other v2
+ *  script on the page calls — injected into <head>, ahead of every v2 script this file
+ *  adds to <body> (the chat widget's script included, since addChatWidget() runs before
+ *  this file and lands its script earlier in document order than anything below), so
+ *  window.__lp2Track is always defined before anything tries to call it.
+ *
+ *  Placed in <head> rather than chasing a spot ahead of Google Tag Manager: GTM is
+ *  added by a later, separate sweep (tagEveryPage(), scripts/build.mjs) anchored right
+ *  after the viewport meta — textually before anything buildLandingPage() or this file
+ *  can ever add to <head>. That is not a gap: GTM's bootstrap snippet only queues
+ *  gtm.js to load asynchronously and never reads dataLayer synchronously, so pushing
+ *  traffic_type here, guarded by the same `dataLayer = dataLayer || []` idiom GTM's
+ *  own snippet uses, reaches the same array object well before the container script
+ *  itself executes over the network — which is what "before GTM loads" actually needs. */
+const LP2_V2_HEAD_JS = `
+<script>
+(function () {
+  // ?internal=1 sticks across the visit; ?internal=0 clears it. An Amplify preview
+  // URL is internal by construction — nobody outside the team has that link.
+  try {
+    var q = new URLSearchParams(location.search);
+    if (q.get('internal') === '1') localStorage.setItem('on-internal', '1');
+    else if (q.get('internal') === '0') localStorage.removeItem('on-internal');
+  } catch (err) { /* private mode */ }
+  var internal = false;
+  try {
+    internal = localStorage.getItem('on-internal') === '1' || /\\.amplifyapp\\.com$/.test(location.hostname);
+  } catch (err) {
+    internal = /\\.amplifyapp\\.com$/.test(location.hostname);
+  }
+  if (internal) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ traffic_type: 'internal' });
+    try { window.clarity && window.clarity('set', 'internal', '1'); } catch (err) { /* Clarity is not installed on this site yet */ }
+  }
+
+  // No personal data ever passes through here — every caller below sticks to the
+  // parameter shapes the brief specifies. Clarity is not installed on this site as of
+  // this change (confirmed: no snippet anywhere in the repo), so every clarity(...)
+  // call is guarded the same way the dataLayer push above already is, and degrades to
+  // a silent no-op rather than a thrown error until it is.
+  window.__lp2Track = function (name, params) {
+    try {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push(Object.assign({ event: name }, params || {}));
+    } catch (err) { /* never let a tag break the page */ }
+    try { window.clarity && window.clarity('event', name); } catch (err) { /* Clarity is not installed on this site yet */ }
+  };
+})();
+</script>
+`;
+
+/** The modal's behaviour on every page that does NOT opt into v2 — byte for byte
+ *  what ships today. Delegated on `document` throughout, because the DC runtime
+ *  re-renders the whole tree on every scroll threshold and per-element listeners
+ *  would be attached to nodes React can replace. Same reasoning as the mobile
+ *  menu's outside-click handler. */
 const LP2_MODAL_JS = String.raw`
 <script>
 (function () {
@@ -739,6 +961,289 @@ const LP2_MODAL_JS = String.raw`
 </script>
 `;
 
+/** v2's replacement for the block above — a separate, self-contained script rather
+ *  than a patched copy of it, because so much differs (open/close now track timing
+ *  and reason, the click handler drops the whole backdrop-close mechanism, the
+ *  submit handler gains a third form and loses the honeypot) that interleaving the
+ *  two as one conditional template risked a stray character quietly breaking the
+ *  "byte for byte on every other page" guarantee LP2_MODAL_JS above exists to keep.
+ *
+ *  Covers: the popup fix (no backdrop-close, no autofocus on touch, a
+ *  guaranteed-open fallback that scrolls to a working form instead), a third form
+ *  (hero-) in the shared submit handler, email made optional, the honeypot dropped,
+ *  and the funnel events that live alongside the popup's own open/close state
+ *  (modal_open/modal_open_failed/modal_close, cta_click, phone_click,
+ *  lead_form_view/start/submit_attempt/error) — see LP2_V2_HEAD_JS for the
+ *  window.__lp2Track helper every track() call below goes through. */
+const LP2_MODAL_JS_V2 = String.raw`
+<script>
+(function () {
+  var root = document.documentElement;
+  var opener = null;
+  var openedAt = 0;
+  function track(name, params) { if (window.__lp2Track) window.__lp2Track(name, params); }
+
+  function openModal(from) {
+    opener = from || null;
+    openedAt = Date.now();
+    root.setAttribute('data-lp2-modal', '');
+    // Set here, not just in the markup. type="email" with a malformed address makes
+    // the browser refuse to fire submit at all, so the handler below never runs and
+    // the reader gets a native bubble instead of the message the rest of the page
+    // uses. The markup carries noValidate too, but the DC runtime rewrites attributes
+    // through React and this is the one that cannot be allowed to go missing.
+    var form = document.getElementById('lp2-form');
+    if (form) form.noValidate = true;
+    // No autofocus on touch: opening the keyboard unasked shifts the sheet under a
+    // thumb that has not tapped a field yet. A pointer/hover check, not the runtime's
+    // own width-based isPhone flag — this is about input type, not viewport size.
+    var coarse = false;
+    try { coarse = window.matchMedia('(hover: none), (pointer: coarse)').matches; } catch (err) { /* assume desktop */ }
+    var first = document.getElementById('lp2-name');
+    if (first && !coarse) setTimeout(function () { first.focus(); }, 0);
+    // Guaranteed open: a CTA click always tries to open the modal, but the attribute
+    // write above is never trusted on its own — verify shortly after that the panel
+    // is actually on screen, and if it is not, send the visitor to a form that works
+    // instead of leaving them on a page where nothing looks like it happened.
+    var loc = (from && from.getAttribute && from.getAttribute('data-cta-loc')) || 'content';
+    setTimeout(function () {
+      var panel = document.querySelector('[data-lp2-panel]');
+      var r = panel ? panel.getBoundingClientRect() : null;
+      var visible = !!(r && r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < (window.innerHeight || 0));
+      if (root.hasAttribute('data-lp2-modal') && visible) { track('modal_open', { cta_location: loc }); return; }
+      track('modal_open_failed', {});
+      var fallback = document.getElementById('hero-form') || document.getElementById('tour-form') || document.getElementById('tour');
+      if (fallback && fallback.scrollIntoView) {
+        fallback.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        fallback.classList.add('lp2-highlight');
+        setTimeout(function () { fallback.classList.remove('lp2-highlight'); }, 2400);
+      }
+    }, 300);
+  }
+  function hadInput() {
+    var ids = ['lp2-name', 'lp2-phone', 'lp2-email', 'lp2-business'];
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (el && el.value && el.value.trim()) return true;
+    }
+    return false;
+  }
+  function closeModal(reason) {
+    if (!root.hasAttribute('data-lp2-modal')) return;
+    track('modal_close', { close_reason: reason || 'x', had_input: hadInput(), ms_open: openedAt ? (Date.now() - openedAt) : 0 });
+    root.removeAttribute('data-lp2-modal');
+    if (opener && opener.focus) opener.focus();
+    opener = null;
+  }
+
+  function isBackdrop(el) { return !!(el && el.classList && el.classList.contains('lp2-modal-back')); }
+
+  // Closing: the X button and Escape only. A tap on the backdrop, or anywhere else
+  // in or out of the panel, does nothing — 12 of 14 recorded visitors who opened
+  // this popup left it within 0-4 seconds without typing, on both mobile and
+  // desktop, and in one recording a tap near the Phone field closed the popup a
+  // second after it opened. The backdrop used to close on a press that started and
+  // ended there; even that read a phone's own on-screen keyboard moving the sheet
+  // as a deliberate tap often enough that it is gone too now.
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var x = t.closest('[data-lp2-close]');
+    if (x && !isBackdrop(x)) { ev.preventDefault(); closeModal('x'); return; }
+    var cta = t.closest('a[href="#tour"]');
+    if (cta) {
+      ev.preventDefault();
+      track('cta_click', { cta_location: cta.getAttribute('data-cta-loc') || 'content', cta_label: (cta.textContent || '').trim() });
+      openModal(cta);
+    }
+  });
+
+  document.addEventListener('keydown', function (ev) {
+    if (!root.hasAttribute('data-lp2-modal')) return;
+    if (ev.key === 'Escape') { ev.stopPropagation(); closeModal('escape'); return; }
+    if (ev.key !== 'Tab') return;
+    var panel = document.querySelector('[data-lp2-panel]');
+    if (!panel) return;
+    var f = panel.querySelectorAll('button:not([disabled]), input, select, textarea, a[href]');
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+  });
+
+  // Three forms share this handler: the modal (lp2-), the mid-page section
+  // (lp2-mid-) and the hero (hero-). All three are built by the same field() helper
+  // and differ only in their id prefix and the tag they send, so one validator
+  // serves all three — copied from validate() in the page's own runtime, with email
+  // optional to match every other lead path on this page.
+  var FORMS = {
+    'lp2-form': { prefix: 'lp2-', tag: 'modal' },
+    'lp2-mid-form': { prefix: 'lp2-mid-', tag: 'mid-page' },
+    'hero-form': { prefix: 'hero-', tag: 'hero' }
+  };
+
+  // While a lead form's fields or submit button are in the viewport on mobile, the
+  // floating buttons and sticky bar stand down — see the [data-lp2-atform] rule for
+  // why. Extended to the hero form and the closing #tour form alongside the
+  // mid-page one, since this page now carries three inline forms a floating button
+  // could sit on top of.
+  (function () {
+    var ids = ['tour-form', 'hero-form', 'tour'];
+    var ticking = false;
+    function measure() {
+      ticking = false;
+      var on = false;
+      for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (!el) continue;
+        var r = el.getBoundingClientRect();
+        if (r.bottom > 0 && r.top < (window.innerHeight || 0)) { on = true; break; }
+      }
+      if (on) root.setAttribute('data-lp2-atform', '');
+      else root.removeAttribute('data-lp2-atform');
+    }
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(measure);
+    }
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    measure();
+  })();
+
+  // lead_form_view: 50% visible, re-queried by id on scroll rather than an
+  // IntersectionObserver, for the same reason the atform measurer above is one —
+  // this script runs before the DC runtime mounts, so any node it observed inside
+  // <x-dc> would be replaced out from under the observer on the page's first
+  // re-render.
+  (function () {
+    var FORM_VIEW = { 'hero-form': 'hero', 'tour-form': 'mid-page', 'tour': 'end-of-page' };
+    var seen = {};
+    var ticking = false;
+    function measure() {
+      ticking = false;
+      Object.keys(FORM_VIEW).forEach(function (id) {
+        if (seen[id]) return;
+        var el = document.getElementById(id);
+        if (!el) return;
+        var r = el.getBoundingClientRect();
+        var vh = window.innerHeight || 0;
+        var visible = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+        if (r.height > 0 && visible / r.height >= 0.5) {
+          seen[id] = true;
+          track('lead_form_view', { form: FORM_VIEW[id] });
+        }
+      });
+    }
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(measure);
+    }
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    measure();
+  })();
+
+  // lead_form_start: first input into any of the four lead forms, once each per
+  // page view. Matched by id prefix rather than a wrapping <form> id, so the same
+  // check covers the bottom form too — its <form> carries no id, only the <section>
+  // around it does.
+  (function () {
+    var PREFIXES = [['hero-', 'hero'], ['lp2-mid-', 'mid-page'], ['lp2-', 'modal'], ['f-', 'end-of-page']];
+    var started = {};
+    document.addEventListener('input', function (ev) {
+      var id = ev.target && ev.target.id;
+      if (!id) return;
+      for (var i = 0; i < PREFIXES.length; i++) {
+        if (id.indexOf(PREFIXES[i][0]) !== 0) continue;
+        var tag = PREFIXES[i][1];
+        if (!started[tag]) { started[tag] = true; track('lead_form_start', { form: tag }); }
+        return;
+      }
+    }, true);
+  })();
+
+  // phone_click: every tel: link on this page carries data-phone-loc.
+  document.addEventListener('click', function (ev) {
+    var a = ev.target && ev.target.closest && ev.target.closest('a[href^="tel:"]');
+    if (!a) return;
+    track('phone_click', { phone_location: a.getAttribute('data-phone-loc') || 'content' });
+  });
+
+  // The locations card is a <div>, not an <a>, precisely so its own "Check
+  // Availability" and "Get directions" buttons can be ordinary nested anchors —
+  // wrapping the whole card in a real <a> the way "make it all clickable" usually
+  // means would nest an anchor inside an anchor. A click that lands on either
+  // button takes its own href as normal; anywhere else on the card opens Maps.
+  document.addEventListener('click', function (ev) {
+    var card = ev.target && ev.target.closest && ev.target.closest('[data-maps-url]');
+    if (!card || (ev.target.closest && ev.target.closest('a'))) return;
+    var url = card.getAttribute('data-maps-url');
+    if (url) window.open(url, '_blank', 'noopener');
+  });
+
+  function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+
+  document.addEventListener('submit', function (ev) {
+    var form = ev.target;
+    var spec = form && FORMS[form.id];
+    if (!spec) return;
+    ev.preventDefault();
+    track('lead_form_submit_attempt', { form: spec.tag });
+
+    var p = spec.prefix;
+    var IDS = { fullName: p + 'name', phone: p + 'phone', email: p + 'email' };
+
+    var f = {
+      fullName: val(IDS.fullName), phone: val(IDS.phone),
+      email: val(IDS.email), business: val(p + 'business')
+    };
+
+    var e = {};
+    if (!f.fullName.trim() || f.fullName.trim().length < 2) e.fullName = 'Please enter your full name.';
+    var digits = f.phone.replace(/[^0-9]/g, '');
+    if (!f.phone.trim()) e.phone = 'Please enter a phone number.';
+    else if (digits.length < 10) e.phone = 'Please enter a 10-digit phone number.';
+    if (f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';
+
+    Object.keys(IDS).forEach(function (k) {
+      var msg = document.getElementById(IDS[k] + '-err');
+      var input = document.getElementById(IDS[k]);
+      if (msg) msg.textContent = e[k] || '';
+      if (input) input.setAttribute('aria-invalid', e[k] ? 'true' : 'false');
+    });
+    var firstBad = Object.keys(e)[0];
+    if (firstBad) {
+      track('lead_form_error', { form: spec.tag, field: firstBad });
+      var el = document.getElementById(IDS[firstBad]);
+      if (el) el.focus();
+      return;
+    }
+
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+
+    // The same three steps the inline form takes, so the lead lands in the same place:
+    // the thank-you page reads on-lead to greet the visitor, __onSendLead carries the
+    // payload and its UTM capture to the webhook, then the redirect. No honeypot on
+    // this page's forms any more — see __onSendLead's own comment for why flagging
+    // replaced it, which is also why there is nothing left here to read into a trap key.
+    var lead = {
+      name: f.fullName.trim(), phone: f.phone.trim(), email: f.email.trim(),
+      business: (f.business || '').trim(), form: spec.tag
+    };
+    try {
+      sessionStorage.setItem('on-lead', JSON.stringify({ name: lead.name, phone: lead.phone }));
+    } catch (err) { /* private mode — the thank-you page falls back to generic copy */ }
+    try { window.__onSendLead(lead); } catch (err) { /* never block the redirect */ }
+    window.location.assign('/thank-you');
+  });
+})();
+</script>
+`;
+
 /** One field, for either of the two forms this file builds — the tour modal and the
  *  mid-page section. Both go through here so their markup cannot drift apart: the same
  *  label/input/error triple, the same ids relative to their prefix, which is what lets
@@ -746,39 +1251,227 @@ const LP2_MODAL_JS = String.raw`
  *
  *  aria-required rather than required — `required` would hand validation to the browser,
  *  whose bubbles would pre-empt the messages the rest of the page uses. */
-const leadField = (prefix, id, label, type, auto, optional) =>
-  '        <div>\n' +
+// forceErrorUi: for a field that is optional (empty passes) but still format-
+// validated when filled — v2's email — which needs the error paragraph business
+// never does, since business has no format rule to ever report. Only matters
+// when optional is also true; a required field already gets the error UI.
+const leadField = (prefix, id, label, type, auto, optional, forceErrorUi) => {
+  const showError = !optional || forceErrorUi;
+  return '        <div>\n' +
   `          <label for="${prefix}${id}">${label}${optional ? ' <i>(optional)</i>' : ''}</label>\n` +
   `          <input class="input" id="${prefix}${id}" name="${id}" type="${type}" autoComplete="${auto}"` +
   (optional ? '' : ' aria-required="true"') +
-  (optional ? '' : ` aria-describedby="${prefix}${id}-err"`) + ' />\n' +
-  (optional ? '' : `          <p class="lp2-err" id="${prefix}${id}-err" role="alert"></p>\n`) +
+  (showError ? ` aria-describedby="${prefix}${id}-err"` : '') + ' />\n' +
+  (showError ? `          <p class="lp2-err" id="${prefix}${id}-err" role="alert"></p>\n` : '') +
   '        </div>\n';
+};
 
-/** The four fields plus the honeypot, in order. Sharing this is the point: a form that
- *  asked for different things, or protected itself differently, would be a second thing
- *  to keep in sync.
+/** The four fields, in order, plus the honeypot on every page that has not opted
+ *  into v2. Sharing this is the point: a form that asked for different things, or
+ *  protected itself differently, would be a second thing to keep in sync — which is
+ *  also why v2 is a real parameter here rather than a second copy of this function:
+ *  this same call builds the fields for the tour modal AND the mid-page section on
+ *  every shortened-variant page, v2 or not, so the honeypot and the email field's
+ *  optionality can only correctly differ per page by being threaded through, not by
+ *  branching at the call site.
  *
  *  The honeypot is never shown, never focusable and never announced, so a person cannot
  *  fill it and a form-filling bot usually will. Off-screen rather than display:none,
  *  which the cruder bots check for. "Company website" is plausible on purpose — exactly
  *  the kind of field an autofiller reaches for. It is read into the lead's `trap` key and
- *  dropped at __onSendLead, the one seam every path shares. */
-const leadFields = (prefix) =>
+ *  dropped at __onSendLead, the one seam every path shares. v2 drops it entirely: see
+ *  __onSendLead's own comment for why flagging replaced dropping the lead outright. */
+const leadFields = (prefix, v2) =>
   leadField(prefix, 'name', 'Full name', 'text', 'name') +
   leadField(prefix, 'phone', 'Phone', 'tel', 'tel') +
-  leadField(prefix, 'email', 'Email', 'email', 'email') +
+  leadField(prefix, 'email', 'Email', 'email', 'email', v2, v2) +
   leadField(prefix, 'business', 'Business name', 'text', 'organization', true) +
+  (v2 ? '' :
   '        <div class="lp2-hp" aria-hidden="true">\n' +
   `          <label for="${prefix}website">Company website</label>\n` +
   `          <input id="${prefix}website" name="website" type="text" tabindex="-1" autoComplete="off" />\n` +
-  '        </div>\n';
+  '        </div>\n');
 
-export function transform(html, { replaceExactly }) {
+export function transform(html, { replaceExactly, v2 = false }) {
   let out = html;
 
   // The stylesheet for everything this file adds.
   out = replaceExactly(out, '</head>', LP2_CSS + '</head>', 1, 'lp2 stylesheet');
+  if (v2) {
+    out = replaceExactly(out, '</head>', LP2_V2_CSS + LP2_V2_HEAD_JS + '</head>', 1, 'lp2 v2 head additions');
+  }
+
+  // ---- RED LINE: the one allowed change inside __onSendLead ------------------
+  // leadSenderScript() (scripts/build.mjs) already ran by the time this file sees
+  // the page, so its output is just more text here — reached the same way as
+  // everything else in this function, not by touching leadSenderScript() itself.
+  // Every other line of that script — webhook URL, transport, payload keys, PAGE,
+  // the no-interaction gate, the generate_lead push — is untouched.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      `    var suspect = null;
+    if (lead && lead.trap) suspect = 'honeypot';
+    else if (!human) suspect = 'no-interaction';
+    if (suspect) {
+      trace('FLAGGED as ' + suspect + ' — delivered anyway, filter it in the receiver',
+        suspect === 'honeypot'
+          ? 'the hidden "Company website" field had a value — usually browser autofill, not a bot'
+          : 'no pointer, key or touch event was seen on this page before submit');
+    }`,
+      `    var suspect = null;
+    if (!human) suspect = 'no-interaction';
+    if (suspect) {
+      trace('FLAGGED as ' + suspect + ' — delivered anyway, filter it in the receiver',
+        'no pointer, key or touch event was seen on this page before submit');
+    }`,
+      1,
+      'v2 RED LINE: drop the honeypot branch'
+    );
+    // 'hero' joins the four existing form tags so the new Hero form reads the same
+    // as the other three in whatever reads this field downstream.
+    out = replaceExactly(
+      out,
+      `  var FORM_NAMES = {
+    'mid-page': 'Form 1 (top)',
+    'end-of-page': 'Form 2 (bottom)',
+    'modal': 'Button (popup)',
+    'chat': 'Chat'
+  };`,
+      `  var FORM_NAMES = {
+    'hero': 'Form 0 (hero)',
+    'mid-page': 'Form 1 (top)',
+    'end-of-page': 'Form 2 (bottom)',
+    'modal': 'Button (popup)',
+    'chat': 'Chat'
+  };`,
+      1,
+      'v2: hero in FORM_NAMES'
+    );
+  }
+
+  // ---- v2: email optional + funnel tracking on the bottom (#tour) form ------
+  // This is the export's own DCLogic validate()/submit(id, ev) — the no-JS
+  // fallback and the closing form on every shortened-variant page — reached the
+  // same way as everything else here, since buildLandingPage() already ran by the
+  // time this file sees the page. validate() also serves the export's own mid
+  // ('m-') form, which /lp still carries; harmless there too, since /lp never sets
+  // v2 and this whole block is skipped for it.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      `    if (!f.email.trim()) e.email = 'Please enter your email.';
+    else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';`,
+      `    if (f.email.trim() && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';`,
+      1,
+      'v2: email optional in validate()'
+    );
+    out = replaceExactly(
+      out,
+      `  submit(id, ev) {
+    ev.preventDefault();
+    const cur = this.state.forms[id];
+    if (cur.status === 'loading') return;
+    const e = this.validate(cur.f);
+    if (Object.keys(e).length) {
+      this.patchForm(id, () => ({ e, status: 'idle' }));
+      const first = document.getElementById(FIELD_IDS[id][Object.keys(e)[0]]);
+      if (first) first.focus();
+      return;
+    }
+    this.patchForm(id, () => ({ e: {}, status: 'loading' }));`,
+      `  submit(id, ev) {
+    ev.preventDefault();
+    if (window.__lp2Track) window.__lp2Track('lead_form_submit_attempt', { form: id === 'end' ? 'end-of-page' : 'mid-page' });
+    const cur = this.state.forms[id];
+    if (cur.status === 'loading') return;
+    const e = this.validate(cur.f);
+    if (Object.keys(e).length) {
+      if (window.__lp2Track) window.__lp2Track('lead_form_error', { form: id === 'end' ? 'end-of-page' : 'mid-page', field: Object.keys(e)[0] });
+      this.patchForm(id, () => ({ e, status: 'idle' }));
+      const first = document.getElementById(FIELD_IDS[id][Object.keys(e)[0]]);
+      if (first) first.focus();
+      return;
+    }
+    this.patchForm(id, () => ({ e: {}, status: 'loading' }));`,
+      1,
+      'v2: bottom form tracking'
+    );
+  }
+
+  // ---- v2: email optional in the chat --------------------------------------
+  // Not a copy of the business step's `optional: true` pattern: send() below skips
+  // check() entirely for an optional step, which is right for business (no format
+  // rule exists for it) and wrong for email (a typed, invalid address would then
+  // reach __onSendLead unchecked). Three coordinated edits instead: the step
+  // itself becomes optional so the Skip button appears, check()'s email branch
+  // passes an empty answer instead of rejecting it, and send() always calls
+  // check() — harmless for business, whose check() branch already only ever
+  // returns ''. addChatWidget() runs before this file, so CHAT_JS's assembled
+  // text is already in `out` by the time this line runs, the same as every other
+  // v2 edit here.
+  if (v2) {
+    // CHAT_JS.replace('__STEPS__', JSON.stringify(CHAT_STEPS)) in addChatWidget()
+    // (scripts/build.mjs, runs before this file) leaves this as compact, single-line
+    // JSON — not the multi-line object literal chat-widget.mjs itself is written as.
+    out = replaceExactly(
+      out,
+      `{"key":"email","ask":"Your email?","placeholder":"Email","type":"email"}`,
+      `{"key":"email","ask":"Your email?","placeholder":"Email","type":"email","optional":true}`,
+      1,
+      'v2: chat email step optional'
+    );
+    out = replaceExactly(
+      out,
+      `    if (key === 'email') {
+      if (!s) return 'Please enter your email.';
+      return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(s) ? '' : 'That email address does not look right.';
+    }`,
+      `    if (key === 'email') {
+      if (!s) return '';
+      return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(s) ? '' : 'That email address does not look right.';
+    }`,
+      1,
+      'v2: chat check() email passes empty'
+    );
+    out = replaceExactly(
+      out,
+      `    var err = step.optional ? '' : check(step.key, v);`,
+      `    var err = check(step.key, v);`,
+      1,
+      'v2: chat send() always validates'
+    );
+    // chat_open when the launcher actually opens the panel (open() toggles closed
+    // again if it's already open, via the early `return close();` above this line
+    // — so this line only runs on a genuine open). chat_step names the step key
+    // only, right after it is recorded as answered — never the visitor's answer.
+    out = replaceExactly(
+      out,
+      `    root.setAttribute('data-on-chat', '');`,
+      `    root.setAttribute('data-on-chat', '');
+    if (window.__lp2Track) window.__lp2Track('chat_open', {});`,
+      1,
+      'v2: chat_open event'
+    );
+    out = replaceExactly(
+      out,
+      `    answers[step.key] = v;`,
+      `    if (window.__lp2Track) window.__lp2Track('chat_step', { step: step.key });
+    answers[step.key] = v;`,
+      1,
+      'v2: chat_step event'
+    );
+    // No promised call time here either — matches the sub-line every other lead
+    // path on this page now uses (section 5: CTA -> heading -> sub-line -> button
+    // -> this message, one consistent story).
+    out = replaceExactly(
+      out,
+      `say('Thanks, ' + first + '. Request received. One of our team will call you shortly to set a time at our Central Los Angeles kitchen.', 'bot');`,
+      `say('Thanks, ' + first + '. Request received. Our team will call you back shortly.', 'bot');`,
+      1,
+      'v2: chat closing message'
+    );
+  }
 
   // ---- 1. the problem comes before the solution -----------------------------
   // "How it works" (the four steps) sat at position 3 and "Why operators call us"
@@ -836,6 +1529,41 @@ export function transform(html, { replaceExactly }) {
     // either way, since there #included is still a real section.
   }
 
+  // ---- 3b. v2: the equipment tabs become one open, scannable list -------------
+  // Visitors opened every tab in sequence, 1-2s each — the content was wanted,
+  // just hidden one click at a time behind five buttons. Cut is safe by
+  // construction: isGalN/setGalN (state.gal) are used nowhere else on the page,
+  // so removing the five tabpanels and their tablist leaves no dangling
+  // reference, the same guarantee step 12 below already checks for a different
+  // image. Photos and the one-line intro under each heading go too — "compact"
+  // and "five photographs" don't fit together — leaving grouped headings and
+  // short bullets only, the same dt/dd density "Also included" right below it
+  // already uses.
+  if (v2) {
+    const TABS = /<div role="tablist" aria-label="Kitchen equipment categories"[\s\S]*?<\/sc-if>\n\n    (?=<div class="lp2-also")/;
+    const found = (out.match(TABS) || []).length;
+    if (found !== 1) throw new Error(`[lp2] v2 equipment spec list: expected 1 tabs block, found ${found}.`);
+    const GROUPS = [
+      ['Cooking &amp; Ventilation', ['Commercial exhaust hood, 8 to 12 feet', 'Extraction &amp; ventilation', 'Commercial cooling system']],
+      ['Sanitation', ['Three compartment sink', 'Hand wash sink', 'Commercial dishwasher &amp; dishwashing area', 'Hygienic walls &amp; skirting']],
+      ['Storage &amp; Cold Chain', ['Walk-in cooler', 'Walk-in freezer', 'Dry storage']],
+      ['Utilities &amp; Safety', ['3 phase electricity', 'Fire suppression system']],
+      ['Logistics', ['Two loading docks / landing areas', 'Food delivery pickup area']],
+    ];
+    const list =
+      '<div class="lp2-spec-list">\n' +
+      GROUPS.map(([name, items]) =>
+        '      <div class="lp2-spec-group">\n' +
+        `        <h3>${name}</h3>\n` +
+        '        <ul>\n' +
+        items.map((it) => `          <li>${it}</li>\n`).join('') +
+        '        </ul>\n' +
+        '      </div>\n'
+      ).join('') +
+      '    </div>\n\n    ';
+    out = out.replace(TABS, list);
+  }
+
   // ---- 4. the duplicate mid-page form becomes a CTA strip --------------------
   // tour-mid carried a second copy of the whole lead form — 1,142px, four fields, the
   // same headline promise as the closing form — sitting where the reader had not yet
@@ -851,11 +1579,13 @@ export function transform(html, { replaceExactly }) {
     const [before, , after] = slice(out, OPEN.tourMid, 'tour-mid');
     out = before + after;
     const strip =
-      '<section class="lp2-cta" data-band="dark" data-rev aria-label="Schedule a tour">\n' +
+      `<section class="lp2-cta" data-band="dark" data-rev aria-label="${v2 ? 'Check availability' : 'Schedule a tour'}">\n` +
       '    <div>\n' +
       '      <h2>Seen enough? Come see it in person.</h2>\n' +
-      '      <p>Sizes, terms and pricing are all covered on the tour.</p>\n' +
-      '      <a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 28px; min-height: 52px;">Schedule a Tour</a>\n' +
+      (v2
+        ? '      <p>See the space and get your questions answered.</p>\n'
+        : '      <p>Sizes, terms and pricing are all covered on the tour.</p>\n') +
+      `      <a href="#tour" class="btn btn-primary blueprint"${v2 ? ' data-cta-loc="content"' : ''} style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 28px; min-height: 52px;">${v2 ? 'Check Availability' : 'Schedule a Tour'}</a>\n` +
       '    </div>\n' +
       '  </section>\n\n  ';
     const FILM = '<section data-band="dark" id="film" aria-label="Watch the kitchens"';
@@ -883,8 +1613,17 @@ export function transform(html, { replaceExactly }) {
     if (endsAt === -1) throw new Error('[lp2] faq: could not find the end of the last question.');
     const tail = last.slice(endsAt + '</div>\n      </div>'.length);
     const items = parts.slice(1).map((p, i) => ITEM + (i === 7 ? last.slice(0, endsAt + '</div>\n      </div>'.length) : p));
+    // v2: "What does it cost?" (index 7) is dropped outright rather than kept and
+    // reordered — the brief removes pricing from the page entirely, FAQ answer
+    // included. Dropping it is also what fixes a mismatch that existed even
+    // before v2: index 0 ("How big are the kitchens?") is the one FAQ item open
+    // by default (faqDefaultOpen, the export's own DCLogic component) and was
+    // already unaffected by this reorder — it just used to display second, behind
+    // index 7. With index 7 gone it displays first, so the default-open item and
+    // the first item on screen are finally the same one, with no other code
+    // needing to change to make that true.
     //           cost   size   private/hourly   what you need
-    const keep = [7,     0,     1,               6];
+    const keep = v2 ? [0, 1, 6] : [7, 0, 1, 6];
     out = before + parts[0] + keep.map(i => items[i]).join('') + tail + after;
   }
 
@@ -965,12 +1704,20 @@ export function transform(html, { replaceExactly }) {
     // other cards — and the hint was on two of the four scrollers, not on the
     // process steps and not on the equipment tabs. Anchored to the element just
     // tagged rather than to a bare '</dl>': three <dl>s exist on the page.
-    out = hintAfter(out, '<dl class="lp2-track"', '</dl>', 'who-it-is-for hint');
-    out = hintAfter(out, '<ol class="lp2-track"', '</ol>', 'how-it-works hint');
-    // The tab row is the fourth scroller and the worst offender: 397px of it is off
-    // screen at 390px. It is a flex row of five buttons and nothing else, so the
-    // first </div> after it is its own.
-    out = hintAfter(out, '<div role="tablist"', '</div>', 'equipment tabs hint', 'lp2-hint-tabs');
+    //
+    // v2 drops the hint text on all four scrollers (this one included) — the
+    // carousels and native swipe stay exactly as they are, CSS only, so nothing
+    // here needs to change beyond skipping the four calls that add the text. The
+    // equipment-tabs one specifically would fail outright on a v2 page regardless:
+    // step 3b above already removed <div role="tablist"> before this line runs.
+    if (!v2) {
+      out = hintAfter(out, '<dl class="lp2-track"', '</dl>', 'who-it-is-for hint');
+      out = hintAfter(out, '<ol class="lp2-track"', '</ol>', 'how-it-works hint');
+      // The tab row is the fourth scroller and the worst offender: 397px of it is off
+      // screen at 390px. It is a flex row of five buttons and nothing else, so the
+      // first </div> after it is its own.
+      out = hintAfter(out, '<div role="tablist"', '</div>', 'equipment tabs hint', 'lp2-hint-tabs');
+    }
   }
 
   // ---- 9. the pain cards become the third track ------------------------------
@@ -985,7 +1732,7 @@ export function transform(html, { replaceExactly }) {
     1,
     'pain track'
   );
-  {
+  if (!v2) {
     const i = out.indexOf('<div class="lp2-track" style="display: grid');
     const j = out.indexOf('</section>', i);
     out = out.slice(0, j) + '  <p class="lp2-hint" aria-hidden="true">Swipe for more &rarr;</p>\n  ' + out.slice(j);
@@ -1045,8 +1792,12 @@ export function transform(html, { replaceExactly }) {
   // distinguishes one site from the other.
   const DEDUPE = [
     ['Onboarding, permitting, Health Department support.', 'We handle the paperwork.', 'permitting in step 03'],
-    ['Hood capacity sized for real production, with the extraction and cooling to keep the room workable through a full service.',
-     'Sized for real production, and the cooling to keep the room workable through a full service.', 'hood in the tab intro'],
+    // Lives in the Cooking & Ventilation tab's own intro paragraph — v2 already
+    // removed it, along with the rest of the tab panels, in step 3b above.
+    ...(v2 ? [] : [[
+      'Hood capacity sized for real production, with the extraction and cooling to keep the room workable through a full service.',
+      'Sized for real production, and the cooling to keep the room workable through a full service.', 'hood in the tab intro',
+    ]]),
     ['A production kitchen and a dedicated driver pickup area, with no dining room to pay for.',
      'A production kitchen and a driver pickup area, with no dining room to pay for.', 'delivery-only'],
     ['Cold storage, dock access and 24-hour entry for the night before a 300-cover event.',
@@ -1156,12 +1907,17 @@ export function transform(html, { replaceExactly }) {
       // two earlier drafts explained the offer here and the page has already made that
       // case three times by this point, so anything past the ask is delay. No promise
       // about call timing either, which is one less thing for someone to have to keep.
-      '        <span class="lp2-mid-eyebrow">Book a tour</span>\n' +
+      `        <span class="lp2-mid-eyebrow">${v2 ? 'Check availability' : 'Book a tour'}</span>\n` +
       '        <h2 id="lp2-mid-title">Ready to see your kitchen?</h2>\n' +
-      '        <p>Leave your details and we&rsquo;ll call you to schedule a tour.</p>\n' +
+      (v2
+        ? '        <p>Leave your details and our team will call you back.</p>\n'
+        : '        <p>Leave your details and we&rsquo;ll call you to schedule a tour.</p>\n') +
       '        <form id="lp2-mid-form" noValidate>\n' +
-      leadFields('lp2-mid-') +
-      '        <button type="submit" class="btn btn-primary blueprint">Book My Tour</button>\n' +
+      leadFields('lp2-mid-', v2) +
+      `        <button type="submit" class="btn btn-primary blueprint">${v2 ? 'Check Availability' : 'Book My Tour'}</button>\n` +
+      (v2
+        ? '        <p class="lp2-mid-phone">Prefer to talk? Call <a href="tel:+18444351633" data-phone-loc="form">435-1633 (844)</a></p>\n'
+        : '') +
       '        </form>\n' +
       '      </div>\n' +
       '    </div>\n' +
@@ -1193,17 +1949,437 @@ export function transform(html, { replaceExactly }) {
       '      <button type="button" class="lp2-modal-x" data-lp2-close aria-label="Close">' +
       '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>' +
       '</button>\n' +
-      '      <span class="lp2-modal-eyebrow">Schedule a tour</span>\n' +
+      `      <span class="lp2-modal-eyebrow">${v2 ? 'Check availability' : 'Schedule a tour'}</span>\n` +
       '      <h2 id="lp2-modal-title">Come see the kitchen you&rsquo;d be cooking in.</h2>\n' +
-      '      <p>Leave your details and we&rsquo;ll call to set a time at our Central Los Angeles kitchen.</p>\n' +
+      (v2
+        ? '      <p>Leave your details and our team will call you back.</p>\n'
+        : '      <p>Leave your details and we&rsquo;ll call to set a time at our Central Los Angeles kitchen.</p>\n') +
       '      <form id="lp2-form" noValidate>\n' +
-      leadFields('lp2-') +
-      '        <button type="submit" class="btn btn-primary blueprint">Schedule My Tour</button>\n' +
+      leadFields('lp2-', v2) +
+      `        <button type="submit" class="btn btn-primary blueprint">${v2 ? 'Check Availability' : 'Schedule My Tour'}</button>\n` +
+      (v2
+        ? '        <p class="lp2-modal-phone">Prefer to talk? Call <a href="tel:+18444351633" data-phone-loc="form">435-1633 (844)</a></p>\n'
+        : '') +
       '      </form>\n' +
       '    </div>\n' +
       '  </div>\n\n  ';
     out = replaceExactly(out, '</main>', '</main>\n\n  ' + modal.trim() + '\n', 1, 'lead modal markup');
-    out = replaceExactly(out, '</body>', LP2_MODAL_JS + '</body>', 1, 'lead modal script');
+    out = replaceExactly(out, '</body>', (v2 ? LP2_MODAL_JS_V2 : LP2_MODAL_JS) + '</body>', 1, 'lead modal script');
+  }
+
+  // ---- 17. v2: the hero gets its own inline form ------------------------------
+  // Visitors' first actions were hunting for what, where, what's included, the
+  // rental model and size — and 12 of 14 recorded popup opens closed again within
+  // 0-4 seconds without anyone typing. The fix in step 1 makes the popup behave;
+  // this step means a visitor never has to open it in the first place. The
+  // headline stays descriptive (this page's own hero.lines, in scripts/build.mjs)
+  // rather than becoming part of this step, since that field was already per-page
+  // before v2 existed. Two more things move in with the form: the supporting
+  // sentence changes to name the concrete facts visitors were hunting for, and the
+  // CTA button + its commented-out phone link are replaced outright — a button
+  // that only opened the same popup step 1 already reaches from six other places
+  // on this page was the least useful CTA on it, once a form sits right next to it.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<div style="position: relative; z-index: 3; width: 100%; max-width: clamp(1240px, 90vw, 1760px); margin: 0 auto; padding: clamp(88px, 11vh, 150px) var(--edge) clamp(44px, 6vw, 76px);">',
+      '<div class="lp2-hero-wrap" style="position: relative; z-index: 3; width: 100%; max-width: clamp(1240px, 90vw, 1760px); margin: 0 auto; padding: clamp(88px, 11vh, 150px) var(--edge) clamp(44px, 6vw, 76px);">\n      <div class="lp2-hero-copy">',
+      1,
+      'v2: open hero copy column'
+    );
+    // Pre-copy-sweep text: LOCATION_COPY/COPY_DASHES (scripts/build.mjs) run as a
+    // later, separate pass over the files already written to dist/, after
+    // buildLandingPage() — and therefore variant.transform() — has already run and
+    // returned. So this file still sees "Van Nuys and Los Angeles" and the export's
+    // own em dash here, not the swept text the finished page ends up with. Moot
+    // either way for v2: the replacement below matches neither phrase, so the later
+    // sweep finds nothing to do on this page and the em-dash guard has nothing left
+    // to catch.
+    out = replaceExactly(
+      out,
+      '<p style="font-size: 18px; line-height: 28px; max-width: 54ch; margin: 26px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">Private, fully certified commercial kitchen space in Van Nuys and Los Angeles — already built, already equipped. You bring the menu. We handle zoning, permitting and the city.</p>',
+      '<p style="font-size: 18px; line-height: 28px; max-width: 54ch; margin: 26px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">Certified and ready to cook. Private kitchens, 200&ndash;600 sq ft or by the hour, with 24/7 access. Permitting and Health Department approval, handled.</p>',
+      1,
+      'v2: hero supporting line'
+    );
+    out = replaceExactly(
+      out,
+      `      <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px;">
+        <a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 26px; min-height: 52px;">
+          Schedule a Tour
+        </a>
+        <!-- PHONE CTA (disabled — uncomment to restore) hero
+<a href="tel:+18444351255" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 22px; min-height: 52px; gap: 9px; color: #FAF8F5; border-color: color-mix(in srgb, #FAF8F5 42%, transparent);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.8.7 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.27a2 2 0 0 1 2.11-.45c.85.34 1.75.57 2.65.7A2 2 0 0 1 22 16.92z"></path></svg>
+          (844) 435-1255
+        </a>
+-->
+      </div>`,
+      `      <p class="lp2-hero-phone-line">Call <a href="tel:+18444351633" data-phone-loc="hero">435-1633 (844)</a></p>
+      <ul class="lp2-hero-facts">
+        <li>USC / Central Los Angeles</li>
+        <li aria-hidden="true">&middot;</li>
+        <li>Free gated parking</li>
+        <li aria-hidden="true">&middot;</li>
+        <li>24/7 access</li>
+      </ul>`,
+      1,
+      'v2: hero CTA becomes phone + facts line'
+    );
+    out = replaceExactly(
+      out,
+      `        <li>Monthly or Hourly</li>
+      </ul>
+    </div>
+  </section>`,
+      `        <li>Monthly or Hourly</li>
+      </ul>
+      </div>
+      <div class="lp2-hero-form-card" id="hero-form-card">
+        <h2>Check availability for your kitchen</h2>
+        <form id="hero-form" noValidate>
+` + leadFields('hero-', v2) +
+      `          <button type="submit" class="btn btn-primary blueprint">Check Availability</button>
+          <p class="lp2-hero-form-phone">Prefer to talk? Call <a href="tel:+18444351633" data-phone-loc="hero">435-1633 (844)</a></p>
+        </form>
+      </div>
+    </div>
+  </section>`,
+      1,
+      'v2: close hero copy column, add form card'
+    );
+  }
+
+  // ---- 18. v2: the new number, everywhere it belongs --------------------------
+  // Every phone number on the page is already dead code — all of it sits inside
+  // <!-- PHONE CTA (disabled — uncomment to restore) X --> comments and none of it
+  // renders (confirmed: zero live tel: links anywhere in the built site). The four
+  // required placements below are uncommented AND renumbered in one step, since
+  // the number itself is changing, not just its visibility. Three more of these
+  // comments exist (easy-upgrade row, the locations "Call" button, the
+  // accessibility panel) — left as dead comments: not on the brief's required list,
+  // and a comment nobody renders costs nothing to leave alone. A fourth, the
+  // mid-form's own phone comment, doesn't exist by the time this file runs at all —
+  // step 4 already deleted the whole #tour-mid section it lived in.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      `<!-- PHONE CTA (disabled — uncomment to restore) header
+<a href="tel:+18444351255" style="font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.04em; text-decoration: none; color: var(--color-accent-700); display: flex; align-items: center; gap: 7px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.8.7 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.27a2 2 0 0 1 2.11-.45c.85.34 1.75.57 2.65.7A2 2 0 0 1 22 16.92z"></path></svg>
+          (844) 435-1255
+        </a>
+-->`,
+      `<a href="tel:+18444351633" data-phone-loc="header" style="font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.04em; text-decoration: none; color: var(--color-accent-700); display: flex; align-items: center; gap: 7px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.8.7 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.27a2 2 0 0 1 2.11-.45c.85.34 1.75.57 2.65.7A2 2 0 0 1 22 16.92z"></path></svg>
+          435-1633 (844)
+        </a>`,
+      1,
+      'v2: header phone'
+    );
+    out = replaceExactly(
+      out,
+      `<!-- PHONE CTA (disabled — uncomment to restore) final CTA
+<p style="margin: 18px 0 0; font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.06em; text-transform: uppercase;">
+            Or call <a href="tel:+18444351255" style="color: var(--color-accent-400);">(844) 435-1255</a>
+          </p>
+-->`,
+      `<p style="margin: 18px 0 0; font-family: var(--font-heading); font-weight: 600; font-size: 17px; letter-spacing: 0.06em; text-transform: uppercase;">
+            Or call <a href="tel:+18444351633" data-phone-loc="form" style="color: var(--color-accent-400);">435-1633 (844)</a>
+          </p>`,
+      1,
+      'v2: bottom form phone'
+    );
+    out = replaceExactly(
+      out,
+      `<!-- PHONE CTA (disabled — uncomment to restore) footer
+<p style="margin: 0 0 4px; font-size: 15px; line-height: 24px;"><a href="tel:+18444351255">(844) 435-1255</a></p>
+-->`,
+      `<p style="margin: 0 0 4px; font-size: 15px; line-height: 24px;"><a href="tel:+18444351633" data-phone-loc="footer">435-1633 (844)</a></p>`,
+      1,
+      'v2: footer phone'
+    );
+    out = replaceExactly(
+      out,
+      `<!-- PHONE CTA (disabled — uncomment to restore) sticky bar
+<a href="tel:+18444351255" aria-label="Call ŌN Kitchens at (844) 435-1255" class="btn btn-secondary" style="width: 56px; min-height: 52px; padding: 0; color: #FAF8F5; border-color: color-mix(in srgb, #FAF8F5 34%, transparent);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.8.7 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.27a2 2 0 0 1 2.11-.45c.85.34 1.75.57 2.65.7A2 2 0 0 1 22 16.92z"></path></svg>
+    </a>
+-->`,
+      `<a href="tel:+18444351633" data-phone-loc="sticky" aria-label="Call ŌN Kitchens at 435-1633 (844)" class="btn btn-secondary" style="width: 56px; min-height: 52px; padding: 0; color: #FAF8F5; border-color: color-mix(in srgb, #FAF8F5 34%, transparent);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.8.7 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.27a2 2 0 0 1 2.11-.45c.85.34 1.75.57 2.65.7A2 2 0 0 1 22 16.92z"></path></svg>
+    </a>`,
+      1,
+      'v2: sticky bar phone'
+    );
+
+    // The new floating call button, directly above the chat launcher. The two are
+    // independent position:fixed elements with no shared stacking wrapper (unlike
+    // the accessibility launcher and its panel, which share one column-reverse
+    // flex container) — so the chat panel's own open position is pushed down to
+    // clear both buttons stacked on top of one another, patched at the exact rule
+    // chat-widget.mjs's CSS ships (reached here the same way as everything else:
+    // addChatWidget() already ran).
+    out = replaceExactly(
+      out,
+      `html[data-on-chat] .on-chat-panel {
+  display: flex; flex-direction: column;
+  position: fixed; right: 16px; bottom: 160px; z-index: 95;`,
+      `html[data-on-chat] .on-chat-panel {
+  display: flex; flex-direction: column;
+  position: fixed; right: 16px; bottom: 236px; z-index: 95;`,
+      1,
+      'v2: chat panel clears the new call button'
+    );
+    out = replaceExactly(
+      out,
+      '</body>',
+      '\n<a href="tel:+18444351633" data-phone-loc="fab" class="lp2-call-fab" aria-label="Call ŌN Kitchens">' +
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.8.7 2.65a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.43-1.27a2 2 0 0 1 2.11-.45c.85.34 1.75.57 2.65.7A2 2 0 0 1 22 16.92z"></path></svg>' +
+        '</a>\n</body>',
+      1,
+      'v2: floating call button'
+    );
+  }
+
+  // ---- 19. v2: "Check Availability", everywhere the flow said Schedule/Book -----
+  // We don't offer calendar booking — the flow is leave details, then a team
+  // member calls back — so every CTA that implied picking a date or time changes
+  // to the same truthful label, sitewide, plus a data-cta-loc tag for cta_click.
+  // Two exceptions, deliberately not touched: the "How it works" step-1 heading
+  // ("Book a tour", body copy about a process step, not a promise) and the FAQ's
+  // own inline link, which goes away with the whole question in the next step.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 18px; font-size: 14px; white-space: nowrap;">\n      Schedule a Tour\n    </a>',
+      '<a href="#tour" class="btn btn-primary blueprint" data-cta-loc="header" style="text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 18px; font-size: 14px; white-space: nowrap;">\n      Check Availability\n    </a>',
+      1,
+      'v2: header CTA'
+    );
+    // Easy-upgrade row and "who it's for" share identical markup, indentation
+    // included, so one call with expected count 2 covers both.
+    out = replaceExactly(
+      out,
+      '<a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 24px; min-height: 50px;">\n          Schedule a Tour\n        </a>',
+      '<a href="#tour" class="btn btn-primary blueprint" data-cta-loc="content" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 24px; min-height: 50px;">\n          Check Availability\n        </a>',
+      2,
+      'v2: easy-upgrade + who-its-for CTAs'
+    );
+    out = replaceExactly(
+      out,
+      '<a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 24px; min-height: 50px;">\n        Schedule a Tour\n      </a>',
+      '<a href="#tour" class="btn btn-primary blueprint" data-cta-loc="content" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 14px 24px; min-height: 50px;">\n        Check Availability\n      </a>',
+      1,
+      'v2: kitchens-section CTA'
+    );
+    out = replaceExactly(
+      out,
+      '<a href="#tour" class="btn btn-primary blueprint" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 13px 22px; min-height: 48px;">\n            Book a tour\n          </a>',
+      '<a href="#tour" class="btn btn-primary blueprint" data-cta-loc="locations" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 13px 22px; min-height: 48px;">\n            Check Availability\n          </a>',
+      1,
+      'v2: locations CTA'
+    );
+    out = replaceExactly(
+      out,
+      '09 · Schedule a tour',
+      '09 · Check availability',
+      1,
+      'v2: bottom section eyebrow'
+    );
+    out = replaceExactly(
+      out,
+      '<a href="#tour" data-tap="footer">Schedule a tour</a>',
+      '<a href="#tour" data-tap="footer" data-cta-loc="footer">Check availability</a>',
+      1,
+      'v2: footer CTA'
+    );
+    out = replaceExactly(
+      out,
+      '<a href="#tour" class="btn btn-primary blueprint" style="flex: 1; max-width: 420px; text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; min-height: 52px;">\n      Schedule a Tour\n    </a>',
+      '<a href="#tour" class="btn btn-primary blueprint" data-cta-loc="sticky" style="flex: 1; max-width: 420px; text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; min-height: 52px;">\n      Check Availability\n    </a>',
+      1,
+      'v2: sticky bar CTA'
+    );
+    // submitLabel and submitLabelM (renderVals(), the DCLogic component) share
+    // this exact ternary tail, so one call covers the bottom form's button and
+    // the export's own mid ('m-') form's button, which only /lp still renders —
+    // harmless there too, since /lp never sets v2 and this whole block is skipped.
+    out = replaceExactly(
+      out,
+      `? 'Sending…' : 'Schedule My Tour'`,
+      `? 'Sending…' : 'Check Availability'`,
+      2,
+      'v2: bottom + mid form submit button label'
+    );
+  }
+
+  // ---- 20. v2: locations gets an address and a map, pricing drops out ---------
+  // Pre-copy-sweep text again for both pricing sentences below — see step 17's
+  // note on why (LOCATION_COPY/COPY_DASHES run after this file, not before it).
+  if (v2) {
+    // singleLocation() (scripts/build.mjs, shared/unconditional) already deleted
+    // the second card, the map iframes and the <address> element that used to sit
+    // here — there is no existing "Get directions" link or address to build on,
+    // only TODO placeholders per the brief, called out as a blocker in the report
+    // rather than an invented address. data-maps-url turns the whole card into a
+    // click target (see the delegated handler in LP2_MODAL_JS_V2) without nesting
+    // an anchor inside the "Check Availability" anchor already in it.
+    out = replaceExactly(
+      out,
+      `<h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 30px; line-height: 32px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0 0 12px;">USC / Central Los Angeles</h3>
+        <p style="margin: 0 0 20px; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 72%, transparent);">Open 24/7/365 · Free gated parking</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+          <a href="#tour" class="btn btn-primary blueprint" data-cta-loc="locations" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 13px 22px; min-height: 48px;">
+            Check Availability
+          </a>`,
+        `<h3 style="font-family: var(--font-heading); font-weight: 600; font-size: 30px; line-height: 32px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0 0 12px;">USC / Central Los Angeles</h3>
+        <address style="margin: 0 0 8px; font-style: normal; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 72%, transparent);">TODO_ADDRESS</address>
+        <p style="margin: 0 0 20px; font-size: 15px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 72%, transparent);">Open 24/7/365 · Free gated parking</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+          <a href="#tour" class="btn btn-primary blueprint" data-cta-loc="locations" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 13px 22px; min-height: 48px;">
+            Check Availability
+          </a>
+          <a href="TODO_MAPS_URL" target="_blank" rel="noopener" class="btn btn-secondary" style="text-transform: uppercase; letter-spacing: 0.06em; font-size: 15px; padding: 13px 22px; min-height: 48px;">
+            Get directions
+          </a>`,
+      1,
+      'v2: locations address + get-directions'
+    );
+    out = replaceExactly(
+      out,
+      '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: clamp(28px, 4vw, 56px);">\n      <div>',
+      '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: clamp(28px, 4vw, 56px);">\n      <div class="lp2-loc-card" data-maps-url="TODO_MAPS_URL">',
+      1,
+      'v2: locations card click target'
+    );
+    // "Terms and pricing depend on the space and the location — both are covered
+    // on the tour." — its own footnote paragraph under the benefits sheet, purely
+    // about pricing, so it comes out whole rather than being reworded.
+    out = replaceExactly(
+      out,
+      '      <p style="margin: 0; padding: 12px 24px; border-top: 1px solid var(--color-divider); font-size: 13px; line-height: 24px; color: color-mix(in srgb, var(--color-text) 70%, transparent);">Terms and pricing depend on the space and the location — both are covered on the tour.</p>\n',
+      '',
+      1,
+      'v2: drop easy-upgrade pricing footnote'
+    );
+    // The final CTA paragraph is otherwise fine — only its trailing pricing
+    // clause goes.
+    out = replaceExactly(
+      out,
+      `We'll show you the space that fits and walk you through what setup looks like — sizes, terms and pricing included.`,
+      `We'll show you the space that fits and walk you through what setup looks like.`,
+      1,
+      'v2: drop final-CTA pricing clause'
+    );
+  }
+
+  // ---- 21. v2: the hero video stays off phones ---------------------------------
+  // rewriteRuntime() (scripts/build.mjs, shared/unconditional) already rewrote
+  // the export's own !s.isPhone gate to a connection-speed check, s.cheapNet, so
+  // a fast-connection phone gets the autoplaying background video today on every
+  // shortened-variant page. Restoring the phone gate alongside it, additively,
+  // is a deliberate behavior change beyond that shared rewrite — called out in
+  // the Phase 1 report rather than left silent, since "keep it off phones" reads
+  // as new intent here, whatever a fast connection measures.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      'showHeroVideo: !s.reduced && s.cheapNet,',
+      'showHeroVideo: !s.reduced && s.cheapNet && !s.isPhone,',
+      1,
+      'v2: hero video off on phones'
+    );
+  }
+
+  // ---- 22. v2: the hero image gets AVIF/WebP srcset ----------------------------
+  // Three widths (640/960/1600) in both formats, generated offline and committed
+  // under assets/ — this repo has no image-processing step of its own and assets/
+  // is a plain pass-through directory (PASS_THROUGH, scripts/build.mjs), so that
+  // stays true; nothing here adds a build-time dependency.
+  //
+  // The shared <link rel="preload"> (scripts/build.mjs) still needs to change,
+  // and measuring said so: a first pass that left it alone, pointed at the
+  // original 106KB file, made mobile LCP very slightly WORSE — the preload
+  // scanner fetched that file at high priority while the <picture> below picked
+  // a different, smaller one to actually paint, so the real LCP resource lost
+  // its priority and the preload bytes were wasted twice over. imagesrcset on
+  // the preload link mirrors the <picture>'s own WebP source exactly, so a
+  // browser that ends up rendering the WebP candidate preloads precisely that
+  // file. AVIF-capable browsers still preload a WebP they won't paint — no
+  // combination of standard HTML avoids that, since <link rel=preload> has no
+  // equivalent of <picture>'s per-source `type` negotiation — but that is a
+  // bounded, known cost (one small extra fetch) against the alternative this
+  // replaced (the wrong file entirely, at the wrong priority). The bare <img>
+  // itself is untouched apart from width/height: still the fallback path for a
+  // browser too old for <picture>, unconditionally.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high">',
+      '<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high" imagesrcset="assets/kitchen-hero-640.webp 640w, assets/kitchen-hero-960.webp 960w, assets/kitchen-hero-1600.webp 1600w" imagesizes="100vw">',
+      1,
+      'v2: hero preload matches the picture srcset'
+    );
+    out = replaceExactly(
+      out,
+      '<img src="assets/kitchen-hero.webp" alt="An operator plating meal-prep containers on a stainless steel workstation under a commercial exhaust hood" fetchPriority="high" style="position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; display: block;" />',
+      '<picture>\n      <source type="image/avif" srcset="assets/kitchen-hero-640.avif 640w, assets/kitchen-hero-960.avif 960w, assets/kitchen-hero-1600.avif 1600w" sizes="100vw" />\n      <source type="image/webp" srcset="assets/kitchen-hero-640.webp 640w, assets/kitchen-hero-960.webp 960w, assets/kitchen-hero-1600.webp 1600w" sizes="100vw" />\n      <img src="assets/kitchen-hero.webp" alt="An operator plating meal-prep containers on a stainless steel workstation under a commercial exhaust hood" fetchPriority="high" width="1600" height="900" style="position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; display: block;" />\n    </picture>',
+      1,
+      'v2: hero image srcset'
+    );
+  }
+
+  // ---- 23. v2: the font stylesheet stops blocking first paint -----------------
+  // font-display: swap is already active (the shared FONT_CSS URL already carries
+  // &display=swap, scripts/build.mjs) — the part still worth doing is the
+  // <link rel="stylesheet"> itself, which blocks rendering until it arrives. The
+  // standard preload-then-swap pattern: fetch it as a non-blocking preload, then
+  // flip its own rel to stylesheet once loaded; the <noscript> fallback keeps a
+  // JS-disabled visitor's fonts working, same as this page's CTAs staying plain
+  // anchors with JS off. Reached the normal way: buildLandingPage()'s head
+  // injection, including this link, already ran by the time this file sees the
+  // page. The design-system stylesheet (a second, different href) is left alone —
+  // the Hero's own inline styles read CSS custom properties that sheet defines,
+  // so deferring it risks a visible flash of unstyled colour on first paint,
+  // which is a worse trade than one render-blocking stylesheet fetch that starts
+  // in parallel with it today.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap">',
+      '<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap" onload="this.onload=null;this.rel=\'stylesheet\'">\n<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap"></noscript>',
+      1,
+      'v2: font stylesheet preload+swap'
+    );
+  }
+
+  // ---- 24. v2: the bottom form's own heading and required email markup --------
+  // Two things the earlier CTA-copy and email-optional passes didn't reach: the
+  // bottom form's heading is its own static "Schedule my tour" text (distinct
+  // from the dynamic submitLabel button text already fixed, and distinct from
+  // "Schedule a Tour"/"Schedule My Tour" elsewhere); and required="{{ true }}" on
+  // f-email is a second, independent gate from validate() — the form already
+  // carries noValidate so a browser never enforces it, but the attribute (and the
+  // label without an "(optional)" suffix) still misdescribes the field to a
+  // screen reader and to anyone reading the markup. Only f-email is touched: the
+  // export's other required-email field, m-email, belongs to the mid form /lp
+  // alone still renders, and /lp never sets v2.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<h3 style="grid-column: 1 / -1; font-family: var(--font-heading); font-weight: 600; font-size: 28px; line-height: 30px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 4px;">Schedule my tour</h3>',
+      '<h3 style="grid-column: 1 / -1; font-family: var(--font-heading); font-weight: 600; font-size: 28px; line-height: 30px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 4px;">Check availability</h3>',
+      1,
+      'v2: bottom form heading'
+    );
+    out = replaceExactly(
+      out,
+      '<label for="f-email" style="color: color-mix(in srgb, #FAF8F5 72%, transparent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Email</label>\n              <input class="input" id="f-email" name="email" data-form="end" type="email" autoComplete="email" required="{{ true }}" value="{{ f.email }}" onChange="{{ onInput }}" aria-describedby="e-email"',
+      '<label for="f-email" style="color: color-mix(in srgb, #FAF8F5 72%, transparent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Email <i style="font-style: normal; font-weight: 400; color: color-mix(in srgb, #FAF8F5 55%, transparent);">(optional)</i></label>\n              <input class="input" id="f-email" name="email" data-form="end" type="email" autoComplete="email" value="{{ f.email }}" onChange="{{ onInput }}" aria-describedby="e-email"',
+      1,
+      'v2: bottom form email not required'
+    );
   }
 
   return out;
