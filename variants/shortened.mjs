@@ -1150,9 +1150,20 @@ const LP2_MODAL_JS_V2 = String.raw`
   // arrived before the visitor could reach one, and re-ran measure() with the
   // now-real elements in place. The hero form breaks that assumption — it's meant
   // to be on screen with zero scrolling — so a body-level MutationObserver re-runs
-  // measure() once after that render pass lands, the same "watch a stable ancestor,
+  // measure() after that render pass lands, the same "watch a stable ancestor,
   // re-query fresh each time" approach the id lookups above already use, for the
   // same reason: any node this observed directly would be the one React replaces.
+  //
+  // Left running for the page's lifetime rather than disconnecting after the
+  // first quiet gap: measured in production, the runtime's own render pass does
+  // not always land as one atomic burst (real GTM/fonts/Vimeo contending for the
+  // main thread), so a one-shot "settle once, then stop watching" observer can
+  // fire on an early, irrelevant gap, find nothing yet, and never get a second
+  // chance once the real form actually lands. A live, still-debounced observer
+  // also self-heals the flag if the runtime re-renders again later (this same
+  // runtime is known to re-render <x-dc> on scroll-threshold or media-query
+  // changes, not just once on load). measure() itself is cheap and idempotent,
+  // so leaving this armed indefinitely costs nothing.
   (function () {
     var ids = ['tour-form', 'hero-form', 'tour'];
     var ticking = false;
@@ -1179,7 +1190,7 @@ const LP2_MODAL_JS_V2 = String.raw`
       var settleTimer = null;
       var mo = new MutationObserver(function () {
         if (settleTimer) clearTimeout(settleTimer);
-        settleTimer = setTimeout(function () { mo.disconnect(); onScroll(); }, 150);
+        settleTimer = setTimeout(onScroll, 150);
       });
       mo.observe(document.body, { childList: true, subtree: true });
     }
@@ -2461,6 +2472,29 @@ export function transform(html, { replaceExactly, v2 = false }) {
       '<label for="f-email" style="color: color-mix(in srgb, #FAF8F5 72%, transparent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Email <i style="font-style: normal; font-weight: 400; color: color-mix(in srgb, #FAF8F5 55%, transparent);">(optional)</i></label>\n              <input class="input" id="f-email" name="email" data-form="end" type="email" autoComplete="email" value="{{ f.email }}" onChange="{{ onInput }}" aria-describedby="e-email"',
       1,
       'v2: bottom form email not required'
+    );
+  }
+
+  // ---- 25. v2: phone format — area code first, the conventional US order ------
+  // Every phone display so far read "435-1633 (844)" (local number first, area
+  // code after) — the brief's own original wording. Explicit follow-up feedback
+  // said this reads backwards and asked for the conventional "(844) 435-1633"
+  // instead (which happens to be what the dead, pre-rollout comments already
+  // used for the old number, before it changed to this one). Only the display
+  // text changes here — the tel:+18444351633 links this sits inside of are
+  // untouched, still built and gated exactly as they were.
+  // One pass, not eight: every one of the 8 places this string appears (header,
+  // hero phone line, hero form card, mid-page form, popup modal, bottom form,
+  // footer, sticky bar aria-label) needs the identical swap, and all 8 already
+  // exist in `out` by this point in the pipeline — this runs last specifically
+  // so it does, regardless of which earlier step constructed which occurrence.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '435-1633 (844)',
+      '(844) 435-1633',
+      8,
+      'v2: phone format — area code first'
     );
   }
 
