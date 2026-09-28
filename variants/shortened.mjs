@@ -681,25 +681,6 @@ const LP2_V2_CSS = `
   .lp2-hero-sub-full { order: 7; }
   .lp2-rating { order: 8; }
   .lp2-hero-badges { order: 9; }
-  /* The form card now starts high enough to land its Phone field inside the
-     fixed accessibility launcher's own box (left:16px, bottom:96px, 54px —
-     scripts/build.mjs), which this reorder can't route around: the launcher is
-     viewport-fixed while the form scrolls with the page, and it must stay put
-     and stay visible everywhere, unlike the call/chat FABs the atform flag
-     already stands down. Insetting the form's own fields — not the card, which
-     keeps its full-width background — clears the launcher's column without
-     moving the control itself. The same launcher lands on the full paragraph,
-     rating and badge row too once they're reordered below the form (confirmed:
-     these sit at the same unpadded left edge the phone line had before its own
-     fix moved it out of the launcher's reach) — same inset, same reasoning. */
-  .lp2-hero-form-card form,
-  .lp2-hero-sub-full,
-  .lp2-rating { padding-left: 58px; }
-  /* The badges row carries its own inline padding-left:0 (part of the export's
-     padding: 16px 0 0 shorthand, load-bearing for the divider's top spacing) —
-     inline styles win over a class rule at any specificity, so only this one
-     needs !important to actually apply. */
-  .lp2-hero-badges { padding-left: 58px !important; }
 }
 @media (min-width: 761px) {
   .lp2-hero-h1-mobile, .lp2-hero-sub-short { display: none; }
