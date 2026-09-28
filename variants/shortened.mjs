@@ -680,10 +680,25 @@ const LP2_V2_CSS = `
   .lp2-hero-h1-full { display: none; }
   .lp2-hero-sub-full { order: 7; }
   .lp2-rating { order: 8; }
-  .lp2-hero-badges { order: 9; }
+  .lp2-hero-badges-mobile { order: 9; }
+  /* "24/7 Access · Private Kitchens · Monthly or Hourly" wraps to a second (in
+     fact third) line at the export's own 15px/26px-gap sizing once it's
+     narrower than ~390px, which is exactly what made the Hero taller than it
+     needed to be. A smaller font alone couldn't close that gap without
+     shrinking past legible — the row needed roughly half its rendered width
+     back — so this is the same short/full duplicate-and-tag pattern as the
+     headline and sub-line above: a separate, shorter, mobile-only version
+     ("Private Kitchens" -> "Private", "Monthly or Hourly" -> "Monthly/Hourly")
+     plus a smaller size, and the original full-text row hidden on mobile
+     rather than resized, so desktop keeps its exact original text untouched. */
+  .lp2-hero-badges-full { display: none; }
 }
 @media (min-width: 761px) {
   .lp2-hero-h1-mobile, .lp2-hero-sub-short { display: none; }
+  /* Needs !important: unlike the two rules above, this element's own inline
+     style sets display:flex (for its own row layout), which an ordinary class
+     rule can never win against regardless of specificity. */
+  .lp2-hero-badges-mobile { display: none !important; }
 }
 
 /* ---- the new floating call button, directly above the chat launcher ---- */
@@ -1015,8 +1030,8 @@ const LP2_MODAL_JS = String.raw`
  *
  *  Covers: the popup fix (no backdrop-close, no autofocus on touch, a
  *  guaranteed-open fallback that scrolls to a working form instead), a third form
- *  (hero-) in the shared submit handler, email made optional, the honeypot dropped,
- *  and the funnel events that live alongside the popup's own open/close state
+ *  (hero-) in the shared submit handler, the honeypot dropped, and the funnel
+ *  events that live alongside the popup's own open/close state
  *  (modal_open/modal_open_failed/modal_close, cta_click, phone_click,
  *  lead_form_view/start/submit_attempt/error) — see LP2_V2_HEAD_JS for the
  *  window.__lp2Track helper every track() call below goes through. */
@@ -1282,7 +1297,8 @@ const LP2_MODAL_JS_V2 = String.raw`
     var digits = f.phone.replace(/[^0-9]/g, '');
     if (!f.phone.trim()) e.phone = 'Please enter a phone number.';
     else if (digits.length < 10) e.phone = 'Please enter a 10-digit phone number.';
-    if (f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';
+    if (!f.email.trim()) e.email = 'Please enter your email.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';
 
     Object.keys(IDS).forEach(function (k) {
       var msg = document.getElementById(IDS[k] + '-err');
@@ -1328,9 +1344,12 @@ const LP2_MODAL_JS_V2 = String.raw`
  *  aria-required rather than required — `required` would hand validation to the browser,
  *  whose bubbles would pre-empt the messages the rest of the page uses. */
 // forceErrorUi: for a field that is optional (empty passes) but still format-
-// validated when filled — v2's email — which needs the error paragraph business
-// never does, since business has no format rule to ever report. Only matters
-// when optional is also true; a required field already gets the error UI.
+// validated when filled, which needs the error paragraph business never does,
+// since business has no format rule to ever report. Only matters when optional
+// is also true; a required field already gets the error UI. Nothing currently
+// calls this true — only the chat widget has an optional, format-validated
+// email, and the chat has its own separate implementation — but the field stays
+// so a future optional-and-validated field doesn't have to reinvent it.
 const leadField = (prefix, id, label, type, auto, optional, forceErrorUi) => {
   const showError = !optional || forceErrorUi;
   return '        <div>\n' +
@@ -1347,9 +1366,12 @@ const leadField = (prefix, id, label, type, auto, optional, forceErrorUi) => {
  *  protected itself differently, would be a second thing to keep in sync — which is
  *  also why v2 is a real parameter here rather than a second copy of this function:
  *  this same call builds the fields for the tour modal AND the mid-page section on
- *  every shortened-variant page, v2 or not, so the honeypot and the email field's
- *  optionality can only correctly differ per page by being threaded through, not by
- *  branching at the call site.
+ *  every shortened-variant page, v2 or not, so the honeypot can only correctly
+ *  differ per page by being threaded through, not by branching at the call site.
+ *  Name, phone and email are required on every one of these forms — the only
+ *  place email is optional anywhere on this page is the chat widget, which has
+ *  its own separate implementation (scripts/chat-widget.mjs) and isn't built
+ *  through this helper at all.
  *
  *  The honeypot is never shown, never focusable and never announced, so a person cannot
  *  fill it and a form-filling bot usually will. Off-screen rather than display:none,
@@ -1360,7 +1382,7 @@ const leadField = (prefix, id, label, type, auto, optional, forceErrorUi) => {
 const leadFields = (prefix, v2) =>
   leadField(prefix, 'name', 'Full name', 'text', 'name') +
   leadField(prefix, 'phone', 'Phone', 'tel', 'tel') +
-  leadField(prefix, 'email', 'Email', 'email', 'email', v2, v2) +
+  leadField(prefix, 'email', 'Email', 'email', 'email') +
   leadField(prefix, 'business', 'Business name', 'text', 'organization', true) +
   (v2 ? '' :
   '        <div class="lp2-hp" aria-hidden="true">\n' +
@@ -1426,22 +1448,16 @@ export function transform(html, { replaceExactly, v2 = false }) {
     );
   }
 
-  // ---- v2: email optional + funnel tracking on the bottom (#tour) form ------
+  // ---- v2: funnel tracking on the bottom (#tour) form -----------------------
   // This is the export's own DCLogic validate()/submit(id, ev) — the no-JS
   // fallback and the closing form on every shortened-variant page — reached the
   // same way as everything else here, since buildLandingPage() already ran by the
   // time this file sees the page. validate() also serves the export's own mid
   // ('m-') form, which /lp still carries; harmless there too, since /lp never sets
-  // v2 and this whole block is skipped for it.
+  // v2 and this whole block is skipped for it. Email here stays required, same as
+  // every other form on this page except the chat — see leadField()'s call site
+  // and the bottom form's own markup fix (section 24) for the other two.
   if (v2) {
-    out = replaceExactly(
-      out,
-      `    if (!f.email.trim()) e.email = 'Please enter your email.';
-    else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';`,
-      `    if (f.email.trim() && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';`,
-      1,
-      'v2: email optional in validate()'
-    );
     out = replaceExactly(
       out,
       `  submit(id, ev) {
@@ -2127,9 +2143,9 @@ export function transform(html, { replaceExactly, v2 = false }) {
     out = replaceExactly(
       out,
       '<ul style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 10px 26px; font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">',
-      '<ul class="lp2-hero-badges" style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 10px 26px; font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">',
+      '<ul class="lp2-hero-badges-full" style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 10px 26px; font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">',
       1,
-      'v2: tag the badges row so mobile can reorder it'
+      'v2: tag the badges row so mobile can hide it in favor of a one-line version'
     );
     out = replaceExactly(
       out,
@@ -2138,6 +2154,13 @@ export function transform(html, { replaceExactly, v2 = false }) {
     </div>
   </section>`,
       `        <li>Monthly or Hourly</li>
+      </ul>
+      <ul class="lp2-hero-badges-mobile" style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 8px 6px; font-family: var(--font-heading); font-weight: 600; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">
+        <li>24/7 Access</li>
+        <li aria-hidden="true" style="color: var(--color-accent-400);">&middot;</li>
+        <li>Private</li>
+        <li aria-hidden="true" style="color: var(--color-accent-400);">&middot;</li>
+        <li>Monthly/Hourly</li>
       </ul>
       </div>
       <div class="lp2-hero-form-card" id="hero-form-card">
@@ -2438,17 +2461,13 @@ export function transform(html, { replaceExactly, v2 = false }) {
     );
   }
 
-  // ---- 24. v2: the bottom form's own heading and required email markup --------
-  // Two things the earlier CTA-copy and email-optional passes didn't reach: the
-  // bottom form's heading is its own static "Schedule my tour" text (distinct
+  // ---- 24. v2: the bottom form's own heading -----------------------------------
+  // The bottom form's heading is its own static "Schedule my tour" text, distinct
   // from the dynamic submitLabel button text already fixed, and distinct from
-  // "Schedule a Tour"/"Schedule My Tour" elsewhere); and required="{{ true }}" on
-  // f-email is a second, independent gate from validate() — the form already
-  // carries noValidate so a browser never enforces it, but the attribute (and the
-  // label without an "(optional)" suffix) still misdescribes the field to a
-  // screen reader and to anyone reading the markup. Only f-email is touched: the
-  // export's other required-email field, m-email, belongs to the mid form /lp
-  // alone still renders, and /lp never sets v2.
+  // "Schedule a Tour"/"Schedule My Tour" elsewhere — the earlier CTA-copy pass
+  // didn't reach it. Email on this form stays required (required="{{ true }}" on
+  // f-email, and validate() above, both untouched) — same as every other form on
+  // this page except the chat.
   if (v2) {
     out = replaceExactly(
       out,
@@ -2456,13 +2475,6 @@ export function transform(html, { replaceExactly, v2 = false }) {
       '<h3 style="grid-column: 1 / -1; font-family: var(--font-heading); font-weight: 600; font-size: 28px; line-height: 30px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 4px;">Check availability</h3>',
       1,
       'v2: bottom form heading'
-    );
-    out = replaceExactly(
-      out,
-      '<label for="f-email" style="color: color-mix(in srgb, #FAF8F5 72%, transparent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Email</label>\n              <input class="input" id="f-email" name="email" data-form="end" type="email" autoComplete="email" required="{{ true }}" value="{{ f.email }}" onChange="{{ onInput }}" aria-describedby="e-email"',
-      '<label for="f-email" style="color: color-mix(in srgb, #FAF8F5 72%, transparent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Email <i style="font-style: normal; font-weight: 400; color: color-mix(in srgb, #FAF8F5 55%, transparent);">(optional)</i></label>\n              <input class="input" id="f-email" name="email" data-form="end" type="email" autoComplete="email" value="{{ f.email }}" onChange="{{ onInput }}" aria-describedby="e-email"',
-      1,
-      'v2: bottom form email not required'
     );
   }
 
