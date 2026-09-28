@@ -2292,43 +2292,32 @@ export function transform(html, { replaceExactly, v2 = false }) {
     );
   }
 
-  // ---- 22. v2: the hero image gets AVIF/WebP srcset ----------------------------
-  // Three widths (640/960/1600) in both formats, generated offline and committed
-  // under assets/ — this repo has no image-processing step of its own and assets/
-  // is a plain pass-through directory (PASS_THROUGH, scripts/build.mjs), so that
-  // stays true; nothing here adds a build-time dependency.
-  //
-  // The shared <link rel="preload"> (scripts/build.mjs) still needs to change,
-  // and measuring said so: a first pass that left it alone, pointed at the
-  // original 106KB file, made mobile LCP very slightly WORSE — the preload
-  // scanner fetched that file at high priority while the <picture> below picked
-  // a different, smaller one to actually paint, so the real LCP resource lost
-  // its priority and the preload bytes were wasted twice over. imagesrcset on
-  // the preload link mirrors the <picture>'s own WebP source exactly, so a
-  // browser that ends up rendering the WebP candidate preloads precisely that
-  // file. AVIF-capable browsers still preload a WebP they won't paint — no
-  // combination of standard HTML avoids that, since <link rel=preload> has no
-  // equivalent of <picture>'s per-source `type` negotiation — but that is a
-  // bounded, known cost (one small extra fetch) against the alternative this
-  // replaced (the wrong file entirely, at the wrong priority). The bare <img>
-  // itself is untouched apart from width/height: still the fallback path for a
-  // browser too old for <picture>, unconditionally.
-  if (v2) {
-    out = replaceExactly(
-      out,
-      '<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high">',
-      '<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high" imagesrcset="assets/kitchen-hero-640.webp 640w, assets/kitchen-hero-960.webp 960w, assets/kitchen-hero-1600.webp 1600w" imagesizes="100vw">',
-      1,
-      'v2: hero preload matches the picture srcset'
-    );
-    out = replaceExactly(
-      out,
-      '<img src="assets/kitchen-hero.webp" alt="An operator plating meal-prep containers on a stainless steel workstation under a commercial exhaust hood" fetchPriority="high" style="position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; display: block;" />',
-      '<picture>\n      <source type="image/avif" srcset="assets/kitchen-hero-640.avif 640w, assets/kitchen-hero-960.avif 960w, assets/kitchen-hero-1600.avif 1600w" sizes="100vw" />\n      <source type="image/webp" srcset="assets/kitchen-hero-640.webp 640w, assets/kitchen-hero-960.webp 960w, assets/kitchen-hero-1600.webp 1600w" sizes="100vw" />\n      <img src="assets/kitchen-hero.webp" alt="An operator plating meal-prep containers on a stainless steel workstation under a commercial exhaust hood" fetchPriority="high" width="1600" height="900" style="position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; display: block;" />\n    </picture>',
-      1,
-      'v2: hero image srcset'
-    );
-  }
+  // ---- 22. v2: hero image byte-optimization — attempted, reverted -------------
+  // Three approaches were tried here (an AVIF/WebP <picture>, a plain <img
+  // srcset>, and finally just swapping which single filename src/href point
+  // at) and all three regressed LCP under throttled mobile conditions, verified
+  // at the network level (CDP request/response events, not just the high-level
+  // Resource Timing API, which can double-count a preloaded-then-consumed
+  // resource even when only one real fetch happens). Root cause, confirmed by
+  // direct instrumentation: <x-dc> stays display:none and inert until the DC
+  // runtime's React-based renderer completes its first real render pass —
+  // under 4x CPU throttling that lands around ~1.4-1.6s in, regardless of image
+  // size, and it swaps in a wholesale fresh subtree (500+ freshly constructed
+  // nodes at once), discarding whatever parser/preload-created <img> existed
+  // before it. Reusing the browser's "list of available images" cache across
+  // that swap turned out to depend on the resource still being fresh in
+  // Chromium's preload-match window at that moment — which, empirically, only
+  // held for the export's original filename/bytes (confirmed: the untouched
+  // baseline never double-fetches); every replacement file tried, at every
+  // size and with or without srcset, landed outside that window and paid for a
+  // full second fetch instead of the bytes it saved. Since this page's <x-dc>
+  // can't show ANY content — hero image included — before that render pass
+  // completes, the image's byte size was never going to be the lever that
+  // moves this page's LCP; the render pass itself is. That's a materially
+  // bigger change (reducing what the runtime has to execute before its first
+  // paint) than an image swap, and out of scope here — so this is reverted to
+  // the original, unconditional, already-safe single file rather than ship a
+  // regression. Left as a flagged follow-up in the report.
 
   // ---- 23. v2: the font stylesheet stops blocking first paint -----------------
   // font-display: swap is already active (the shared FONT_CSS URL already carries
