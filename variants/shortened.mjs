@@ -589,6 +589,17 @@ const LP2_V2_CSS = `
 .lp2-hero-facts li[aria-hidden] { color: var(--color-accent-400); }
 
 .lp2-hero-form-card {
+  /* The hero is a [data-band="dark"] section, which redefines --color-text (and
+     --color-divider/--color-accent-700) to a light value so ordinary text sitting
+     directly on the dark backdrop stays readable — every existing dark-band
+     component assumes it never supplies its own background. This card is the
+     first one that does: it's a light island floating on the dark hero photo, so
+     it needs the *un-redefined* light-theme tokens for its own children (h2,
+     label, input, the phone link) — otherwise --color-text resolves to the same
+     light value as the card's own background and every label/heading disappears. */
+  --color-text: #141414;
+  --color-divider: color-mix(in srgb, #141414 16%, transparent);
+  --color-accent-700: #7A5216;
   background: var(--color-bg); color: var(--color-text);
   border: 1px solid var(--color-divider); box-shadow: var(--shadow-lg);
   padding: clamp(20px, 2.6vw, 28px); margin-top: clamp(22px, 4vw, 32px);
@@ -639,6 +650,49 @@ const LP2_V2_CSS = `
     padding-bottom: 22px !important;
   }
   .lp2-hero-form-card { padding: 18px; margin-top: 20px; }
+}
+
+/* ---- mobile hero: form above the fold, everything else reflows around it ----
+   The brief: at 390x844 / 360x800, the form heading and first field must already
+   be visible in the bottom third of the first viewport — not just "the hero is
+   shorter," an actual reordering, since the full headline + full supporting
+   paragraph + rating + badges together are taller than the budget allows no
+   matter how much padding is trimmed.
+   Mechanism: .lp2-hero-copy becomes display:contents on mobile, so its children
+   (eyebrow, hr, headline, paragraphs, phone line, facts, rating, badges) become
+   direct flex items of .lp2-hero-wrap alongside .lp2-hero-form-card, its sibling
+   — only then can the form card slot in *between* them via order. Nothing here
+   runs above 760px: .lp2-hero-copy stays a normal block there, so the desktop
+   two-column grid (scripts above) is completely untouched.
+   Content: a short, mobile-only headline and one-sentence sub-line replace the
+   full-length versions above the fold; the full versions still exist for
+   desktop, and reappear below the form on mobile (order puts them after
+   .lp2-hero-form-card) rather than being deleted, same as the rating and the
+   24/7-access badge row. */
+@media (max-width: 760px) {
+  .lp2-hero-wrap { display: flex; flex-direction: column; }
+  .lp2-hero-copy { display: contents; }
+  .lp2-hero-h1-mobile { order: 2; }
+  .lp2-hero-sub-short { order: 3; }
+  .lp2-hero-phone-line { order: 4; }
+  .lp2-hero-facts { order: 5; }
+  .lp2-hero-form-card { order: 6; }
+  .lp2-hero-h1-full { display: none; }
+  .lp2-hero-sub-full { order: 7; }
+  .lp2-rating { order: 8; }
+  .lp2-hero-badges { order: 9; }
+  /* The form card now starts high enough to land its Phone field inside the
+     fixed accessibility launcher's own box (left:16px, bottom:96px, 54px —
+     scripts/build.mjs), which this reorder can't route around: the launcher is
+     viewport-fixed while the form scrolls with the page, and it must stay put
+     and stay visible everywhere, unlike the call/chat FABs the atform flag
+     already stands down. Insetting the form's own fields — not the card, which
+     keeps its full-width background — clears the launcher's column without
+     moving the control itself. */
+  .lp2-hero-form-card form { padding-left: 58px; }
+}
+@media (min-width: 761px) {
+  .lp2-hero-h1-mobile, .lp2-hero-sub-short { display: none; }
 }
 
 /* ---- the new floating call button, directly above the chat launcher ---- */
@@ -1087,6 +1141,18 @@ const LP2_MODAL_JS_V2 = String.raw`
   // why. Extended to the hero form and the closing #tour form alongside the
   // mid-page one, since this page now carries three inline forms a floating button
   // could sit on top of.
+  //
+  // This script runs at parse time, before the DC runtime's own first render pass
+  // (the one that swaps <x-dc>'s contents in wholesale, well after DOMContentLoaded
+  // under any real-world throttling) — so the very first measure() call below finds
+  // none of these ids yet and leaves the flag off, same as always. That never
+  // mattered while every inline form started below the fold: a real scroll always
+  // arrived before the visitor could reach one, and re-ran measure() with the
+  // now-real elements in place. The hero form breaks that assumption — it's meant
+  // to be on screen with zero scrolling — so a body-level MutationObserver re-runs
+  // measure() once after that render pass lands, the same "watch a stable ancestor,
+  // re-query fresh each time" approach the id lookups above already use, for the
+  // same reason: any node this observed directly would be the one React replaces.
   (function () {
     var ids = ['tour-form', 'hero-form', 'tour'];
     var ticking = false;
@@ -1109,6 +1175,14 @@ const LP2_MODAL_JS_V2 = String.raw`
     }
     document.addEventListener('scroll', onScroll, { capture: true, passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
+    if (window.MutationObserver) {
+      var settleTimer = null;
+      var mo = new MutationObserver(function () {
+        if (settleTimer) clearTimeout(settleTimer);
+        settleTimer = setTimeout(function () { mo.disconnect(); onScroll(); }, 150);
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
     measure();
   })();
 
@@ -1987,6 +2061,21 @@ export function transform(html, { replaceExactly, v2 = false }) {
       1,
       'v2: open hero copy column'
     );
+    // Mobile needs the headline+form to fit above the fold, and the full 3-line
+    // headline is too tall to get there no matter how much padding is trimmed —
+    // see the mobile reorder CSS below for the rest of the story. Rather than
+    // rewrite the one headline both breakpoints share, this adds a second,
+    // shorter one: full version keeps its exact text for desktop (just tagged so
+    // the mobile CSS can hide it), short version is new and mobile-only. Only one
+    // is ever in the accessibility tree at a time — display:none removes the
+    // other from it completely, the same as any responsive image-swap pattern.
+    out = replaceExactly(
+      out,
+      '<h1 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(44px, 6.4vw, 88px); line-height: 1.03; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">\n        <span style="display: block;">Ghost Kitchen Space for Rent</span>\n        <span style="display: block;">in Central Los Angeles.</span>\n        <span style="display: block; color: var(--color-accent-400);">Built for Delivery Brands.</span>\n      </h1>',
+      '<h1 class="lp2-hero-h1-full" style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(44px, 6.4vw, 88px); line-height: 1.03; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">\n        <span style="display: block;">Ghost Kitchen Space for Rent</span>\n        <span style="display: block;">in Central Los Angeles.</span>\n        <span style="display: block; color: var(--color-accent-400);">Built for Delivery Brands.</span>\n      </h1>\n      <h1 class="lp2-hero-h1-mobile" style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 8vw, 38px); line-height: 1.08; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">\n        <span style="display: block;">Ghost Kitchen Space in Central LA.</span>\n        <span style="display: block; color: var(--color-accent-400);">Built for Delivery Brands.</span>\n      </h1>',
+      1,
+      'v2: mobile-only short headline alongside the full one'
+    );
     // Pre-copy-sweep text: LOCATION_COPY/COPY_DASHES (scripts/build.mjs) run as a
     // later, separate pass over the files already written to dist/, after
     // buildLandingPage() — and therefore variant.transform() — has already run and
@@ -1995,12 +2084,16 @@ export function transform(html, { replaceExactly, v2 = false }) {
     // either way for v2: the replacement below matches neither phrase, so the later
     // sweep finds nothing to do on this page and the em-dash guard has nothing left
     // to catch.
+    // Same duplicate-and-tag approach as the headline just above: the full
+    // sentence (with the specifics — 200-600 sq ft, permitting, Health
+    // Department) stays for desktop and reappears below the form on mobile; a
+    // short, one-sentence version is new and sits above the form on mobile only.
     out = replaceExactly(
       out,
       '<p style="font-size: 18px; line-height: 28px; max-width: 54ch; margin: 26px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">Private, fully certified commercial kitchen space in Van Nuys and Los Angeles — already built, already equipped. You bring the menu. We handle zoning, permitting and the city.</p>',
-      '<p style="font-size: 18px; line-height: 28px; max-width: 54ch; margin: 26px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">Certified and ready to cook. Private kitchens, 200&ndash;600 sq ft or by the hour, with 24/7 access. Permitting and Health Department approval, handled.</p>',
+      '<p class="lp2-hero-sub-full" style="font-size: 18px; line-height: 28px; max-width: 54ch; margin: 26px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">Certified and ready to cook. Private kitchens, 200&ndash;600 sq ft or by the hour, with 24/7 access. Permitting and Health Department approval, handled.</p>\n      <p class="lp2-hero-sub-short" style="font-size: 16px; line-height: 24px; max-width: 54ch; margin: 14px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">Certified, ready-to-cook kitchens with 24/7 access.</p>',
       1,
-      'v2: hero supporting line'
+      'v2: hero supporting line (full, desktop) + short mobile-only line'
     );
     out = replaceExactly(
       out,
@@ -2025,6 +2118,16 @@ export function transform(html, { replaceExactly, v2 = false }) {
       </ul>`,
       1,
       'v2: hero CTA becomes phone + facts line'
+    );
+    // Tagged so the mobile reorder CSS can move it below the form — it's the
+    // same "24/7 Access · Private Kitchens · Monthly or Hourly" row the export
+    // always had here, untouched and unmoved on desktop.
+    out = replaceExactly(
+      out,
+      '<ul style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 10px 26px; font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">',
+      '<ul class="lp2-hero-badges" style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 10px 26px; font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">',
+      1,
+      'v2: tag the badges row so mobile can reorder it'
     );
     out = replaceExactly(
       out,
@@ -2274,23 +2377,13 @@ export function transform(html, { replaceExactly, v2 = false }) {
     );
   }
 
-  // ---- 21. v2: the hero video stays off phones ---------------------------------
-  // rewriteRuntime() (scripts/build.mjs, shared/unconditional) already rewrote
-  // the export's own !s.isPhone gate to a connection-speed check, s.cheapNet, so
-  // a fast-connection phone gets the autoplaying background video today on every
-  // shortened-variant page. Restoring the phone gate alongside it, additively,
-  // is a deliberate behavior change beyond that shared rewrite — called out in
-  // the Phase 1 report rather than left silent, since "keep it off phones" reads
-  // as new intent here, whatever a fast connection measures.
-  if (v2) {
-    out = replaceExactly(
-      out,
-      'showHeroVideo: !s.reduced && s.cheapNet,',
-      'showHeroVideo: !s.reduced && s.cheapNet && !s.isPhone,',
-      1,
-      'v2: hero video off on phones'
-    );
-  }
+  // ---- 21. v2: hero video on phones — tried off, put back -----------------------
+  // Phase 1 restored an !s.isPhone gate on top of the shared rewriteRuntime()
+  // connection-speed check (s.cheapNet), as a mobile-performance tradeoff called
+  // out explicitly in that report. Explicit follow-up feedback said the opposite:
+  // the video should autoplay on mobile too, same as it did before that change.
+  // Reverted to exactly the shared, already-tested behavior — connection-speed
+  // gated, not phone-gated — same as every other shortened-variant page.
 
   // ---- 22. v2: hero image byte-optimization — attempted, reverted -------------
   // Three approaches were tried here (an AVIF/WebP <picture>, a plain <img
