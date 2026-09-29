@@ -548,6 +548,84 @@ section[aria-label="Our partners"] > div {
  *  as one constant so it is one injection point instead of several. */
 const LP2_V2_CSS = `
 <style>
+/* ---- metric-matched fallback fonts, so first paint (the LCP stand-in's H1,
+   in particular) doesn't reflow when the real webfont swaps in ----
+   --font-heading/--font-body's shared fallback is plain system-ui, whose
+   glyph widths don't match Barlow (Condensed)'s at all. That mismatch has
+   always existed but was never visible: on every other page, and on this
+   one before the LCP stand-in existed, nothing ever painted text in the
+   fallback before the real webfont arrived, so the swap -- and the reflow
+   it causes -- never had anything on screen yet to shift. The stand-in
+   paints the hero H1 before support.js has even started, let alone
+   finished fetching the webfont, which is exactly the condition this bug
+   needed to become visible -- and PageSpeed's own "Layout shift culprits"
+   audit is what caught it, the same way the stand-in exposed the
+   --edge/--color-accent-400 gap below. Metrics here are Barlow Condensed
+   600 and Barlow 400 against Arial AND Roboto -- both, not just Arial,
+   because local('Arial') alone silently fails on stock Android (Chrome on
+   Android has no font actually named Arial to find, confirmed by testing
+   this exact rule in a real browser: the face's FontFace.status comes back
+   "error" and the whole declaration is skipped, falling through to
+   system-ui as if this fix didn't exist), and Android is most of this
+   brief's own "mobile" number. A second @font-face under a second fallback
+   name, sourced from local('Roboto') -- Android's actual native sans,
+   present on every stock build -- with ITS OWN metrics-derived overrides,
+   covers that case the same way; the two are listed in order in the
+   font stack below and the browser uses whichever one it can actually
+   resolve locally.
+
+   The heading numbers below are NOT the textbook size-adjust formula's own
+   output (web.dev: "Improve font fallbacks with new CSS font descriptors";
+   @capsizecss/metrics' xWidthAvg-ratio approach -- that gives ~79.9%/Arial,
+   ~80.0%/Roboto). Checked those against the real fonts rendering this
+   page's actual headline text (this H1 specifically, all-caps per
+   text-transform below) and they undershot badly, 16-19% too wide on every
+   line: xWidthAvg is a whole-character-set average, and Barlow CONDENSED's
+   condensing plus this headline's own all-caps transform both push it
+   further from Arial/Roboto's proportions than the whole-alphabet average
+   suggests. Replaced with size-adjust measured directly off this headline's
+   own three lines, rendered in the real fonts at a shared reference size --
+   under 2% width divergence on every line, next to the ~17% the formula
+   number left on the table. Barlow 400 (below, body text, not condensed,
+   not all-caps) had no such gap -- its formula and measured numbers agreed
+   within ~1%, so that one keeps the textbook value. */
+@font-face {
+  font-family: 'Barlow Condensed Fallback: Arial';
+  src: local('Arial');
+  size-adjust: 67.60%;
+  ascent-override: 147.93%;
+  descent-override: 29.59%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Barlow Condensed Fallback: Roboto';
+  src: local('Roboto');
+  size-adjust: 73.43%;
+  ascent-override: 136.18%;
+  descent-override: 27.24%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Barlow Fallback: Arial';
+  src: local('Arial');
+  size-adjust: 96.68%;
+  ascent-override: 103.43%;
+  descent-override: 20.69%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Barlow Fallback: Roboto';
+  src: local('Roboto');
+  size-adjust: 96.89%;
+  ascent-override: 103.21%;
+  descent-override: 20.64%;
+  line-gap-override: 0%;
+}
+:root {
+  --font-heading: "Barlow Condensed", "Barlow Condensed Fallback: Arial", "Barlow Condensed Fallback: Roboto", system-ui, sans-serif;
+  --font-body: "Barlow", "Barlow Fallback: Arial", "Barlow Fallback: Roboto", system-ui, sans-serif;
+}
+
 /* ---- the popup's fallback highlight ----
    Briefly marks the form the popup's guaranteed-open check scrolled to, so a visitor
    whose popup failed to render sees why the page just moved under them. */
