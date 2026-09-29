@@ -194,6 +194,51 @@ function gtmHead() {
   );
 }
 
+/** Same container snippet as gtmHead(), timing-gated for one page — see DEFER_GTM
+ *  below tagEveryPage() for which page and why.
+ *
+ *  window.dataLayer and the gtm.start marker are still created immediately, exactly
+ *  like the eager version: this site's own dataLayer.push() event tracking
+ *  (chat_open, generate_lead, etc. — see variants/shortened.mjs) pushes onto that
+ *  array long before GTM itself loads either way, the array just queues them, and
+ *  GTM's own page-load timing stays accurate since gtm.start still reflects the
+ *  real navigation. Only the actual gtm.js fetch is held back — the ~469KB and the
+ *  long main-thread tasks PageSpeed measured competing with first paint — until the
+ *  browser has room for it: first idle moment after `load`, first scroll/tap/
+ *  keypress (whichever comes first), or 4s no matter what, so a visitor who never
+ *  does anything but read the page still eventually gets tagged. Unlike the Vimeo
+ *  facade elsewhere in this rollout, this keeps the unconditional timeout — GTM is
+ *  conversion tracking, not decoration, so it has to fire even for a visitor who
+ *  never scrolls. */
+function gtmHeadDeferred() {
+  return (
+    `<!-- Google Tag Manager -->\n` +
+    `<script>\n` +
+    `window.dataLayer = window.dataLayer || [];\n` +
+    `window.dataLayer.push({'gtm.start': new Date().getTime(), event: 'gtm.js'});\n` +
+    `(function () {\n` +
+    `  var loaded = false;\n` +
+    `  function loadGtm() {\n` +
+    `    if (loaded) return;\n` +
+    `    loaded = true;\n` +
+    `    var d = document, s = 'script', l = 'dataLayer', i = '${GTM_ID}';\n` +
+    `    var f = d.getElementsByTagName(s)[0], j = d.createElement(s);\n` +
+    `    var dl = l != 'dataLayer' ? '&l=' + l : '';\n` +
+    `    j.async = true;\n` +
+    `    j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;\n` +
+    `    f.parentNode.insertBefore(j, f);\n` +
+    `    ['scroll', 'pointerdown', 'keydown'].forEach(function (t) { window.removeEventListener(t, loadGtm, true); });\n` +
+    `  }\n` +
+    `  var ric = window.requestIdleCallback || function (cb) { setTimeout(cb, 200); };\n` +
+    `  window.addEventListener('load', function () { ric(loadGtm, { timeout: 4000 }); });\n` +
+    `  ['scroll', 'pointerdown', 'keydown'].forEach(function (t) { window.addEventListener(t, loadGtm, { capture: true, passive: true }); });\n` +
+    `  setTimeout(loadGtm, 4000);\n` +
+    `})();\n` +
+    `</script>\n` +
+    `<!-- End Google Tag Manager -->`
+  );
+}
+
 /** The no-JS fallback, for immediately after <body>.
  *
  *  Safe there on the landing pages specifically because <x-dc> is body's only child and
@@ -2185,6 +2230,15 @@ function assertNoindexed(html, label) {
  *    to the parent's dataLayer rather than put a second container in the frame. */
 const UNTAGGED = new Set(['lp2.html', 'map.html']);
 
+/** Pages that get gtmHeadDeferred() instead of gtmHead() — see that function for
+ *  what changes and why. Its own PageSpeed Insights run flagged GTM's ~469KB and
+ *  its long main-thread tasks as the page's #2 problem after Vimeo, competing with
+ *  first paint on a page this rollout is otherwise explicitly performance-tuning;
+ *  every other page keeps the eager, synchronous-injection snippet exactly as
+ *  before — this is a page-output decision, same shape as UNTAGGED above, not a
+ *  change to how GTM behaves generally. */
+const DEFER_GTM = new Set(['ghost-kitchen.html']);
+
 /** Top-level directories under dist/ the sweep does not descend into. All three are
  *  verbatim copies — two from the read-only design export, one from vendor/ — so any
  *  HTML inside them would be design-tool debris or library documentation, not a page
@@ -2473,7 +2527,8 @@ async function tagEveryPage() {
         '<meta charset="utf-8">',
         '<head>',
       ],
-      `<link rel="preconnect" href="https://www.googletagmanager.com">\n` + gtmHead(),
+      `<link rel="preconnect" href="https://www.googletagmanager.com">\n` +
+        (DEFER_GTM.has(page) ? gtmHeadDeferred() : gtmHead()),
       page,
       'gtm container script'
     );
