@@ -2536,7 +2536,16 @@ async function tagEveryPage() {
         '<meta charset="utf-8">',
         '<head>',
       ],
-      `<link rel="preconnect" href="https://www.googletagmanager.com">\n` +
+      // The preconnect is only worth its place this early for the eager path: it
+      // warms a connection gtm.js is about to use within the same task. Deferred
+      // pages don't request gtm.js for 5.5s (or an interaction) at the earliest,
+      // by which time a speculative connection opened at navigation start has
+      // typically already gone idle and closed -- so it competes for a share of
+      // the browser's early connection budget (a real cost on a slow/throttled
+      // connection specifically, where that budget is smallest) for a warm-up
+      // that's very unlikely to still be warm when it's actually used. Skipped
+      // for exactly the pages where that trade stops paying for itself.
+      (DEFER_GTM.has(page) ? '' : '<link rel="preconnect" href="https://www.googletagmanager.com">\n') +
         (DEFER_GTM.has(page) ? gtmHeadDeferred() : gtmHead()),
       page,
       'gtm container script'

@@ -548,6 +548,17 @@ section[aria-label="Our partners"] > div {
  *  as one constant so it is one injection point instead of several. */
 const LP2_V2_CSS = `
 <style>
+/* ---- defensive backstop for every <img> on the page ----
+   Every image here already carries its own explicit sizing (width/height
+   attributes, an inline aspect-ratio, or an absolute-fill pattern -- see the
+   per-image work elsewhere in this file and the raw export's own markup),
+   so this rule matches nothing that isn't already correctly sized today.
+   It exists as a floor for whatever isn't: an inline style="" always wins
+   over this regardless of specificity, so it can only affect an <img> that
+   has neither an inline height nor an explicit height attribute, which is
+   exactly the case a future edit could introduce by accident. */
+img { max-width: 100%; height: auto; }
+
 /* ---- metric-matched fallback fonts, so first paint (the LCP stand-in's H1,
    in particular) doesn't reflow when the real webfont swaps in ----
    --font-heading/--font-body's shared fallback is plain system-ui, whose
@@ -624,6 +635,57 @@ const LP2_V2_CSS = `
 :root {
   --font-heading: "Barlow Condensed", "Barlow Condensed Fallback: Arial", "Barlow Condensed Fallback: Roboto", system-ui, sans-serif;
   --font-body: "Barlow", "Barlow Fallback: Arial", "Barlow Fallback: Roboto", system-ui, sans-serif;
+}
+
+/* ---- headline weight only: never swap, so the metric-matched fallback
+   above is belt-and-braces rather than the only thing standing between this
+   page and a shift -- confirmed by testing that BOTH local('Arial') and
+   local('Roboto') fail to resolve in a plain Linux container with no
+   desktop/mobile OS fonts installed, which is a believable description of
+   whatever machine actually runs a PageSpeed/Lighthouse pass. If neither
+   fallback face above can load on a given visitor's device either, this is
+   what actually keeps the swap from happening at all, there or anywhere
+   else: three @font-face rules, identical to Google Fonts' own definition
+   for Barlow Condensed 600 (same URLs, same unicode-ranges -- this repo
+   doesn't self-host, and duplicating the actual font bytes here would be
+   its own maintenance burden for zero benefit) except for font-display,
+   swap -> optional. optional gives the browser a very short window (spec:
+   about 100ms, browser-dependent) to use the real font if it's already
+   available, and otherwise commits to the fallback for this navigation --
+   no later swap, ever, once that window closes. The preload two sections up
+   makes "already available" the common case for a real visitor; optional
+   is what makes the uncommon case (slow connection, cold cache, or a
+   fallback that can't metric-match because neither Arial nor Roboto
+   resolved) cost zero layout shift instead of one. Only the 600 weight is
+   overridden -- the only weight this page's own markup sets on
+   --font-heading text -- so this does not touch how any other weight or
+   the shared design system's own use of the family behaves. Declared after
+   the shared stylesheet in the document, so it wins the cascade for that
+   one weight regardless of which finishes loading first (font selection
+   follows document order, not fetch completion order). */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: optional;
+  src: url(https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4873z3nWuZEC.woff2) format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: optional;
+  src: url(https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4873z3jWuZEC.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: optional;
+  src: url(https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4873z3bWuQ.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* ---- the popup's fallback highlight ----
@@ -2609,18 +2671,54 @@ export function transform(html, { replaceExactly, v2 = false }) {
   // completes, the image's byte size was never going to be the lever that
   // moves this page's LCP; the render pass itself is. That's a materially
   // bigger change (reducing what the runtime has to execute before its first
-  // paint) than an image swap, and out of scope here — so this is reverted to
-  // the original, unconditional, already-safe single file rather than ship a
-  // regression. Left as a flagged follow-up in the report.
+  // paint) than an image swap, and out of scope here — so this markup (the
+  // <x-dc>-internal <img>) is reverted to the original, unconditional,
+  // already-safe single filename rather than ship a regression.
+  //
+  // The LCP stand-in added later in this file ("a temporary static hero, so
+  // the LCP element paints before React") changed what's actually safe to try
+  // here, but not in the direction of a srcset: the stand-in's own <img> and
+  // this <x-dc>-internal one are two separate elements that both point at
+  // "assets/kitchen-hero.webp" today, and that shared filename is exactly what
+  // lets the second one paint instantly once <x-dc> swaps in — it's already in
+  // the browser's cache from the stand-in's own preload, so there's no second
+  // real fetch to wait for. Giving the stand-in a srcset (tried, measured,
+  // reverted — see git history) breaks that: the stand-in then requests a
+  // *different* URL than this <x-dc>-internal <img> still does, the shared
+  // cache entry stops existing, and the <x-dc>-internal one pays for a real,
+  // un-preloaded fetch of the original file precisely when the runtime's
+  // render pass is competing for the main thread — measured making LCP worse,
+  // not better, exactly the failure mode this whole section already
+  // documents.
+  //
+  // Recompressing kitchen-hero.webp itself in place, at its original filename
+  // (tried: 106KB -> ~43KB, 1200w instead of 1600w, quality 70), was going to
+  // be the way around that — same filename, same shared cache entry, so both
+  // <img>s still only cost one real fetch between them, just smaller ones.
+  // Reverted before shipping: this filename turned out not to be
+  // ghost-kitchen's alone. index.html and lp.html use the exact same file as
+  // their OWN hero (confirmed in the built output: identical position:
+  // absolute; inset: 0 usage, same fetchPriority="high"), and
+  // catering-health-permit.html/fda-food-facility-registration.html/
+  // thank-you.html all reference it too, further down their own pages.
+  // Recompressing it — even losslessly-in-spirit, same photo, smaller file —
+  // changes what all of those pages actually serve, which is exactly what
+  // this rollout has stayed away from since the very first commit. Left
+  // alone; flagged as a follow-up in the report rather than done here, since
+  // fixing it for real means either accepting that shared cost sitewide (a
+  // call for whoever owns the whole site, not a ghost-kitchen-only build
+  // flag) or giving ghost-kitchen its own differently-named photo end to end
+  // — including the <x-dc>-internal copy two sections up, which is exactly
+  // the change already proven to regress LCP on its own.
 
   // ---- v2: below-fold images — smaller files, srcset, explicit dimensions -------
-  // kitchen-hero.webp is deliberately NOT touched here, for the exact reason two
-  // sections up: it's the one image on this page that sits behind a <link
-  // rel=preload> and gets caught in the DC runtime's render-pass swap, and every
-  // recompressed/resized/renamed variant tried there regressed LCP under direct
-  // measurement. Nothing below is preloaded and nothing below is above the fold —
-  // by the time a visitor scrolls this far the runtime's initial render finished
-  // long ago, so none of that risk applies here.
+  // kitchen-hero.webp is NOT touched here, for the reason directly above: it's
+  // shared with other pages, not just with the stand-in and the <x-dc>-
+  // internal hero on THIS page, so nothing on this page can safely change its
+  // bytes or its filename at all. Nothing below is preloaded and nothing
+  // below is above the fold — by the time a
+  // visitor scrolls this far the runtime's initial render finished long ago,
+  // so none of that risk applies to what follows.
   //
   // could-be-you.webp, prep-overhead.webp and prep-rail.webp are all used on every
   // other shortened-variant page too (confirmed: dist/index.html, lp.html, and the
@@ -2784,9 +2882,19 @@ export function transform(html, { replaceExactly, v2 = false }) {
     out = replaceExactly(
       out,
       '<title>Ghost Kitchen & Virtual Restaurant Space For Rent In LA | ŌN Kitchens</title>',
-      '<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high">\n<title>Ghost Kitchen & Virtual Restaurant Space For Rent In LA | ŌN Kitchens</title>',
+      // The font preload is the Latin woff2 for Barlow Condensed 600 -- the one
+      // weight the stand-in's own H1 (this page's LCP element) sets on
+      // --font-heading -- fetched straight from the same URL Google Fonts'
+      // own CSS already resolves to (see the @font-face rules further down in
+      // this file), so it's one request either way, just requested sooner.
+      // Only this one weight/subset: preloading every weight this family ships
+      // would compete with the hero image for the same early bandwidth this
+      // is meant to protect, for weights nothing above the fold uses.
+      `<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high">
+<link rel="preload" as="font" type="font/woff2" href="https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4873z3bWuQ.woff2" crossorigin>
+<title>Ghost Kitchen & Virtual Restaurant Space For Rent In LA | ŌN Kitchens</title>`,
       1,
-      'v2: hero preload to the top of head'
+      'v2: hero preload to the top of head, plus preload the headline webfont'
     );
   }
 
