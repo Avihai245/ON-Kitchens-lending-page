@@ -2540,6 +2540,84 @@ export function transform(html, { replaceExactly, v2 = false }) {
     );
   }
 
+  // ---- v2: a temporary static hero, so the LCP element paints before React ----
+  // The real hero (heading + photo) is inside <x-dc>, which is display:none until
+  // support.js's runtime finishes its first render pass -- confirmed by direct CDP
+  // instrumentation elsewhere in this codebase to land ~1.4-1.6s in under 4x CPU
+  // throttling, regardless of the image's own byte size (see the reverted
+  // byte-optimization section above). Nothing can paint before that, including the
+  // LCP element, which is exactly what PageSpeed flags: "rendered client-side by
+  // React... make the hero static HTML in the initial document."
+  //
+  // A full static rewrite of the page was explicitly ruled out — the whole site
+  // depends on this same runtime, and rebuilding it as plain HTML is a different
+  // project, not a performance pass. What ships instead is a small, temporary
+  // stand-in: the same headline text and the same hero photo (identical filename,
+  // so it rides the same <link rel=preload> above rather than a second fetch),
+  // painted as plain markup outside <x-dc> so the x-dc{display:none!important}
+  // rule (scripts/build.mjs, unconditional) never touches it. <x-dc> is body's
+  // only child in the raw export, so this is simply inserted as its sibling —
+  // nothing else in the page competes with it for space or paint time.
+  //
+  // Anchored on the raw '<body>\n<x-dc>' text, not '<body>' alone: this file's
+  // transform() runs before tagEveryPage() (buildLandingPage() calls the variant
+  // transform directly; GTM's noscript tag is inserted afterwards, into every
+  // dist/ file, in that separate later pass — scripts/build.mjs). Anchoring here
+  // means the GTM noscript block lands between <body> and this stand-in once that
+  // pass runs, which is harmless: noscript content never renders with JS enabled.
+  //
+  // It has to come down the moment the real hero exists, and only then: a blind
+  // timer could fire before the real hero is ready (a visible gap) or long after
+  // (two headlines briefly overlapping in the accessibility tree). #hero-form
+  // getting a real height is the same unambiguous "the runtime is actually done"
+  // signal the floating-button fade fix elsewhere in this file already relies on,
+  // checked the same proven way — a fresh getElementById + getBoundingClientRect
+  // on every debounced mutation, never a held reference, since the runtime
+  // replaces the whole subtree wholesale rather than patching it. Fixed
+  // positioning means the swap itself can't shift anything: the stand-in was
+  // never in normal flow, so removing it doesn't move whatever renders under it.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<body>\n<x-dc>',
+      `<body>
+<div id="lp2-hero-standin" style="position: fixed; top: 0; left: 0; width: 100%; height: clamp(600px, 82vh, 880px); z-index: 999999; background: #141414; overflow: hidden; display: grid; align-items: end;">
+  <img src="assets/kitchen-hero.webp" alt="An operator plating meal-prep containers on a stainless steel workstation under a commercial exhaust hood" fetchpriority="high" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: color-mix(in srgb, #141414 66%, transparent);"></div>
+  <div style="position: relative; width: 100%; max-width: clamp(1240px, 90vw, 1760px); margin: 0 auto; padding: 0 var(--edge) clamp(44px, 6vw, 76px);">
+    <h1 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(44px, 6.4vw, 88px); line-height: 1.03; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; color: #FAF8F5; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">
+      <span style="display: block;">Ghost Kitchen Space for Rent</span>
+      <span style="display: block;">in Central Los Angeles.</span>
+      <span style="display: block; color: var(--color-accent-400);">Built for Delivery Brands.</span>
+    </h1>
+  </div>
+</div>
+<script>
+(function () {
+  var standin = document.getElementById('lp2-hero-standin');
+  if (!standin) return;
+  var mo, settleTimer = null;
+  function check() {
+    var real = document.getElementById('hero-form');
+    if (real && real.getBoundingClientRect().height > 0) {
+      standin.remove();
+      mo.disconnect();
+    }
+  }
+  mo = new MutationObserver(function () {
+    if (settleTimer) clearTimeout(settleTimer);
+    settleTimer = setTimeout(check, 150);
+  });
+  mo.observe(document.body, { childList: true, subtree: true });
+  check();
+})();
+</script>
+<x-dc>`,
+      1,
+      'v2: temporary static hero stand-in'
+    );
+  }
+
   // ---- v2: drop the design system's empty, dead bundle script -----------------
   // _ds_bundle.js is a render-blocking <script> (no defer/async) that costs a
   // full request round trip before the parser can continue, for 300 bytes that
