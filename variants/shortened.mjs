@@ -2748,6 +2748,57 @@ export function transform(html, { replaceExactly, v2 = false }) {
   // replaces the whole subtree wholesale rather than patching it. Fixed
   // positioning means the swap itself can't shift anything: the stand-in was
   // never in normal flow, so removing it doesn't move whatever renders under it.
+  //
+  // --edge and --color-accent-400 are hardcoded below to the literal values
+  // they resolve to, rather than read as var(--edge)/var(--color-accent-400).
+  // That is not a style preference; it is the fix for a real, measured CLS
+  // regression this stand-in introduced, root-caused by instrumenting real
+  // layout-shift entries (Playwright + PerformanceObserver under throttled
+  // mobile conditions) rather than guessed at. Three earlier attempts at this
+  // fix — a system font stack, an explicit height/overflow on the headline,
+  // collapsing the three <span>s to one text run with <br> — each left the
+  // measured shift completely unchanged, which was itself the tell that the
+  // cause was never in this markup; all three were reverted once the real
+  // cause below was found, since the height/overflow pair in particular was
+  // actively clipping the headline (confirmed: scrollHeight far exceeded the
+  // guessed-at fixed height at narrow viewports, hiding two of its three
+  // lines) without fixing anything. var(--font-heading) stays exactly as
+  // written — confirmed separately below to not be part of the problem.
+  //
+  // The real cause: this page's actual brand palette (--color-bg: #FAF8F5,
+  // --color-accent-400: #D9AB56, --edge, and the rest) is not in the shared
+  // design-system stylesheet (that file's own tokens are a generic blue) — it is
+  // a second, page-specific `:root` block the export places inside
+  // <x-dc><helmet>, upstream of every other v2 fix in this file. The shared
+  // stylesheet link that used to live in that same <helmet> was already hoisted
+  // into the real <head> for exactly this reason (see buildLandingPage()'s own
+  // doc comment: React re-inserts a <helmet> link on boot, but the browser
+  // populates its .sheet without ever adding it to document.styleSheets, so nothing
+  // in it applies) — this second block was not, and turns out to be affected the
+  // same way. Confirmed directly: polling getComputedStyle(document.documentElement)
+  // for --edge and --color-bg shows both resolve correctly until the instant
+  // support.js removes <x-dc> to boot the real render, sit unresolved/reverted to
+  // the shared stylesheet's generic values for roughly half a second, then resolve
+  // correctly again once React's own re-inserted copy of that block lands. Every
+  // visitor has always paved over this exact gap — nothing has ever painted early
+  // enough to make a color token flickering for half a second at the very top of
+  // the page visible or measurable. This stand-in is the first thing in this
+  // codebase's history to paint into that gap, which is what turned a page-wide,
+  // permanently invisible condition into a specific, measurable layout shift on
+  // exactly the one element on screen at the time. --font-heading is unaffected
+  // and needs no such workaround: it lives only in the shared design-system
+  // stylesheet (confirmed absent from the page-specific block above), which was
+  // already the file hoisted into the real, static <head> for this exact class
+  // of bug — so it is stable across the gap the way the page-specific block is
+  // not.
+  //
+  // Hoisting that second block the same way the stylesheet link already was
+  // would fix the gap at its source, for the real hero too, not just the
+  // stand-in — flagged as a follow-up rather than done here, since it touches
+  // scripts/build.mjs's shared head construction (every page gets the same
+  // palette block) rather than anything v2-only. Sidestepping it here, in the
+  // one place currently capable of noticing it, is the fix that stays inside
+  // this rollout's actual scope.
   if (v2) {
     out = replaceExactly(
       out,
@@ -2756,11 +2807,11 @@ export function transform(html, { replaceExactly, v2 = false }) {
 <div id="lp2-hero-standin" style="position: fixed; top: 0; left: 0; width: 100%; height: clamp(600px, 82vh, 880px); z-index: 999999; background: #141414; overflow: hidden; display: grid; align-items: end;">
   <img src="assets/kitchen-hero.webp" alt="An operator plating meal-prep containers on a stainless steel workstation under a commercial exhaust hood" fetchpriority="high" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;">
   <div aria-hidden="true" style="position: absolute; inset: 0; background: color-mix(in srgb, #141414 66%, transparent);"></div>
-  <div style="position: relative; width: 100%; max-width: clamp(1240px, 90vw, 1760px); margin: 0 auto; padding: 0 var(--edge) clamp(44px, 6vw, 76px);">
+  <div style="position: relative; width: 100%; max-width: clamp(1240px, 90vw, 1760px); margin: 0 auto; padding: 0 clamp(20px, 5vw, 72px) 60px;">
     <h1 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(44px, 6.4vw, 88px); line-height: 1.03; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; color: #FAF8F5; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">
       <span style="display: block;">Ghost Kitchen Space for Rent</span>
       <span style="display: block;">in Central Los Angeles.</span>
-      <span style="display: block; color: var(--color-accent-400);">Built for Delivery Brands.</span>
+      <span style="display: block; color: #D9AB56;">Built for Delivery Brands.</span>
     </h1>
   </div>
 </div>
@@ -2772,7 +2823,8 @@ export function transform(html, { replaceExactly, v2 = false }) {
   function check() {
     var real = document.getElementById('hero-form');
     if (real && real.getBoundingClientRect().height > 0) {
-      standin.remove();
+      standin.style.display = 'none';
+      requestAnimationFrame(function () { standin.remove(); });
       mo.disconnect();
     }
   }
