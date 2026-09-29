@@ -49,23 +49,29 @@ customHeaders:
   # otherwise break the live site with no deploy and no code review.
 
   # ---- Caching -----------------------------------------------------------------
-  # Nothing in the design export has a content hash in its filename, so cache
-  # lifetimes are kept short enough that a redeploy is picked up promptly. Raise
-  # these once filenames are fingerprinted.
-
-  # Images, support.js and the design-system CSS: one day.
+  # Filenames themselves still are not fingerprinted (the design export's own
+  # references would all need rewriting too, everywhere, for that), but every
+  # reference to one of these three patterns, on every page, now carries a
+  # content-hash query string appended at build time (scripts/build.mjs,
+  # fingerprintAssets() — assets/foo.webp?v=<sha256 of foo.webp, truncated>).
+  # A query string busts a cache exactly like a new filename does, so a year is
+  # safe: change the file, the build produces a new hash, the new page HTML asks
+  # for a new URL, and only visitors who already had the OLD bytes cached keep
+  # them — which is correct, since those bytes did not change. HTML itself is
+  # never fingerprinted (see below), so every visitor's next navigation always
+  # picks up whatever ?v= that build produced.
   - pattern: '/assets/**'
     headers:
       - key: 'Cache-Control'
-        value: 'public, max-age=86400'
+        value: 'public, max-age=31536000, immutable'
   - pattern: '/_ds/**'
     headers:
       - key: 'Cache-Control'
-        value: 'public, max-age=86400'
+        value: 'public, max-age=31536000, immutable'
   - pattern: '/support.js'
     headers:
       - key: 'Cache-Control'
-        value: 'public, max-age=86400'
+        value: 'public, max-age=31536000, immutable'
 
   # Vendored libraries carry their version in the path, so they are immutable.
   - pattern: '/vendor/**'

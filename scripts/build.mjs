@@ -12,8 +12,9 @@
 import { CHAT_STEPS, CHAT_CSS, CHAT_JS } from './chat-widget.mjs';
 import { cp, mkdir, rm, readFile, writeFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'palette-and-photography-decisions', 'project');
@@ -2555,6 +2556,107 @@ async function tagEveryPage() {
   );
 }
 
+/** Long-cached file groups: every reference to one of these, on every page, gets a
+ *  content-hash query string appended (assets/foo.webp -> assets/foo.webp?v=xxxx),
+ *  and customHttp.yml then caches these patterns for a year — see the comment on
+ *  that pattern list for why the two changes only work together. vendor/ already
+ *  carries its version in the path (react-18.3.1.production.min.js) and needs
+ *  none of this. Fonts are not included: nothing under them is self-hosted, they
+ *  load from fonts.gstatic.com, whose own cache headers are not this repo's to set. */
+const FINGERPRINTED_DIRS = ['assets', '_ds'];
+const FINGERPRINTED_FILES = ['support.js'];
+
+/** Recursively lists every file under `dir`, as paths relative to OUT using forward
+ *  slashes — the same separator the HTML always uses, regardless of the OS running
+ *  the build. */
+async function listFilesRelative(dir) {
+  const found = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...(await listFilesRelative(full)));
+    } else {
+      found.push(relative(OUT, full).split(sep).join('/'));
+    }
+  }
+  return found;
+}
+
+/** Appends a content-hash query string to every reference to a long-cached file, on
+ *  every page in dist/ — plain src/href attributes and each individual URL inside a
+ *  srcset list alike, since both need the same busting. Run once, last, over the
+ *  fully finished dist/: the hash has to match what actually ships, so this has to
+ *  run after every other rewrite (the copy pass, tagEveryPage()) has already landed.
+ *
+ *  Deliberately sitewide rather than v2-gated: cache headers are a hosting-level
+ *  setting in customHttp.yml, matched by URL pattern, with no per-page mechanism to
+ *  gate on the way HTML/CSS/JS can be — so unlike everything else in this rollout,
+ *  there is no way to raise cache lifetimes for /ghost-kitchen alone. Explicit,
+ *  scoped exception, not a precedent for touching shared output more broadly. */
+async function fingerprintAssets() {
+  const targets = [];
+  for (const dir of FINGERPRINTED_DIRS) {
+    if (existsSync(join(OUT, dir))) targets.push(...(await listFilesRelative(join(OUT, dir))));
+  }
+  for (const file of FINGERPRINTED_FILES) {
+    if (existsSync(join(OUT, file))) targets.push(file);
+  }
+
+  const hashes = new Map();
+  for (const relPath of targets) {
+    const buf = await readFile(join(OUT, relPath));
+    hashes.set(relPath, createHash('sha256').update(buf).digest('hex').slice(0, 10));
+  }
+
+  // Longest path first, so a shorter name can never accidentally match inside a
+  // longer one that happens to start the same way (assets/could-be-you.webp is not
+  // a prefix of assets/could-be-you-480.webp, but nothing here should depend on
+  // that kind of coincidence holding for every current and future filename).
+  const paths = [...hashes.keys()].sort((a, b) => b.length - a.length);
+
+  const pages = await htmlPages();
+  for (const page of pages) {
+    const file = join(OUT, page);
+    let html = await readFile(file, 'utf8');
+    const before = html;
+    for (const relPath of paths) {
+      const hash = hashes.get(relPath);
+      // Matches a bare reference — in a quoted src/href, or as one entry in a
+      // comma-separated srcset — never a reference that already carries ?v= (an
+      // idempotency guard, though this function only ever runs once per build) and
+      // never a longer filename that merely starts with this one.
+      const re = new RegExp(
+        relPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\?v=)(?=["\\s,])',
+        'g'
+      );
+      html = html.replace(re, `${relPath}?v=${hash}`);
+    }
+    if (html !== before) await writeFile(file, html);
+  }
+
+  // Proven, not trusted: every occurrence of every fingerprinted path, across every
+  // page, now carries ?v=<its own hash> — none left bare, none doubled.
+  const allHtml = (await Promise.all(pages.map((p) => readFile(join(OUT, p), 'utf8')))).join('\n');
+  for (const relPath of paths) {
+    const hash = hashes.get(relPath);
+    const escaped = relPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const bare = (allHtml.match(new RegExp(escaped + '(?!\\?v=)(?=["\\s,])', 'g')) || []).length;
+    const versioned = (allHtml.match(new RegExp(escaped + '\\?v=' + hash + '(?=["\\s,])', 'g')) || []).length;
+    if (bare !== 0) {
+      throw new Error(`[build] fingerprintAssets: ${relPath} still has ${bare} unversioned reference(s).`);
+    }
+    if (versioned === 0 && targets.includes(relPath)) {
+      // Not an error — plenty of generated files (every extra srcset width, the
+      // partner logos, review photos) are only reachable from ghost-kitchen or not
+      // referenced by <img>/<source> at all yet, and that's fine; this only checks
+      // that whichever references DO exist are all correctly versioned, above.
+      continue;
+    }
+  }
+
+  console.log(`  cache busting  <- ?v=<hash> on ${hashes.size} fingerprinted file(s) across ${pages.length} page(s)`);
+}
+
 async function buildThankYou() {
   const src = await readFile(join(SRC, ENTRY), 'utf8');
 
@@ -2762,6 +2864,7 @@ async function main() {
   await assertChatCopy();
   await removeCopyDashes();
   await tagEveryPage();
+  await fingerprintAssets();
 
   // Loud when unset, because the failure is silent everywhere else: the forms validate,
   // the visitor reaches /thank-you, and GTM reports a conversion — for a lead that was
