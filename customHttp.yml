@@ -97,17 +97,18 @@ customHeaders:
       - key: 'Cache-Control'
         value: 'public, max-age=0, must-revalidate'
 
-  # ---- /ghost-kitchen only: Content-Security-Policy -----------------------------
+  # ---- v2 pages only: Content-Security-Policy ------------------------------------
   # Everywhere else on the site keeps no CSP, for the reason given above (inline
   # style="" on every element, no way to hash or nonce that away without breaking
-  # the export). /ghost-kitchen is different: every inline SCRIPT on it is one this
-  # repo authors and controls (see variants/shortened.mjs and the raw export), so
-  # each one can be hashed instead of needing 'unsafe-inline' for script-src. Style
-  # still can't be hashed the same way — inline style attributes are far too many
-  # and some are set at runtime by React itself, which no build-time hash could
-  # ever cover — so style-src keeps 'unsafe-inline', same as the sitewide draft.
+  # the export). The four v2 pages below are different: every inline SCRIPT on
+  # each one is one this repo authors and controls (see variants/shortened.mjs
+  # and the raw export), so each script can be hashed instead of needing
+  # 'unsafe-inline' for script-src. Style still can't be hashed the same way —
+  # inline style attributes are far too many and some are set at runtime by
+  # React itself, which no build-time hash could ever cover — so style-src
+  # keeps 'unsafe-inline', same as the sitewide draft.
   #
-  # Both patterns exist because it is not documented anywhere reliable whether
+  # Two patterns per page because it is not documented anywhere reliable whether
   # Amplify's custom-headers matcher runs before or after clean-URL resolution
   # (see scripts/build.mjs's note on THANK_YOU_PATH for that resolution) — belt and
   # suspenders, same reasoning as '**/*.html' plus '/index.html' above.
@@ -122,28 +123,78 @@ customHeaders:
   # visitor's own browser console, under Issues -> Content Security Policy) without
   # ever blocking anything. Once you've watched it for real traffic and seen no
   # unexpected violations, flip both keys below from
-  # 'Content-Security-Policy-Report-Only' to 'Content-Security-Policy' to enforce.
+  # 'Content-Security-Policy-Report-Only' to 'Content-Security-Policy' to enforce,
+  # per page once that page's own traffic has been watched.
   #
-  # The value itself is generated, not hand-written — scripts/build.mjs,
-  # computeGhostKitchenCsp(), hashes every inline <script> straight out of the
-  # built dist/ghost-kitchen.html and rewrites the two lines between the markers
-  # below on every build, so the policy can never drift out of sync with the
-  # scripts it's supposed to cover. Do not hand-edit the value between the
-  # markers; edit the origin list or the reasoning in computeGhostKitchenCsp()
-  # instead and let the next build regenerate it.
+  # Each value is generated, not hand-written — scripts/build.mjs,
+  # computeCspFor(), hashes every inline <script> straight out of that page's own
+  # built dist/ output and rewrites the two lines between that page's own markers
+  # below on every build, so no page's policy can drift out of sync with the
+  # scripts it's supposed to cover, and one page's hashes can never land under
+  # another page's markers. Do not hand-edit a value between markers; edit the
+  # origin list or the reasoning in computeCspFor() instead and let the next
+  # build regenerate all four.
+  - pattern: '/'
+    headers:
+      - key: 'Cross-Origin-Opener-Policy'
+        value: 'same-origin-allow-popups'
+      # BEGIN GENERATED CSP: main
+      - key: 'Content-Security-Policy-Report-Only'
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-JauNLayjQ2RiqxCjoRX57xNO4WoqHlnR468ibN3KP0I=' 'sha256-UyDwVl0VQX8iAlCIyGDnxwu4yYofofwAr3X6ybYPVtE=' 'sha256-t/pSmL5RzLxGXb0pFwfmuBC880U8lixYrCjDpNamglY=' 'sha256-q0PvztS1YEhB6VkizxWzbKj4H1DTdwvcDyuIMOSzjLU=' 'sha256-u1jr6gSjj5S00JKWZwJcVHwvkwUQsVOc9s92mMleIZo=' 'sha256-hB4WUo7GLySAUU5BwU+kcWGggUUIbt1URzwu26ftkUU=' 'sha256-bWjouFpJjGaZhAm1zvIsjiorwia3BoOh9mjLNlBRk8o=' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.facebook.com https://*.vimeocdn.com; connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://www.facebook.com https://hooks.example-test-receiver.com; frame-src 'self' https://player.vimeo.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
+      # END GENERATED CSP: main
+  - pattern: '/index.html'
+    headers:
+      - key: 'Cross-Origin-Opener-Policy'
+        value: 'same-origin-allow-popups'
+      # BEGIN GENERATED CSP: main
+      - key: 'Content-Security-Policy-Report-Only'
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-JauNLayjQ2RiqxCjoRX57xNO4WoqHlnR468ibN3KP0I=' 'sha256-UyDwVl0VQX8iAlCIyGDnxwu4yYofofwAr3X6ybYPVtE=' 'sha256-t/pSmL5RzLxGXb0pFwfmuBC880U8lixYrCjDpNamglY=' 'sha256-q0PvztS1YEhB6VkizxWzbKj4H1DTdwvcDyuIMOSzjLU=' 'sha256-u1jr6gSjj5S00JKWZwJcVHwvkwUQsVOc9s92mMleIZo=' 'sha256-hB4WUo7GLySAUU5BwU+kcWGggUUIbt1URzwu26ftkUU=' 'sha256-bWjouFpJjGaZhAm1zvIsjiorwia3BoOh9mjLNlBRk8o=' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.facebook.com https://*.vimeocdn.com; connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://www.facebook.com https://hooks.example-test-receiver.com; frame-src 'self' https://player.vimeo.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
+      # END GENERATED CSP: main
   - pattern: '/ghost-kitchen'
     headers:
       - key: 'Cross-Origin-Opener-Policy'
         value: 'same-origin-allow-popups'
-      # BEGIN GENERATED CSP
+      # BEGIN GENERATED CSP: ghost-kitchen
       - key: 'Content-Security-Policy-Report-Only'
         value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-JauNLayjQ2RiqxCjoRX57xNO4WoqHlnR468ibN3KP0I=' 'sha256-ViDt8N7WsAjU7WjSlq6R6+PeQLA3n2JZfMJ0qJCdE+8=' 'sha256-t/pSmL5RzLxGXb0pFwfmuBC880U8lixYrCjDpNamglY=' 'sha256-q0PvztS1YEhB6VkizxWzbKj4H1DTdwvcDyuIMOSzjLU=' 'sha256-u1jr6gSjj5S00JKWZwJcVHwvkwUQsVOc9s92mMleIZo=' 'sha256-hB4WUo7GLySAUU5BwU+kcWGggUUIbt1URzwu26ftkUU=' 'sha256-bWjouFpJjGaZhAm1zvIsjiorwia3BoOh9mjLNlBRk8o=' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.facebook.com https://*.vimeocdn.com; connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://www.facebook.com https://hooks.example-test-receiver.com; frame-src 'self' https://player.vimeo.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
-      # END GENERATED CSP
+      # END GENERATED CSP: ghost-kitchen
   - pattern: '/ghost-kitchen.html'
     headers:
       - key: 'Cross-Origin-Opener-Policy'
         value: 'same-origin-allow-popups'
-      # BEGIN GENERATED CSP
+      # BEGIN GENERATED CSP: ghost-kitchen
       - key: 'Content-Security-Policy-Report-Only'
         value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-JauNLayjQ2RiqxCjoRX57xNO4WoqHlnR468ibN3KP0I=' 'sha256-ViDt8N7WsAjU7WjSlq6R6+PeQLA3n2JZfMJ0qJCdE+8=' 'sha256-t/pSmL5RzLxGXb0pFwfmuBC880U8lixYrCjDpNamglY=' 'sha256-q0PvztS1YEhB6VkizxWzbKj4H1DTdwvcDyuIMOSzjLU=' 'sha256-u1jr6gSjj5S00JKWZwJcVHwvkwUQsVOc9s92mMleIZo=' 'sha256-hB4WUo7GLySAUU5BwU+kcWGggUUIbt1URzwu26ftkUU=' 'sha256-bWjouFpJjGaZhAm1zvIsjiorwia3BoOh9mjLNlBRk8o=' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.facebook.com https://*.vimeocdn.com; connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://www.facebook.com https://hooks.example-test-receiver.com; frame-src 'self' https://player.vimeo.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
-      # END GENERATED CSP
+      # END GENERATED CSP: ghost-kitchen
+  - pattern: '/catering-health-permit'
+    headers:
+      - key: 'Cross-Origin-Opener-Policy'
+        value: 'same-origin-allow-popups'
+      # BEGIN GENERATED CSP: catering-health-permit
+      - key: 'Content-Security-Policy-Report-Only'
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-JauNLayjQ2RiqxCjoRX57xNO4WoqHlnR468ibN3KP0I=' 'sha256-MRgcx1oiKj+6Oa0PPL/B+NErPYUvNuBeBUGsB87fw2g=' 'sha256-t/pSmL5RzLxGXb0pFwfmuBC880U8lixYrCjDpNamglY=' 'sha256-q0PvztS1YEhB6VkizxWzbKj4H1DTdwvcDyuIMOSzjLU=' 'sha256-u1jr6gSjj5S00JKWZwJcVHwvkwUQsVOc9s92mMleIZo=' 'sha256-hB4WUo7GLySAUU5BwU+kcWGggUUIbt1URzwu26ftkUU=' 'sha256-bWjouFpJjGaZhAm1zvIsjiorwia3BoOh9mjLNlBRk8o=' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.facebook.com https://*.vimeocdn.com; connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://www.facebook.com https://hooks.example-test-receiver.com; frame-src 'self' https://player.vimeo.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
+      # END GENERATED CSP: catering-health-permit
+  - pattern: '/catering-health-permit.html'
+    headers:
+      - key: 'Cross-Origin-Opener-Policy'
+        value: 'same-origin-allow-popups'
+      # BEGIN GENERATED CSP: catering-health-permit
+      - key: 'Content-Security-Policy-Report-Only'
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-JauNLayjQ2RiqxCjoRX57xNO4WoqHlnR468ibN3KP0I=' 'sha256-MRgcx1oiKj+6Oa0PPL/B+NErPYUvNuBeBUGsB87fw2g=' 'sha256-t/pSmL5RzLxGXb0pFwfmuBC880U8lixYrCjDpNamglY=' 'sha256-q0PvztS1YEhB6VkizxWzbKj4H1DTdwvcDyuIMOSzjLU=' 'sha256-u1jr6gSjj5S00JKWZwJcVHwvkwUQsVOc9s92mMleIZo=' 'sha256-hB4WUo7GLySAUU5BwU+kcWGggUUIbt1URzwu26ftkUU=' 'sha256-bWjouFpJjGaZhAm1zvIsjiorwia3BoOh9mjLNlBRk8o=' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.facebook.com https://*.vimeocdn.com; connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://www.facebook.com https://hooks.example-test-receiver.com; frame-src 'self' https://player.vimeo.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
+      # END GENERATED CSP: catering-health-permit
+  - pattern: '/fda-food-facility-registration'
+    headers:
+      - key: 'Cross-Origin-Opener-Policy'
+        value: 'same-origin-allow-popups'
+      # BEGIN GENERATED CSP: fda-food-facility-registration
+      - key: 'Content-Security-Policy-Report-Only'
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-JauNLayjQ2RiqxCjoRX57xNO4WoqHlnR468ibN3KP0I=' 'sha256-bjB8RPvhsCF3oaxsywn1uBhJuJIZgs1u2p9gbfdZtb4=' 'sha256-t/pSmL5RzLxGXb0pFwfmuBC880U8lixYrCjDpNamglY=' 'sha256-q0PvztS1YEhB6VkizxWzbKj4H1DTdwvcDyuIMOSzjLU=' 'sha256-u1jr6gSjj5S00JKWZwJcVHwvkwUQsVOc9s92mMleIZo=' 'sha256-hB4WUo7GLySAUU5BwU+kcWGggUUIbt1URzwu26ftkUU=' 'sha256-bWjouFpJjGaZhAm1zvIsjiorwia3BoOh9mjLNlBRk8o=' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.facebook.com https://*.vimeocdn.com; connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://www.facebook.com https://hooks.example-test-receiver.com; frame-src 'self' https://player.vimeo.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
+      # END GENERATED CSP: fda-food-facility-registration
+  - pattern: '/fda-food-facility-registration.html'
+    headers:
+      - key: 'Cross-Origin-Opener-Policy'
+        value: 'same-origin-allow-popups'
+      # BEGIN GENERATED CSP: fda-food-facility-registration
+      - key: 'Content-Security-Policy-Report-Only'
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-JauNLayjQ2RiqxCjoRX57xNO4WoqHlnR468ibN3KP0I=' 'sha256-bjB8RPvhsCF3oaxsywn1uBhJuJIZgs1u2p9gbfdZtb4=' 'sha256-t/pSmL5RzLxGXb0pFwfmuBC880U8lixYrCjDpNamglY=' 'sha256-q0PvztS1YEhB6VkizxWzbKj4H1DTdwvcDyuIMOSzjLU=' 'sha256-u1jr6gSjj5S00JKWZwJcVHwvkwUQsVOc9s92mMleIZo=' 'sha256-hB4WUo7GLySAUU5BwU+kcWGggUUIbt1URzwu26ftkUU=' 'sha256-bWjouFpJjGaZhAm1zvIsjiorwia3BoOh9mjLNlBRk8o=' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.facebook.com https://*.vimeocdn.com; connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://www.facebook.com https://hooks.example-test-receiver.com; frame-src 'self' https://player.vimeo.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
+      # END GENERATED CSP: fda-food-facility-registration
