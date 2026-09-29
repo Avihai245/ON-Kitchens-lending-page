@@ -204,13 +204,23 @@ function gtmHead() {
  *  array long before GTM itself loads either way, the array just queues them, and
  *  GTM's own page-load timing stays accurate since gtm.start still reflects the
  *  real navigation. Only the actual gtm.js fetch is held back — the ~469KB and the
- *  long main-thread tasks PageSpeed measured competing with first paint — until the
- *  browser has room for it: first idle moment after `load`, first scroll/tap/
- *  keypress (whichever comes first), or 4s no matter what, so a visitor who never
- *  does anything but read the page still eventually gets tagged. Unlike the Vimeo
- *  facade elsewhere in this rollout, this keeps the unconditional timeout — GTM is
- *  conversion tracking, not decoration, so it has to fire even for a visitor who
- *  never scrolls. */
+ *  long main-thread tasks PageSpeed measured competing with first paint.
+ *
+ *  First cut of this (see git history) also fired on the first idle moment after
+ *  `load`. Measured TBT went UP after shipping that version — 510ms to 4,630ms
+ *  mobile — because the LCP stand-in (variants/shortened.mjs) moved FCP much
+ *  earlier without moving support.js's own boot cost, so `load` firing early just
+ *  meant GTM's ~2.8s of script work now started while React was still hydrating
+ *  instead of after it, and TBT is everything long-task between FCP and TTI —
+ *  moving FCP earlier without moving that cost pulled more of it inside the
+ *  window instead of outside it. The `load`+idle path is gone: the only triggers
+ *  now are genuine visitor engagement (first scroll/tap/keypress, unchanged) or a
+ *  flat 5.5s from navigation start, whichever comes first — long enough to almost
+ *  never land on top of support.js's own boot window, short enough that a visitor
+ *  who never interacts still gets tagged. Unlike the Vimeo facade elsewhere in
+ *  this rollout, this keeps the unconditional timeout — GTM is conversion
+ *  tracking, not decoration, so it has to fire even for a visitor who never
+ *  scrolls. */
 function gtmHeadDeferred() {
   return (
     `<!-- Google Tag Manager -->\n` +
@@ -230,10 +240,8 @@ function gtmHeadDeferred() {
     `    f.parentNode.insertBefore(j, f);\n` +
     `    ['scroll', 'pointerdown', 'keydown'].forEach(function (t) { window.removeEventListener(t, loadGtm, true); });\n` +
     `  }\n` +
-    `  var ric = window.requestIdleCallback || function (cb) { setTimeout(cb, 200); };\n` +
-    `  window.addEventListener('load', function () { ric(loadGtm, { timeout: 4000 }); });\n` +
     `  ['scroll', 'pointerdown', 'keydown'].forEach(function (t) { window.addEventListener(t, loadGtm, { capture: true, passive: true }); });\n` +
-    `  setTimeout(loadGtm, 4000);\n` +
+    `  setTimeout(loadGtm, 5500);\n` +
     `})();\n` +
     `</script>\n` +
     `<!-- End Google Tag Manager -->`
