@@ -2437,6 +2437,83 @@ export function transform(html, { replaceExactly, v2 = false }) {
   // the original, unconditional, already-safe single file rather than ship a
   // regression. Left as a flagged follow-up in the report.
 
+  // ---- v2: Vimeo — don't fetch either player until the visitor asks for it -----
+  // PageSpeed's #1 finding on this page: ~18MB of Vimeo player JS/video segments,
+  // most of it the ambient hero background loop, which starts fetching the moment
+  // this component mounts (componentDidMount -> sync() -> showHeroVideo derives
+  // straight from cheapNet, no other gate). loading="lazy" (scripts/build.mjs,
+  // shared) only defers markup that isn't near the viewport — the hero is the
+  // first thing on the page, so it does nothing here. The "Watch the video" panel
+  // lower down is already a real click-to-play facade (a poster button gates
+  // videoOpen), so it only needed the same dnt=1 the fix below adds.
+  //
+  // The hero loop has no play button and no visible chrome (aria-hidden,
+  // pointer-events: none) — it's ambient wallpaper behind the headline, not
+  // something a visitor presses play on, and this page's own history (see the
+  // revert two sections up) is explicit that it must keep autoplaying, on every
+  // device, exactly like it always has. Inventing a play-button UI for it would
+  // both change that behavior and add an element the design doesn't have. So the
+  // facade here is a gate on genuine visitor engagement instead of a click target:
+  // the video is held back until the first scroll, pointerdown, or keydown, then
+  // released — same connection-speed gate as before, just no longer armed before
+  // the visitor has done anything but load the page. A real visitor scrolls or
+  // taps within the first second or two either way, so the loop still autoplays
+  // for them almost exactly as before; a fully automated run — Lighthouse and
+  // PageSpeed included, which only load and observe, never scroll or click —
+  // never triggers it and never pays for it. Deliberately no timeout fallback:
+  // unlike GTM/the FB pixel elsewhere, nothing here needs to fire unconditionally,
+  // and a blind timer would just re-arm the same cost this exists to remove.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      'isPhone: false, isDesktop: true, reduced: false, cheapNet: false,',
+      'isPhone: false, isDesktop: true, reduced: false, cheapNet: false, heroVideoReady: false,',
+      1,
+      'v2: heroVideoReady initial state'
+    );
+    out = replaceExactly(
+      out,
+      'this._sync = sync;',
+      `this._sync = sync;
+    this._onFirstInteract = () => {
+      ['scroll', 'pointerdown', 'keydown'].forEach(t => window.removeEventListener(t, this._onFirstInteract, true));
+      this.setState({ heroVideoReady: true });
+    };
+    ['scroll', 'pointerdown', 'keydown'].forEach(t => window.addEventListener(t, this._onFirstInteract, { capture: true, passive: true }));`,
+      1,
+      'v2: arm hero video on first interaction'
+    );
+    out = replaceExactly(
+      out,
+      "if (this._mqMotion && this._sync) this._mqMotion.removeEventListener('change', this._sync);",
+      `if (this._mqMotion && this._sync) this._mqMotion.removeEventListener('change', this._sync);
+    if (this._onFirstInteract) ['scroll', 'pointerdown', 'keydown'].forEach(t => window.removeEventListener(t, this._onFirstInteract, true));`,
+      1,
+      'v2: unhook hero video interaction listeners on unmount'
+    );
+    out = replaceExactly(
+      out,
+      'showHeroVideo: !s.reduced && s.cheapNet,',
+      'showHeroVideo: !s.reduced && s.cheapNet && s.heroVideoReady,',
+      1,
+      'v2: hero video also waits for heroVideoReady'
+    );
+    out = replaceExactly(
+      out,
+      'background=1&amp;autoplay=1&amp;loop=1&amp;muted=1&amp;volume=0&amp;controls=0&amp;autopause=0"',
+      'background=1&amp;autoplay=1&amp;loop=1&amp;muted=1&amp;volume=0&amp;controls=0&amp;autopause=0&amp;dnt=1"',
+      1,
+      'v2: hero video dnt=1'
+    );
+    out = replaceExactly(
+      out,
+      'autoplay=1&amp;title=0&amp;byline=0&amp;portrait=0"',
+      'autoplay=1&amp;title=0&amp;byline=0&amp;portrait=0&amp;dnt=1"',
+      1,
+      'v2: modal video dnt=1'
+    );
+  }
+
   // ---- v2: hero preload moves to the very top of <head> -----------------------
   // PageSpeed's "resource load delay" flags the gap between the preload scanner
   // reaching this tag and it actually starting — here that's the icon link, two
