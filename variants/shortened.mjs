@@ -2437,6 +2437,80 @@ export function transform(html, { replaceExactly, v2 = false }) {
   // the original, unconditional, already-safe single file rather than ship a
   // regression. Left as a flagged follow-up in the report.
 
+  // ---- v2: below-fold images — smaller files, srcset, explicit dimensions -------
+  // kitchen-hero.webp is deliberately NOT touched here, for the exact reason two
+  // sections up: it's the one image on this page that sits behind a <link
+  // rel=preload> and gets caught in the DC runtime's render-pass swap, and every
+  // recompressed/resized/renamed variant tried there regressed LCP under direct
+  // measurement. Nothing below is preloaded and nothing below is above the fold —
+  // by the time a visitor scrolls this far the runtime's initial render finished
+  // long ago, so none of that risk applies here.
+  //
+  // could-be-you.webp, prep-overhead.webp and prep-rail.webp are all used on every
+  // other shortened-variant page too (confirmed: dist/index.html, lp.html, and the
+  // two info pages all reference the same three filenames), so the originals are
+  // left byte-for-byte alone and every new file below ships under a new name
+  // instead — could-be-you-{480,650,800,1200}.{webp,avif}, prep-overhead-{480,650,
+  // 1000}.{webp,avif}, prep-rail-opt.webp — generated once (sharp, quality 65-70
+  // per the brief, AVIF a few points lower for comparable perceived quality) and
+  // committed as static files, same as every other asset in this repo. Only this
+  // page's markup, v2-gated below, ever points at them, so every other page's
+  // output is provably unaffected regardless of what these new files contain.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<img src="assets/could-be-you.webp" alt="A cook plating bowls in a stainless commercial kitchen, annotated: this could be you, and this could be your kitchen, your logo could be here" loading="lazy" width="1200" height="932" />',
+      `<picture>
+        <source type="image/avif" srcset="assets/could-be-you-480.avif 480w, assets/could-be-you-650.avif 650w, assets/could-be-you-800.avif 800w, assets/could-be-you-1200.avif 1200w" sizes="(max-width: 760px) 100vw, 50vw" />
+        <source type="image/webp" srcset="assets/could-be-you-480.webp 480w, assets/could-be-you-650.webp 650w, assets/could-be-you-800.webp 800w, assets/could-be-you-1200.webp 1200w" sizes="(max-width: 760px) 100vw, 50vw" />
+        <img src="assets/could-be-you-1200.webp" alt="A cook plating bowls in a stainless commercial kitchen, annotated: this could be you, and this could be your kitchen, your logo could be here" loading="lazy" decoding="async" width="1200" height="932" />
+      </picture>`,
+      1,
+      'v2: could-be-you responsive picture'
+    );
+    out = replaceExactly(
+      out,
+      '<img src="assets/prep-overhead.webp" alt="Two cooks portioning bowls and packing delivery containers across a stainless prep table" loading="lazy" style="width: 100%; aspect-ratio: 4 / 3.4; object-fit: cover; display: block;" />',
+      `<picture>
+        <source type="image/avif" srcset="assets/prep-overhead-480.avif 480w, assets/prep-overhead-650.avif 650w, assets/prep-overhead-1000.avif 1000w" sizes="(max-width: 760px) 100vw, 50vw" />
+        <source type="image/webp" srcset="assets/prep-overhead-480.webp 480w, assets/prep-overhead-650.webp 650w, assets/prep-overhead-1000.webp 1000w" sizes="(max-width: 760px) 100vw, 50vw" />
+        <img src="assets/prep-overhead-1000.webp" alt="Two cooks portioning bowls and packing delivery containers across a stainless prep table" loading="lazy" decoding="async" style="width: 100%; aspect-ratio: 4 / 3.4; object-fit: cover; display: block;" />
+      </picture>`,
+      1,
+      'v2: prep-overhead responsive picture'
+    );
+    out = replaceExactly(
+      out,
+      '<img src="assets/prep-rail.webp" alt="" loading="lazy" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0.8;" />',
+      '<img src="assets/prep-rail-opt.webp" alt="" loading="lazy" decoding="async" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0.8;" />',
+      1,
+      'v2: prep-rail recompressed'
+    );
+    // Six review photos, each appearing twice (the visible strip plus its marquee
+    // duplicate) at one shared intrinsic size — real width/height so the browser
+    // reserves the right box before any of them has loaded, instead of the
+    // width:100%/height:auto pair alone, which has nothing to size against until
+    // the byte arrive.
+    out = replaceExactly(
+      out,
+      'loading="lazy" style="width: 100%; height: auto; display: block;" />',
+      'loading="lazy" decoding="async" width="760" height="507" style="width: 100%; height: auto; display: block;" />',
+      12,
+      'v2: review photo dimensions'
+    );
+    // Everything left carrying loading="lazy" at this point is the eight partner
+    // logos (each appearing twice) -- already small, not named in the brief, but
+    // decoding="async" is free and applies the same "don't block the main thread
+    // decoding an off-screen image" fix uniformly.
+    out = replaceExactly(
+      out,
+      'loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />',
+      'loading="lazy" decoding="async" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />',
+      16,
+      'v2: partner logo decoding=async'
+    );
+  }
+
   // ---- v2: Vimeo — don't fetch either player until the visitor asks for it -----
   // PageSpeed's #1 finding on this page: ~18MB of Vimeo player JS/video segments,
   // most of it the ambient hero background loop, which starts fetching the moment
