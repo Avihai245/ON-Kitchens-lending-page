@@ -831,7 +831,14 @@ img { max-width: 100%; height: auto; }
      ("Private Kitchens" -> "Private", "Monthly or Hourly" -> "Monthly/Hourly")
      plus a smaller size, and the original full-text row hidden on mobile
      rather than resized, so desktop keeps its exact original text untouched. */
-  .lp2-hero-badges-full { display: none; }
+  /* Needs !important, same reason as .lp2-hero-badges-mobile below: this
+     element's own inline style sets display:flex, which an ordinary class
+     rule can never win against regardless of specificity. Without it, the
+     desktop badge row stayed visible on mobile too, right under the eyebrow
+     -- its own margin/border/padding (sized for sitting after the rating row
+     on desktop) rendered as a blank gap and a stray rule line above the real
+     mobile-only headline. */
+  .lp2-hero-badges-full { display: none !important; }
 }
 @media (min-width: 761px) {
   .lp2-hero-h1-mobile, .lp2-hero-sub-short { display: none; }
