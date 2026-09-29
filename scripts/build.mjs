@@ -93,7 +93,40 @@ const THANK_YOU_FILE = 'thank-you.html';
 const PAGES = [
   // /: the shortened, redesigned page. Page-specific overrides live in
   // variants/shortened.mjs, applied last — see buildLandingPage()'s own doc comment.
-  { outFile: 'index.html', slug: 'main', variant: 'shortened' },
+  //
+  // hero here is the raw export's own original eyebrow/headline (see
+  // heroOverride()'s own anchor text below) — spelled out explicitly, rather
+  // than left as the old no-op `hero: null`, only so v2 has real hero data to
+  // read once it's turned on. heroOverride() replaces the anchor with these
+  // exact same words, so this is a no-op for what visitors see. sub/subShort
+  // are new: the v2 hero form's supporting line, adapted from PAGE_DESCRIPTION
+  // (the site's own existing, already-approved default copy) rather than
+  // written fresh.
+  {
+    outFile: 'index.html',
+    slug: 'main',
+    variant: 'shortened',
+    v2: true,
+    hero: {
+      // Matches the other three shortened-variant pages' own eyebrow exactly
+      // (all one location since the consolidation LOCATION_COPY's sweep exists
+      // for) rather than the raw export's own, older "· Los Angeles" default.
+      eyebrow: 'Commercial kitchen rental · USC / Central Los Angeles',
+      lines: ['A certified kitchen.', 'No construction.', 'No waiting.'],
+      // Adapted from PAGE_DESCRIPTION below (a literal, not a reference: PAGES
+      // is evaluated before that const's own declaration line runs) -- rewritten
+      // without its long dash (fine in a <meta description>, not in reader-
+      // facing copy, where the sitewide guard applies) and without Van Nuys
+      // (the business's old second location; LOCATION_COPY's own sweep exists
+      // to catch this same fact going stale elsewhere, so this just starts
+      // correct instead of relying on that sweep to fix it after the fact).
+      sub:
+        'Private, fully certified commercial kitchen space in Central Los Angeles, ' +
+        'already built and already equipped. You bring the menu. We handle zoning, ' +
+        'permitting and the city.',
+      subShort: 'Private, certified kitchen space, built and equipped.',
+    },
+  },
 
   // The three below are / itself, cloned for a different search. Same variant, same
   // sections, same photographs, same reviews, same four forms, same thank-you page —
@@ -130,12 +163,21 @@ const PAGES = [
     hero: {
       eyebrow: 'Commercial kitchen rental · USC / Central Los Angeles',
       lines: ['Ghost Kitchen Space for Rent', 'in Central Los Angeles.', 'Built for Delivery Brands.'],
+      // The hand-abbreviated 2-line mobile headline this page has always had
+      // (see the v2 hero-form work in variants/shortened.mjs) — unchanged,
+      // just now sourced from here instead of hardcoded at every call site.
+      mobileLines: ['Ghost Kitchen Space in Central LA.', 'Built for Delivery Brands.'],
+      sub:
+        'Certified and ready to cook. Private kitchens, 200&ndash;600 sq ft or by the ' +
+        'hour, with 24/7 access. Permitting and Health Department approval, handled.',
+      subShort: 'Certified, ready-to-cook kitchens with 24/7 access.',
     },
   },
   {
     outFile: 'catering-health-permit.html',
     slug: 'catering-health-permit',
     variant: 'shortened',
+    v2: true,
     title: 'Approved Kitchen For Your LA Catering Health Permit | ŌN Kitchens',
     description:
       'A catering health permit needs an approved commercial kitchen. Ours is ' +
@@ -144,12 +186,21 @@ const PAGES = [
     hero: {
       eyebrow: 'Commercial kitchen rental · USC / Central Los Angeles',
       lines: ['A catering kitchen.', 'Health Dept. approved.', 'Permit-ready today.'],
+      // No hand-abbreviated mobileLines for this page (see variants/shortened.mjs:
+      // v2 hero-form section for why that isn't mechanical) — mobile reuses these
+      // same three lines at the mobile headline's own smaller size instead of a
+      // shorter invented one.
+      sub:
+        'Inspected and equipped for your catering health permit. Private kitchen ' +
+        'space, monthly or hourly, with 24/7 access, in Central Los Angeles.',
+      subShort: 'Inspected kitchens, permit-ready today.',
     },
   },
   {
     outFile: 'fda-food-facility-registration.html',
     slug: 'fda-food-facility-registration',
     variant: 'shortened',
+    v2: true,
     title: 'FDA-Registered & Organic-Ready Commercial Kitchen | ŌN Kitchens',
     description:
       'Need an FDA-registered or organic-certified facility to produce from? Private, ' +
@@ -158,6 +209,10 @@ const PAGES = [
     hero: {
       eyebrow: 'Commercial kitchen rental · USC / Central Los Angeles',
       lines: ['A registered facility.', 'FDA and organic.', 'Ready to produce.'],
+      sub:
+        'Private, inspected kitchen space for FDA-registered or organic-certified ' +
+        'production. Monthly or hourly, with 24/7 access, in Central Los Angeles.',
+      subShort: 'FDA-ready kitchens, 24/7 access.',
     },
   },
 
@@ -2179,7 +2234,7 @@ async function buildLandingPage({
   let overridden = false;
   if (variant) {
     const before = out;
-    out = variant.transform(out, { replaceExactly, v2 });
+    out = variant.transform(out, { replaceExactly, v2, hero });
     if (typeof out !== 'string') {
       throw new Error(`[build] ${label}: the variant transform did not return HTML.`);
     }
@@ -2245,8 +2300,19 @@ const UNTAGGED = new Set(['lp2.html', 'map.html']);
  *  first paint on a page this rollout is otherwise explicitly performance-tuning;
  *  every other page keeps the eager, synchronous-injection snippet exactly as
  *  before — this is a page-output decision, same shape as UNTAGGED above, not a
- *  change to how GTM behaves generally. */
-const DEFER_GTM = new Set(['ghost-kitchen.html']);
+ *  change to how GTM behaves generally.
+ *
+ *  Extended to the other three v2 pages alongside the rest of this rollout: the
+ *  same LCP stand-in (variants/shortened.mjs) now paints first on all four, so
+ *  the same TBT mechanism this comment describes -- FCP moving earlier without
+ *  moving support.js's own boot cost -- applies to all four the same way. /lp
+ *  and /lp2 don't carry the stand-in and stay on the eager path. */
+const DEFER_GTM = new Set([
+  'index.html',
+  'ghost-kitchen.html',
+  'catering-health-permit.html',
+  'fda-food-facility-registration.html',
+]);
 
 /** Top-level directories under dist/ the sweep does not descend into. All three are
  *  verbatim copies — two from the read-only design export, one from vendor/ — so any
@@ -2737,8 +2803,8 @@ const CSP_THIRD_PARTY = {
  *  keeps 'unsafe-inline' — this page sets inline style="" on most elements, and
  *  React itself writes more of it at runtime, which no build-time hash could ever
  *  cover — matching the sitewide draft policy in customHttp.yml's own comment. */
-async function computeGhostKitchenCsp() {
-  const html = await readFile(join(OUT, 'ghost-kitchen.html'), 'utf8');
+async function computeCspFor(outFile) {
+  const html = await readFile(join(OUT, outFile), 'utf8');
   const matches = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
   // [^>]* inside an opening tag stops at the first literal '>', including one
   // buried in an attribute value (data-props carries an escaped JSON blob today,
@@ -2750,7 +2816,7 @@ async function computeGhostKitchenCsp() {
   const trueScriptTagCount = (html.match(/<script[\s>]/g) || []).length;
   if (matches.length !== trueScriptTagCount) {
     throw new Error(
-      `[build] computeGhostKitchenCsp: found ${trueScriptTagCount} <script> tags but only matched ` +
+      `[build] computeCspFor(${outFile}): found ${trueScriptTagCount} <script> tags but only matched ` +
         `${matches.length} — a '>' inside some attribute value is confusing the parser. Fix the regex.`
     );
   }
@@ -2758,7 +2824,7 @@ async function computeGhostKitchenCsp() {
     .filter((m) => !/\bsrc=/.test(m[0].slice(0, m[0].indexOf('>') + 1)))
     .map((m) => m[1]);
   if (inlineScripts.length === 0) {
-    throw new Error('[build] computeGhostKitchenCsp: found 0 inline <script> blocks — the page or the regex has changed.');
+    throw new Error(`[build] computeCspFor(${outFile}): found 0 inline <script> blocks — the page or the regex has changed.`);
   }
   const hashes = inlineScripts.map(
     (body) => `'sha256-${createHash('sha256').update(body, 'utf8').digest('base64')}'`
@@ -2769,7 +2835,7 @@ async function computeGhostKitchenCsp() {
     try {
       connect.push(new URL(LEAD_WEBHOOK_URL).origin);
     } catch {
-      throw new Error('[build] computeGhostKitchenCsp: LEAD_WEBHOOK_URL is set but is not a valid URL.');
+      throw new Error(`[build] computeCspFor(${outFile}): LEAD_WEBHOOK_URL is set but is not a valid URL.`);
     }
   }
 
@@ -2788,15 +2854,21 @@ async function computeGhostKitchenCsp() {
   return directives.join('; ') + ';';
 }
 
-/** Writes the freshly computed CSP into the two GENERATED_CSP_PLACEHOLDER slots in
- *  the repo-root customHttp.yml (Amplify reads that file directly from the repo,
- *  never from dist/ — see its own header comment — so this has to edit it in
- *  place rather than emit it alongside the build output). Proven, not trusted:
- *  fails loudly if the markers are gone (a hand-edit that removed them) or if the
- *  count is anything but exactly 2 (one for '/ghost-kitchen', one for
- *  '/ghost-kitchen.html' — see the comment there for why both exist), the same
- *  contract replaceExactly already holds every other rewrite in this codebase to. */
-async function writeCspToCustomHttpYml(csp) {
+/** Writes the freshly computed CSP into the two GENERATED CSP marker slots for
+ *  one page (a clean-URL pattern and its .html twin — see the per-page blocks
+ *  in customHttp.yml for why both exist) in the repo-root customHttp.yml
+ *  (Amplify reads that file directly from the repo, never from dist/ — see its
+ *  own header comment — so this has to edit it in place rather than emit it
+ *  alongside the build output). Proven, not trusted: fails loudly if the
+ *  markers for this slug are gone (a hand-edit that removed them) or if the
+ *  count is anything but exactly 2, the same contract replaceExactly already
+ *  holds every other rewrite in this codebase to.
+ *
+ *  Markers are labelled by slug (# BEGIN GENERATED CSP: <slug>) rather than
+ *  bare, now that more than one page has a generated block — a bare marker
+ *  would happily match a different page's block and overwrite it with the
+ *  wrong policy with no error at all. */
+async function writeCspToCustomHttpYml(slug, csp) {
   const file = join(ROOT, 'customHttp.yml');
   const yaml = await readFile(file, 'utf8');
   // Anchored on the BEGIN/END marker comments, not a placeholder string -- a
@@ -2806,19 +2878,22 @@ async function writeCspToCustomHttpYml(csp) {
   // again. The value is re-quoted from scratch each time rather than assumed to
   // still be exactly one quoted string, so a hand-edit that broke the quoting
   // fails the count check below instead of silently matching the wrong span.
-  const re =
-    /(# BEGIN GENERATED CSP\n(?:[ \t]*\r?\n)?[ \t]*- key: 'Content-Security-Policy-Report-Only'\n[ \t]*value: )"[^"]*"(\n[ \t]*# END GENERATED CSP)/g;
+  const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(
+    `(# BEGIN GENERATED CSP: ${escapedSlug}\\n(?:[ \\t]*\\r?\\n)?[ \\t]*- key: 'Content-Security-Policy-Report-Only'\\n[ \\t]*value: )"[^"]*"(\\n[ \\t]*# END GENERATED CSP: ${escapedSlug})`,
+    'g'
+  );
   const count = (yaml.match(re) || []).length;
   if (count !== 2) {
     throw new Error(
-      `[build] writeCspToCustomHttpYml: expected 2 GENERATED CSP block(s) in customHttp.yml, found ${count}. ` +
+      `[build] writeCspToCustomHttpYml(${slug}): expected 2 GENERATED CSP block(s) in customHttp.yml, found ${count}. ` +
         `A hand-edit likely moved or removed the BEGIN/END markers or the key/value shape between them.`
     );
   }
   const escaped = csp.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   const updated = yaml.replace(re, (_m, before, after) => `${before}"${escaped}"${after}`);
   await writeFile(file, updated);
-  console.log(`  content-security-policy  <- Report-Only, /ghost-kitchen, generated fresh (customHttp.yml)`);
+  console.log(`  content-security-policy  <- Report-Only, ${slug}, generated fresh (customHttp.yml)`);
 }
 
 async function buildThankYou() {
@@ -3029,7 +3104,16 @@ async function main() {
   await removeCopyDashes();
   await tagEveryPage();
   await fingerprintAssets();
-  await writeCspToCustomHttpYml(await computeGhostKitchenCsp());
+  // Every v2 page gets its own generated CSP block: the lead-submission
+  // ("spam gate") inline script embeds `var PAGE = "<slug>";` literally, so
+  // that script's own hash differs per page (confirmed directly -- it's the
+  // only one of the 7 inline scripts that does; the stand-in's script, the
+  // GTM bootstrap, and everything else are byte-identical across all four).
+  // The @font-face rules are CSS, not script, and don't factor into script-src
+  // hashing at all.
+  for (const page of PAGES.filter((p) => p.v2)) {
+    await writeCspToCustomHttpYml(page.slug, await computeCspFor(page.outFile));
+  }
 
   // Loud when unset, because the failure is silent everywhere else: the forms validate,
   // the visitor reaches /thank-you, and GTM reports a conversion — for a lead that was

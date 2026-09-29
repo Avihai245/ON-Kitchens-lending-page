@@ -1623,7 +1623,7 @@ function assertQuotesPreserved(sourceCss, minifiedCss, label) {
   }
 }
 
-export function transform(html, { replaceExactly, v2 = false }) {
+export function transform(html, { replaceExactly, v2 = false, hero = null }) {
   let out = html;
 
   const lp2CssMin = minifyCss(LP2_CSS);
@@ -2325,10 +2325,37 @@ export function transform(html, { replaceExactly, v2 = false }) {
     // the mobile CSS can hide it), short version is new and mobile-only. Only one
     // is ever in the accessibility tree at a time — display:none removes the
     // other from it completely, the same as any responsive image-swap pattern.
+    // mobileLines defaults to the same three lines as desktop when a page has
+    // no hand-abbreviated version (see the PAGES registry comment on this) --
+    // taller on a phone than ghost-kitchen's own tuned 2-line version, never
+    // wrong, never invented.
+    const mobileLines = hero.mobileLines || hero.lines;
+    const h1Spans = (lines) =>
+      lines
+        .map((line, i) =>
+          i === lines.length - 1
+            ? `<span style="display: block; color: var(--color-accent-400);">${line}</span>`
+            : `<span style="display: block;">${line}</span>`
+        )
+        .join('\n        ');
+    // The find pattern has to be reconstructed from THIS page's own hero.lines
+    // too, not ghost-kitchen's: heroOverride() (scripts/build.mjs) has already
+    // run by the time transform() sees this HTML, so the real hero's H1
+    // already carries this page's own words, in exactly this shape (one span
+    // per line, unclassed, the last one carrying the accent colour) — the
+    // same shape h1Spans() below produces, which is what makes reusing it for
+    // the find side safe rather than a second, drifting copy of the markup.
     out = replaceExactly(
       out,
-      '<h1 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(44px, 6.4vw, 88px); line-height: 1.03; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">\n        <span style="display: block;">Ghost Kitchen Space for Rent</span>\n        <span style="display: block;">in Central Los Angeles.</span>\n        <span style="display: block; color: var(--color-accent-400);">Built for Delivery Brands.</span>\n      </h1>',
-      '<h1 class="lp2-hero-h1-full" style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(44px, 6.4vw, 88px); line-height: 1.03; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">\n        <span style="display: block;">Ghost Kitchen Space for Rent</span>\n        <span style="display: block;">in Central Los Angeles.</span>\n        <span style="display: block; color: var(--color-accent-400);">Built for Delivery Brands.</span>\n      </h1>\n      <h1 class="lp2-hero-h1-mobile" style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 8vw, 38px); line-height: 1.08; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">\n        <span style="display: block;">Ghost Kitchen Space in Central LA.</span>\n        <span style="display: block; color: var(--color-accent-400);">Built for Delivery Brands.</span>\n      </h1>',
+      `<h1 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(44px, 6.4vw, 88px); line-height: 1.03; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">
+        ${h1Spans(hero.lines)}
+      </h1>`,
+      `<h1 class="lp2-hero-h1-full" style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(44px, 6.4vw, 88px); line-height: 1.03; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">
+        ${h1Spans(hero.lines)}
+      </h1>
+      <h1 class="lp2-hero-h1-mobile" style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(30px, 8vw, 38px); line-height: 1.08; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">
+        ${h1Spans(mobileLines)}
+      </h1>`,
       1,
       'v2: mobile-only short headline alongside the full one'
     );
@@ -2344,10 +2371,14 @@ export function transform(html, { replaceExactly, v2 = false }) {
     // sentence (with the specifics — 200-600 sq ft, permitting, Health
     // Department) stays for desktop and reappears below the form on mobile; a
     // short, one-sentence version is new and sits above the form on mobile only.
+    if (!hero.sub || !hero.subShort) {
+      throw new Error('v2: hero stand-in needs hero.sub and hero.subShort -- got ' + JSON.stringify(hero));
+    }
     out = replaceExactly(
       out,
       '<p style="font-size: 18px; line-height: 28px; max-width: 54ch; margin: 26px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">Private, fully certified commercial kitchen space in Van Nuys and Los Angeles — already built, already equipped. You bring the menu. We handle zoning, permitting and the city.</p>',
-      '<p class="lp2-hero-sub-full" style="font-size: 18px; line-height: 28px; max-width: 54ch; margin: 26px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">Certified and ready to cook. Private kitchens, 200&ndash;600 sq ft or by the hour, with 24/7 access. Permitting and Health Department approval, handled.</p>\n      <p class="lp2-hero-sub-short" style="font-size: 16px; line-height: 24px; max-width: 54ch; margin: 14px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">Certified, ready-to-cook kitchens with 24/7 access.</p>',
+      `<p class="lp2-hero-sub-full" style="font-size: 18px; line-height: 28px; max-width: 54ch; margin: 26px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">${hero.sub}</p>
+      <p class="lp2-hero-sub-short" style="font-size: 16px; line-height: 24px; max-width: 54ch; margin: 14px 0 0; color: color-mix(in srgb, #FAF8F5 88%, transparent);">${hero.subShort}</p>`,
       1,
       'v2: hero supporting line (full, desktop) + short mobile-only line'
     );
@@ -2867,10 +2898,14 @@ export function transform(html, { replaceExactly, v2 = false }) {
   // reaching this tag and it actually starting — here that's the icon link, two
   // font preconnects, the font preload/noscript pair and the design-system
   // stylesheet link, all ahead of it today. None of those block the image
-  // request once discovered; discovery itself is what's late. Moved to the very
-  // first line the page-specific head array contributes (title/meta-description
-  // are inert metadata, so ahead of or behind them makes no difference — this
-  // goes ahead of everything that isn't).
+  // request once discovered; discovery itself is what's late. Moved to just
+  // ahead of the icon link -- the first line buildLandingPage()'s page-specific
+  // head array contributes that is the same text on every page (title and
+  // meta-description differ per page since heroOverride() and the PAGES
+  // registry both run per-page; anchoring on either would need a page-specific
+  // anchor here too). Title/description are inert metadata either way, so
+  // landing two lines later than "the very first line" makes no real
+  // difference to when the preload scanner finds this.
   if (v2) {
     out = replaceExactly(
       out,
@@ -2881,7 +2916,7 @@ export function transform(html, { replaceExactly, v2 = false }) {
     );
     out = replaceExactly(
       out,
-      '<title>Ghost Kitchen & Virtual Restaurant Space For Rent In LA | ŌN Kitchens</title>',
+      '<link rel="icon" href="favicon.svg" type="image/svg+xml">',
       // The font preload is the Latin woff2 for Barlow Condensed 600 -- the one
       // weight the stand-in's own H1 (this page's LCP element) sets on
       // --font-heading -- fetched straight from the same URL Google Fonts'
@@ -2892,7 +2927,7 @@ export function transform(html, { replaceExactly, v2 = false }) {
       // is meant to protect, for weights nothing above the fold uses.
       `<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="https://fonts.gstatic.com/s/barlowcondensed/v13/HTxwL3I-JCGChYJ8VI-L6OO_au7B4873z3bWuQ.woff2" crossorigin>
-<title>Ghost Kitchen & Virtual Restaurant Space For Rent In LA | ŌN Kitchens</title>`,
+<link rel="icon" href="favicon.svg" type="image/svg+xml">`,
       1,
       'v2: hero preload to the top of head, plus preload the headline webfont'
     );
@@ -2986,6 +3021,20 @@ export function transform(html, { replaceExactly, v2 = false }) {
   // one place currently capable of noticing it, is the fix that stays inside
   // this rollout's actual scope.
   if (v2) {
+    // The stand-in's headline has to match whatever this page's own hero (see
+    // heroOverride() in scripts/build.mjs) actually says, or a visitor gets
+    // ghost-kitchen's copy for the half-second before the real, correct
+    // headline swaps in underneath it. hero is threaded in from PAGES via
+    // buildLandingPage() -> transform() for exactly this reason. Same shape
+    // heroOverride() itself requires -- three lines, the third one carrying
+    // the brand accent colour -- so a page missing either fails loudly here
+    // instead of silently shipping the wrong words.
+    if (!hero || !Array.isArray(hero.lines) || hero.lines.length !== 3) {
+      throw new Error(
+        'v2: hero stand-in needs a hero with exactly three headline lines -- got ' +
+          JSON.stringify(hero)
+      );
+    }
     out = replaceExactly(
       out,
       '<body>\n<x-dc>',
@@ -2995,9 +3044,9 @@ export function transform(html, { replaceExactly, v2 = false }) {
   <div aria-hidden="true" style="position: absolute; inset: 0; background: color-mix(in srgb, #141414 66%, transparent);"></div>
   <div style="position: relative; width: 100%; max-width: clamp(1240px, 90vw, 1760px); margin: 0 auto; padding: 0 clamp(20px, 5vw, 72px) 60px;">
     <h1 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(44px, 6.4vw, 88px); line-height: 1.03; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; color: #FAF8F5; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">
-      <span style="display: block;">Ghost Kitchen Space for Rent</span>
-      <span style="display: block;">in Central Los Angeles.</span>
-      <span style="display: block; color: #D9AB56;">Built for Delivery Brands.</span>
+      <span style="display: block;">${hero.lines[0]}</span>
+      <span style="display: block;">${hero.lines[1]}</span>
+      <span style="display: block; color: #D9AB56;">${hero.lines[2]}</span>
     </h1>
   </div>
 </div>
