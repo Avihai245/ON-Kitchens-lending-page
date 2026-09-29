@@ -1390,13 +1390,111 @@ const leadFields = (prefix, v2) =>
   `          <input id="${prefix}website" name="website" type="text" tabindex="-1" autoComplete="off" />\n` +
   '        </div>\n');
 
+/** Strips comments and collapses whitespace, but never inside a quoted string --
+ *  this CSS leans on [style*="..."] attribute selectors (the mobile padding
+ *  overrides, the atform fade rule, more) whose quoted value has to byte-match
+ *  literal inline style="" text written elsewhere in the page. A whitespace-
+ *  collapsing regex applied blindly (confirmed by testing one against this exact
+ *  file) silently turns `[style*="display: flex"]` into `[style*="display:flex"]`
+ *  -- a selector that then matches nothing, ever, with no error and no visible
+ *  symptom beyond a rule quietly not applying. Tracking quote state avoids that
+ *  class of bug entirely, at the cost of being a little less aggressive than a
+ *  real CSS parser would be (selector combinators like `.a > b` keep their
+ *  spaces) -- a trade this file takes deliberately, since silent breakage is a
+ *  far worse outcome than a few hundred extra bytes. */
+function minifyCss(css) {
+  const DELIMS = new Set(['{', '}', ';', ',', ':']);
+  let out = '';
+  let quote = null;
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i];
+    if (quote) {
+      out += ch;
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      out += ch;
+      continue;
+    }
+    if (ch === '/' && css[i + 1] === '*') {
+      const end = css.indexOf('*/', i + 2);
+      i = (end === -1 ? css.length : end + 1);
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      let j = i;
+      while (j < css.length && /\s/.test(css[j])) j++;
+      const prev = out[out.length - 1];
+      const next = css[j];
+      if (!DELIMS.has(prev) && !(next !== undefined && DELIMS.has(next))) out += ' ';
+      i = j - 1;
+      continue;
+    }
+    if (DELIMS.has(ch) && out[out.length - 1] === ' ') out = out.slice(0, -1);
+    out += ch;
+  }
+  return out.replace(/;}/g, '}').trim();
+}
+
+/** Comments removed, nothing else touched -- used only to give assertQuotesPreserved
+ *  a fair, apples-to-apples "before" to compare against. Without this, a naive
+ *  quote-scan of the raw source treats every English contraction in a comment
+ *  (form's, wasn't, doesn't) as an opening quote and then runs to the next
+ *  apostrophe anywhere in the file looking for a close, which is nowhere near what
+ *  minifyCss's own, correctly comment-aware quote tracking actually does. */
+function stripCommentsOnly(css) {
+  let out = '';
+  let quote = null;
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i];
+    if (quote) {
+      out += ch;
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      out += ch;
+      continue;
+    }
+    if (ch === '/' && css[i + 1] === '*') {
+      const end = css.indexOf('*/', i + 2);
+      i = (end === -1 ? css.length : end + 1);
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/** Proven, not trusted (see minifyCss's own comment): every quoted string that
+ *  survives comment-stripping must appear, byte-for-byte, in the minified output
+ *  -- the one thing minifyCss must never change. A single multiset comparison
+ *  catches any regression here regardless of which future edit to LP2_CSS/
+ *  LP2_V2_CSS causes it, without needing to know in advance what that edit is. */
+function assertQuotesPreserved(sourceCss, minifiedCss, label) {
+  const quoted = (s) => (s.match(/"[^"]*"|'[^']*'/g) || []).sort();
+  const before = quoted(stripCommentsOnly(sourceCss));
+  const after = quoted(minifiedCss);
+  if (JSON.stringify(before) !== JSON.stringify(after)) {
+    throw new Error(`[build] ${label}: minifyCss changed a quoted string's contents -- refusing to ship it.`);
+  }
+}
+
 export function transform(html, { replaceExactly, v2 = false }) {
   let out = html;
 
+  const lp2CssMin = minifyCss(LP2_CSS);
+  assertQuotesPreserved(LP2_CSS, lp2CssMin, 'LP2_CSS');
+
   // The stylesheet for everything this file adds.
-  out = replaceExactly(out, '</head>', LP2_CSS + '</head>', 1, 'lp2 stylesheet');
+  out = replaceExactly(out, '</head>', lp2CssMin + '</head>', 1, 'lp2 stylesheet');
   if (v2) {
-    out = replaceExactly(out, '</head>', LP2_V2_CSS + LP2_V2_HEAD_JS + '</head>', 1, 'lp2 v2 head additions');
+    const lp2V2CssMin = minifyCss(LP2_V2_CSS);
+    assertQuotesPreserved(LP2_V2_CSS, lp2V2CssMin, 'LP2_V2_CSS');
+    out = replaceExactly(out, '</head>', lp2V2CssMin + LP2_V2_HEAD_JS + '</head>', 1, 'lp2 v2 head additions');
   }
 
   // ---- RED LINE: the one allowed change inside __onSendLead ------------------
