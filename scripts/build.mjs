@@ -2657,6 +2657,153 @@ async function fingerprintAssets() {
   console.log(`  cache busting  <- ?v=<hash> on ${hashes.size} fingerprinted file(s) across ${pages.length} page(s)`);
 }
 
+/** Origins ghost-kitchen.html actually loads from, beyond 'self' — each one traced
+ *  to a real reference in the built page rather than copied from a generic list:
+ *  googletagmanager.com is the deferred GTM bootstrap's own script fetch (see
+ *  variants/shortened.mjs's Vimeo/GTM sections) and its <noscript> iframe;
+ *  connect.facebook.net and the two facebook.com hosts cover the Facebook Pixel,
+ *  which this repo's own code never loads directly (confirmed: no fbevents.js
+ *  reference anywhere in this codebase) but which a tag inside the GTM container
+ *  very likely does, per the PageSpeed brief that flagged it running; google-
+ *  analytics.com the same way, for a GA4 tag GTM may fire; player.vimeo.com and
+ *  vimeocdn.com are the click-to-load facade's iframes and their thumbnails;
+ *  fonts.googleapis.com/gstatic.com are the page's Google Fonts stylesheet and
+ *  woff2 files. LEAD_WEBHOOK_URL's own origin is added separately, below, straight
+ *  from the real build-time value rather than a hardcoded guess. */
+const CSP_THIRD_PARTY = {
+  script: ['https://www.googletagmanager.com', 'https://connect.facebook.net'],
+  style: ['https://fonts.googleapis.com'],
+  font: ['https://fonts.gstatic.com'],
+  img: [
+    'https://www.googletagmanager.com',
+    'https://www.facebook.com',
+    'https://*.vimeocdn.com',
+  ],
+  connect: [
+    'https://www.googletagmanager.com',
+    'https://www.google-analytics.com',
+    'https://www.facebook.com',
+  ],
+  frame: ['https://player.vimeo.com', 'https://www.googletagmanager.com'],
+};
+
+/** Hashes every inline <script> actually shipped on dist/ghost-kitchen.html (after
+ *  every other build step, so the hash always matches what a browser receives) and
+ *  builds the full policy string around them. Run once, last — see the call site.
+ *
+ *  script-src carries 'unsafe-eval', confirmed necessary by testing this exact
+ *  policy under real enforcement (a Playwright run with the header actually
+ *  applied, not just read back) rather than trusting the static analysis that
+ *  produced everything else here: support.js's own runtime — support.js:842,
+ *  evalDcLogic() — compiles the page's entire <script data-dc-script> body (the
+ *  whole `class Component extends DCLogic { ... }`, holding every piece of this
+ *  rollout's own logic along with the rest of the export's) via `new Function(...)`
+ *  every time the DC runtime boots or re-renders, not once at parse time. Without
+ *  it, support.js's own catch block still runs — "the template renders with props
+ *  only" — but every custom behavior on the page silently stops working with no
+ *  thrown error a visitor would ever see. That's a materially different, much
+ *  narrower relaxation than 'unsafe-inline': an attacker who found an injection
+ *  point could still not run a new <script> tag of their own (no matching hash),
+ *  only strings already reaching this specific eval — and it is not this
+ *  rollout's to remove, since it comes from support.js, which is PASS_THROUGH,
+ *  never patched, for the reasons given elsewhere in this file.
+ *
+ *  The hashes exist anyway, rather than leaning on 'unsafe-eval' alone to cover
+ *  everything: they still name every inline <script> exactly, so a future
+ *  injection landing in a literal new <script> tag remains blocked even though
+ *  eval'd strings are not.
+ *
+ *  script-src hashes rather than 'unsafe-inline' for the tags themselves: every
+ *  inline script on this page is authored in this repo (variants/shortened.mjs or
+ *  the raw export), so each one can be named exactly instead of trusting the whole
+ *  category. style-src
+ *  keeps 'unsafe-inline' — this page sets inline style="" on most elements, and
+ *  React itself writes more of it at runtime, which no build-time hash could ever
+ *  cover — matching the sitewide draft policy in customHttp.yml's own comment. */
+async function computeGhostKitchenCsp() {
+  const html = await readFile(join(OUT, 'ghost-kitchen.html'), 'utf8');
+  const matches = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
+  // [^>]* inside an opening tag stops at the first literal '>', including one
+  // buried in an attribute value (data-props carries an escaped JSON blob today,
+  // with none, but nothing guarantees that forever) — which would silently split
+  // one <script> tag into a bogus pair and hash the wrong bytes for both. Counting
+  // real opening tags the regex can't misparse (a bare substring count) and
+  // comparing against how many the regex actually matched turns that failure mode
+  // loud instead of silent.
+  const trueScriptTagCount = (html.match(/<script[\s>]/g) || []).length;
+  if (matches.length !== trueScriptTagCount) {
+    throw new Error(
+      `[build] computeGhostKitchenCsp: found ${trueScriptTagCount} <script> tags but only matched ` +
+        `${matches.length} — a '>' inside some attribute value is confusing the parser. Fix the regex.`
+    );
+  }
+  const inlineScripts = matches
+    .filter((m) => !/\bsrc=/.test(m[0].slice(0, m[0].indexOf('>') + 1)))
+    .map((m) => m[1]);
+  if (inlineScripts.length === 0) {
+    throw new Error('[build] computeGhostKitchenCsp: found 0 inline <script> blocks — the page or the regex has changed.');
+  }
+  const hashes = inlineScripts.map(
+    (body) => `'sha256-${createHash('sha256').update(body, 'utf8').digest('base64')}'`
+  );
+
+  const connect = [...CSP_THIRD_PARTY.connect];
+  if (LEAD_WEBHOOK_URL) {
+    try {
+      connect.push(new URL(LEAD_WEBHOOK_URL).origin);
+    } catch {
+      throw new Error('[build] computeGhostKitchenCsp: LEAD_WEBHOOK_URL is set but is not a valid URL.');
+    }
+  }
+
+  const directives = [
+    `default-src 'self'`,
+    `script-src 'self' 'unsafe-eval' ${hashes.join(' ')} ${CSP_THIRD_PARTY.script.join(' ')}`,
+    `style-src 'self' 'unsafe-inline' ${CSP_THIRD_PARTY.style.join(' ')}`,
+    `font-src 'self' ${CSP_THIRD_PARTY.font.join(' ')}`,
+    `img-src 'self' data: ${CSP_THIRD_PARTY.img.join(' ')}`,
+    `connect-src 'self' ${connect.join(' ')}`,
+    `frame-src 'self' ${CSP_THIRD_PARTY.frame.join(' ')}`,
+    `object-src 'none'`,
+    `base-uri 'self'`,
+    `frame-ancestors 'self'`,
+  ];
+  return directives.join('; ') + ';';
+}
+
+/** Writes the freshly computed CSP into the two GENERATED_CSP_PLACEHOLDER slots in
+ *  the repo-root customHttp.yml (Amplify reads that file directly from the repo,
+ *  never from dist/ — see its own header comment — so this has to edit it in
+ *  place rather than emit it alongside the build output). Proven, not trusted:
+ *  fails loudly if the markers are gone (a hand-edit that removed them) or if the
+ *  count is anything but exactly 2 (one for '/ghost-kitchen', one for
+ *  '/ghost-kitchen.html' — see the comment there for why both exist), the same
+ *  contract replaceExactly already holds every other rewrite in this codebase to. */
+async function writeCspToCustomHttpYml(csp) {
+  const file = join(ROOT, 'customHttp.yml');
+  const yaml = await readFile(file, 'utf8');
+  // Anchored on the BEGIN/END marker comments, not a placeholder string -- a
+  // placeholder only ever matches on the very first build, since it's gone the
+  // moment this function replaces it. The markers, unlike the value between them,
+  // are never rewritten, so every build afterward can find the same two spots
+  // again. The value is re-quoted from scratch each time rather than assumed to
+  // still be exactly one quoted string, so a hand-edit that broke the quoting
+  // fails the count check below instead of silently matching the wrong span.
+  const re =
+    /(# BEGIN GENERATED CSP\n(?:[ \t]*\r?\n)?[ \t]*- key: 'Content-Security-Policy-Report-Only'\n[ \t]*value: )"[^"]*"(\n[ \t]*# END GENERATED CSP)/g;
+  const count = (yaml.match(re) || []).length;
+  if (count !== 2) {
+    throw new Error(
+      `[build] writeCspToCustomHttpYml: expected 2 GENERATED CSP block(s) in customHttp.yml, found ${count}. ` +
+        `A hand-edit likely moved or removed the BEGIN/END markers or the key/value shape between them.`
+    );
+  }
+  const escaped = csp.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const updated = yaml.replace(re, (_m, before, after) => `${before}"${escaped}"${after}`);
+  await writeFile(file, updated);
+  console.log(`  content-security-policy  <- Report-Only, /ghost-kitchen, generated fresh (customHttp.yml)`);
+}
+
 async function buildThankYou() {
   const src = await readFile(join(SRC, ENTRY), 'utf8');
 
@@ -2865,6 +3012,7 @@ async function main() {
   await removeCopyDashes();
   await tagEveryPage();
   await fingerprintAssets();
+  await writeCspToCustomHttpYml(await computeGhostKitchenCsp());
 
   // Loud when unset, because the failure is silent everywhere else: the forms validate,
   // the visitor reaches /thank-you, and GTM reports a conversion — for a lead that was
