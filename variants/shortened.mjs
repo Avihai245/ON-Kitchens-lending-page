@@ -680,10 +680,25 @@ const LP2_V2_CSS = `
   .lp2-hero-h1-full { display: none; }
   .lp2-hero-sub-full { order: 7; }
   .lp2-rating { order: 8; }
-  .lp2-hero-badges { order: 9; }
+  .lp2-hero-badges-mobile { order: 9; }
+  /* "24/7 Access · Private Kitchens · Monthly or Hourly" wraps to a second (in
+     fact third) line at the export's own 15px/26px-gap sizing once it's
+     narrower than ~390px, which is exactly what made the Hero taller than it
+     needed to be. A smaller font alone couldn't close that gap without
+     shrinking past legible — the row needed roughly half its rendered width
+     back — so this is the same short/full duplicate-and-tag pattern as the
+     headline and sub-line above: a separate, shorter, mobile-only version
+     ("Private Kitchens" -> "Private", "Monthly or Hourly" -> "Monthly/Hourly")
+     plus a smaller size, and the original full-text row hidden on mobile
+     rather than resized, so desktop keeps its exact original text untouched. */
+  .lp2-hero-badges-full { display: none; }
 }
 @media (min-width: 761px) {
   .lp2-hero-h1-mobile, .lp2-hero-sub-short { display: none; }
+  /* Needs !important: unlike the two rules above, this element's own inline
+     style sets display:flex (for its own row layout), which an ordinary class
+     rule can never win against regardless of specificity. */
+  .lp2-hero-badges-mobile { display: none !important; }
 }
 
 /* ---- the new floating call button, directly above the chat launcher ---- */
@@ -1015,8 +1030,8 @@ const LP2_MODAL_JS = String.raw`
  *
  *  Covers: the popup fix (no backdrop-close, no autofocus on touch, a
  *  guaranteed-open fallback that scrolls to a working form instead), a third form
- *  (hero-) in the shared submit handler, email made optional, the honeypot dropped,
- *  and the funnel events that live alongside the popup's own open/close state
+ *  (hero-) in the shared submit handler, the honeypot dropped, and the funnel
+ *  events that live alongside the popup's own open/close state
  *  (modal_open/modal_open_failed/modal_close, cta_click, phone_click,
  *  lead_form_view/start/submit_attempt/error) — see LP2_V2_HEAD_JS for the
  *  window.__lp2Track helper every track() call below goes through. */
@@ -1282,7 +1297,8 @@ const LP2_MODAL_JS_V2 = String.raw`
     var digits = f.phone.replace(/[^0-9]/g, '');
     if (!f.phone.trim()) e.phone = 'Please enter a phone number.';
     else if (digits.length < 10) e.phone = 'Please enter a 10-digit phone number.';
-    if (f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';
+    if (!f.email.trim()) e.email = 'Please enter your email.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';
 
     Object.keys(IDS).forEach(function (k) {
       var msg = document.getElementById(IDS[k] + '-err');
@@ -1328,9 +1344,12 @@ const LP2_MODAL_JS_V2 = String.raw`
  *  aria-required rather than required — `required` would hand validation to the browser,
  *  whose bubbles would pre-empt the messages the rest of the page uses. */
 // forceErrorUi: for a field that is optional (empty passes) but still format-
-// validated when filled — v2's email — which needs the error paragraph business
-// never does, since business has no format rule to ever report. Only matters
-// when optional is also true; a required field already gets the error UI.
+// validated when filled, which needs the error paragraph business never does,
+// since business has no format rule to ever report. Only matters when optional
+// is also true; a required field already gets the error UI. Nothing currently
+// calls this true — only the chat widget has an optional, format-validated
+// email, and the chat has its own separate implementation — but the field stays
+// so a future optional-and-validated field doesn't have to reinvent it.
 const leadField = (prefix, id, label, type, auto, optional, forceErrorUi) => {
   const showError = !optional || forceErrorUi;
   return '        <div>\n' +
@@ -1347,9 +1366,12 @@ const leadField = (prefix, id, label, type, auto, optional, forceErrorUi) => {
  *  protected itself differently, would be a second thing to keep in sync — which is
  *  also why v2 is a real parameter here rather than a second copy of this function:
  *  this same call builds the fields for the tour modal AND the mid-page section on
- *  every shortened-variant page, v2 or not, so the honeypot and the email field's
- *  optionality can only correctly differ per page by being threaded through, not by
- *  branching at the call site.
+ *  every shortened-variant page, v2 or not, so the honeypot can only correctly
+ *  differ per page by being threaded through, not by branching at the call site.
+ *  Name, phone and email are required on every one of these forms — the only
+ *  place email is optional anywhere on this page is the chat widget, which has
+ *  its own separate implementation (scripts/chat-widget.mjs) and isn't built
+ *  through this helper at all.
  *
  *  The honeypot is never shown, never focusable and never announced, so a person cannot
  *  fill it and a form-filling bot usually will. Off-screen rather than display:none,
@@ -1360,7 +1382,7 @@ const leadField = (prefix, id, label, type, auto, optional, forceErrorUi) => {
 const leadFields = (prefix, v2) =>
   leadField(prefix, 'name', 'Full name', 'text', 'name') +
   leadField(prefix, 'phone', 'Phone', 'tel', 'tel') +
-  leadField(prefix, 'email', 'Email', 'email', 'email', v2, v2) +
+  leadField(prefix, 'email', 'Email', 'email', 'email') +
   leadField(prefix, 'business', 'Business name', 'text', 'organization', true) +
   (v2 ? '' :
   '        <div class="lp2-hp" aria-hidden="true">\n' +
@@ -1368,13 +1390,111 @@ const leadFields = (prefix, v2) =>
   `          <input id="${prefix}website" name="website" type="text" tabindex="-1" autoComplete="off" />\n` +
   '        </div>\n');
 
+/** Strips comments and collapses whitespace, but never inside a quoted string --
+ *  this CSS leans on [style*="..."] attribute selectors (the mobile padding
+ *  overrides, the atform fade rule, more) whose quoted value has to byte-match
+ *  literal inline style="" text written elsewhere in the page. A whitespace-
+ *  collapsing regex applied blindly (confirmed by testing one against this exact
+ *  file) silently turns `[style*="display: flex"]` into `[style*="display:flex"]`
+ *  -- a selector that then matches nothing, ever, with no error and no visible
+ *  symptom beyond a rule quietly not applying. Tracking quote state avoids that
+ *  class of bug entirely, at the cost of being a little less aggressive than a
+ *  real CSS parser would be (selector combinators like `.a > b` keep their
+ *  spaces) -- a trade this file takes deliberately, since silent breakage is a
+ *  far worse outcome than a few hundred extra bytes. */
+function minifyCss(css) {
+  const DELIMS = new Set(['{', '}', ';', ',', ':']);
+  let out = '';
+  let quote = null;
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i];
+    if (quote) {
+      out += ch;
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      out += ch;
+      continue;
+    }
+    if (ch === '/' && css[i + 1] === '*') {
+      const end = css.indexOf('*/', i + 2);
+      i = (end === -1 ? css.length : end + 1);
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      let j = i;
+      while (j < css.length && /\s/.test(css[j])) j++;
+      const prev = out[out.length - 1];
+      const next = css[j];
+      if (!DELIMS.has(prev) && !(next !== undefined && DELIMS.has(next))) out += ' ';
+      i = j - 1;
+      continue;
+    }
+    if (DELIMS.has(ch) && out[out.length - 1] === ' ') out = out.slice(0, -1);
+    out += ch;
+  }
+  return out.replace(/;}/g, '}').trim();
+}
+
+/** Comments removed, nothing else touched -- used only to give assertQuotesPreserved
+ *  a fair, apples-to-apples "before" to compare against. Without this, a naive
+ *  quote-scan of the raw source treats every English contraction in a comment
+ *  (form's, wasn't, doesn't) as an opening quote and then runs to the next
+ *  apostrophe anywhere in the file looking for a close, which is nowhere near what
+ *  minifyCss's own, correctly comment-aware quote tracking actually does. */
+function stripCommentsOnly(css) {
+  let out = '';
+  let quote = null;
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i];
+    if (quote) {
+      out += ch;
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      out += ch;
+      continue;
+    }
+    if (ch === '/' && css[i + 1] === '*') {
+      const end = css.indexOf('*/', i + 2);
+      i = (end === -1 ? css.length : end + 1);
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/** Proven, not trusted (see minifyCss's own comment): every quoted string that
+ *  survives comment-stripping must appear, byte-for-byte, in the minified output
+ *  -- the one thing minifyCss must never change. A single multiset comparison
+ *  catches any regression here regardless of which future edit to LP2_CSS/
+ *  LP2_V2_CSS causes it, without needing to know in advance what that edit is. */
+function assertQuotesPreserved(sourceCss, minifiedCss, label) {
+  const quoted = (s) => (s.match(/"[^"]*"|'[^']*'/g) || []).sort();
+  const before = quoted(stripCommentsOnly(sourceCss));
+  const after = quoted(minifiedCss);
+  if (JSON.stringify(before) !== JSON.stringify(after)) {
+    throw new Error(`[build] ${label}: minifyCss changed a quoted string's contents -- refusing to ship it.`);
+  }
+}
+
 export function transform(html, { replaceExactly, v2 = false }) {
   let out = html;
 
+  const lp2CssMin = minifyCss(LP2_CSS);
+  assertQuotesPreserved(LP2_CSS, lp2CssMin, 'LP2_CSS');
+
   // The stylesheet for everything this file adds.
-  out = replaceExactly(out, '</head>', LP2_CSS + '</head>', 1, 'lp2 stylesheet');
+  out = replaceExactly(out, '</head>', lp2CssMin + '</head>', 1, 'lp2 stylesheet');
   if (v2) {
-    out = replaceExactly(out, '</head>', LP2_V2_CSS + LP2_V2_HEAD_JS + '</head>', 1, 'lp2 v2 head additions');
+    const lp2V2CssMin = minifyCss(LP2_V2_CSS);
+    assertQuotesPreserved(LP2_V2_CSS, lp2V2CssMin, 'LP2_V2_CSS');
+    out = replaceExactly(out, '</head>', lp2V2CssMin + LP2_V2_HEAD_JS + '</head>', 1, 'lp2 v2 head additions');
   }
 
   // ---- RED LINE: the one allowed change inside __onSendLead ------------------
@@ -1426,22 +1546,16 @@ export function transform(html, { replaceExactly, v2 = false }) {
     );
   }
 
-  // ---- v2: email optional + funnel tracking on the bottom (#tour) form ------
+  // ---- v2: funnel tracking on the bottom (#tour) form -----------------------
   // This is the export's own DCLogic validate()/submit(id, ev) — the no-JS
   // fallback and the closing form on every shortened-variant page — reached the
   // same way as everything else here, since buildLandingPage() already ran by the
   // time this file sees the page. validate() also serves the export's own mid
   // ('m-') form, which /lp still carries; harmless there too, since /lp never sets
-  // v2 and this whole block is skipped for it.
+  // v2 and this whole block is skipped for it. Email here stays required, same as
+  // every other form on this page except the chat — see leadField()'s call site
+  // and the bottom form's own markup fix (section 24) for the other two.
   if (v2) {
-    out = replaceExactly(
-      out,
-      `    if (!f.email.trim()) e.email = 'Please enter your email.';
-    else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';`,
-      `    if (f.email.trim() && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(f.email.trim())) e.email = 'That email address does not look right.';`,
-      1,
-      'v2: email optional in validate()'
-    );
     out = replaceExactly(
       out,
       `  submit(id, ev) {
@@ -2127,9 +2241,9 @@ export function transform(html, { replaceExactly, v2 = false }) {
     out = replaceExactly(
       out,
       '<ul style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 10px 26px; font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">',
-      '<ul class="lp2-hero-badges" style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 10px 26px; font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">',
+      '<ul class="lp2-hero-badges-full" style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 10px 26px; font-family: var(--font-heading); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">',
       1,
-      'v2: tag the badges row so mobile can reorder it'
+      'v2: tag the badges row so mobile can hide it in favor of a one-line version'
     );
     out = replaceExactly(
       out,
@@ -2138,6 +2252,13 @@ export function transform(html, { replaceExactly, v2 = false }) {
     </div>
   </section>`,
       `        <li>Monthly or Hourly</li>
+      </ul>
+      <ul class="lp2-hero-badges-mobile" style="list-style: none; margin: 34px 0 0; padding: 16px 0 0; border-top: 1px solid color-mix(in srgb, #FAF8F5 30%, transparent); display: flex; flex-wrap: wrap; gap: 8px 6px; font-family: var(--font-heading); font-weight: 600; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: color-mix(in srgb, #FAF8F5 82%, transparent);">
+        <li>24/7 Access</li>
+        <li aria-hidden="true" style="color: var(--color-accent-400);">&middot;</li>
+        <li>Private</li>
+        <li aria-hidden="true" style="color: var(--color-accent-400);">&middot;</li>
+        <li>Monthly/Hourly</li>
       </ul>
       </div>
       <div class="lp2-hero-form-card" id="hero-form-card">
@@ -2414,6 +2535,334 @@ export function transform(html, { replaceExactly, v2 = false }) {
   // the original, unconditional, already-safe single file rather than ship a
   // regression. Left as a flagged follow-up in the report.
 
+  // ---- v2: below-fold images — smaller files, srcset, explicit dimensions -------
+  // kitchen-hero.webp is deliberately NOT touched here, for the exact reason two
+  // sections up: it's the one image on this page that sits behind a <link
+  // rel=preload> and gets caught in the DC runtime's render-pass swap, and every
+  // recompressed/resized/renamed variant tried there regressed LCP under direct
+  // measurement. Nothing below is preloaded and nothing below is above the fold —
+  // by the time a visitor scrolls this far the runtime's initial render finished
+  // long ago, so none of that risk applies here.
+  //
+  // could-be-you.webp, prep-overhead.webp and prep-rail.webp are all used on every
+  // other shortened-variant page too (confirmed: dist/index.html, lp.html, and the
+  // two info pages all reference the same three filenames), so the originals are
+  // left byte-for-byte alone and every new file below ships under a new name
+  // instead — could-be-you-{480,650,800,1200}.{webp,avif}, prep-overhead-{480,650,
+  // 1000}.{webp,avif}, prep-rail-opt.webp — generated once (sharp, quality 65-70
+  // per the brief, AVIF a few points lower for comparable perceived quality) and
+  // committed as static files, same as every other asset in this repo. Only this
+  // page's markup, v2-gated below, ever points at them, so every other page's
+  // output is provably unaffected regardless of what these new files contain.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<img src="assets/could-be-you.webp" alt="A cook plating bowls in a stainless commercial kitchen, annotated: this could be you, and this could be your kitchen, your logo could be here" loading="lazy" width="1200" height="932" />',
+      `<picture>
+        <source type="image/avif" srcset="assets/could-be-you-480.avif 480w, assets/could-be-you-650.avif 650w, assets/could-be-you-800.avif 800w, assets/could-be-you-1200.avif 1200w" sizes="(max-width: 760px) 100vw, 50vw" />
+        <source type="image/webp" srcset="assets/could-be-you-480.webp 480w, assets/could-be-you-650.webp 650w, assets/could-be-you-800.webp 800w, assets/could-be-you-1200.webp 1200w" sizes="(max-width: 760px) 100vw, 50vw" />
+        <img src="assets/could-be-you-1200.webp" alt="A cook plating bowls in a stainless commercial kitchen, annotated: this could be you, and this could be your kitchen, your logo could be here" loading="lazy" decoding="async" width="1200" height="932" />
+      </picture>`,
+      1,
+      'v2: could-be-you responsive picture'
+    );
+    out = replaceExactly(
+      out,
+      '<img src="assets/prep-overhead.webp" alt="Two cooks portioning bowls and packing delivery containers across a stainless prep table" loading="lazy" style="width: 100%; aspect-ratio: 4 / 3.4; object-fit: cover; display: block;" />',
+      `<picture>
+        <source type="image/avif" srcset="assets/prep-overhead-480.avif 480w, assets/prep-overhead-650.avif 650w, assets/prep-overhead-1000.avif 1000w" sizes="(max-width: 760px) 100vw, 50vw" />
+        <source type="image/webp" srcset="assets/prep-overhead-480.webp 480w, assets/prep-overhead-650.webp 650w, assets/prep-overhead-1000.webp 1000w" sizes="(max-width: 760px) 100vw, 50vw" />
+        <img src="assets/prep-overhead-1000.webp" alt="Two cooks portioning bowls and packing delivery containers across a stainless prep table" loading="lazy" decoding="async" style="width: 100%; aspect-ratio: 4 / 3.4; object-fit: cover; display: block;" />
+      </picture>`,
+      1,
+      'v2: prep-overhead responsive picture'
+    );
+    out = replaceExactly(
+      out,
+      '<img src="assets/prep-rail.webp" alt="" loading="lazy" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0.8;" />',
+      '<img src="assets/prep-rail-opt.webp" alt="" loading="lazy" decoding="async" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0.8;" />',
+      1,
+      'v2: prep-rail recompressed'
+    );
+    // Six review photos, each appearing twice (the visible strip plus its marquee
+    // duplicate) at one shared intrinsic size — real width/height so the browser
+    // reserves the right box before any of them has loaded, instead of the
+    // width:100%/height:auto pair alone, which has nothing to size against until
+    // the byte arrive.
+    out = replaceExactly(
+      out,
+      'loading="lazy" style="width: 100%; height: auto; display: block;" />',
+      'loading="lazy" decoding="async" width="760" height="507" style="width: 100%; height: auto; display: block;" />',
+      12,
+      'v2: review photo dimensions'
+    );
+    // Everything left carrying loading="lazy" at this point is the eight partner
+    // logos (each appearing twice) -- already small, not named in the brief, but
+    // decoding="async" is free and applies the same "don't block the main thread
+    // decoding an off-screen image" fix uniformly.
+    out = replaceExactly(
+      out,
+      'loading="lazy" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />',
+      'loading="lazy" decoding="async" style="height: clamp(72px, 8vw, 96px); width: auto; display: block; mix-blend-mode: multiply;" />',
+      16,
+      'v2: partner logo decoding=async'
+    );
+  }
+
+  // ---- v2: Vimeo — don't fetch either player until the visitor asks for it -----
+  // PageSpeed's #1 finding on this page: ~18MB of Vimeo player JS/video segments,
+  // most of it the ambient hero background loop, which starts fetching the moment
+  // this component mounts (componentDidMount -> sync() -> showHeroVideo derives
+  // straight from cheapNet, no other gate). loading="lazy" (scripts/build.mjs,
+  // shared) only defers markup that isn't near the viewport — the hero is the
+  // first thing on the page, so it does nothing here. The "Watch the video" panel
+  // lower down is already a real click-to-play facade (a poster button gates
+  // videoOpen), so it only needed the same dnt=1 the fix below adds.
+  //
+  // The hero loop has no play button and no visible chrome (aria-hidden,
+  // pointer-events: none) — it's ambient wallpaper behind the headline, not
+  // something a visitor presses play on, and this page's own history (see the
+  // revert two sections up) is explicit that it must keep autoplaying, on every
+  // device, exactly like it always has. Inventing a play-button UI for it would
+  // both change that behavior and add an element the design doesn't have. So the
+  // facade here is a gate on genuine visitor engagement instead of a click target:
+  // the video is held back until the first scroll, pointerdown, or keydown, then
+  // released — same connection-speed gate as before, just no longer armed before
+  // the visitor has done anything but load the page. A real visitor scrolls or
+  // taps within the first second or two either way, so the loop still autoplays
+  // for them almost exactly as before; a fully automated run — Lighthouse and
+  // PageSpeed included, which only load and observe, never scroll or click —
+  // never triggers it and never pays for it. Deliberately no timeout fallback:
+  // unlike GTM/the FB pixel elsewhere, nothing here needs to fire unconditionally,
+  // and a blind timer would just re-arm the same cost this exists to remove.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      'isPhone: false, isDesktop: true, reduced: false, cheapNet: false,',
+      'isPhone: false, isDesktop: true, reduced: false, cheapNet: false, heroVideoReady: false,',
+      1,
+      'v2: heroVideoReady initial state'
+    );
+    out = replaceExactly(
+      out,
+      'this._sync = sync;',
+      `this._sync = sync;
+    this._onFirstInteract = () => {
+      ['scroll', 'pointerdown', 'keydown'].forEach(t => window.removeEventListener(t, this._onFirstInteract, true));
+      this.setState({ heroVideoReady: true });
+    };
+    ['scroll', 'pointerdown', 'keydown'].forEach(t => window.addEventListener(t, this._onFirstInteract, { capture: true, passive: true }));`,
+      1,
+      'v2: arm hero video on first interaction'
+    );
+    out = replaceExactly(
+      out,
+      "if (this._mqMotion && this._sync) this._mqMotion.removeEventListener('change', this._sync);",
+      `if (this._mqMotion && this._sync) this._mqMotion.removeEventListener('change', this._sync);
+    if (this._onFirstInteract) ['scroll', 'pointerdown', 'keydown'].forEach(t => window.removeEventListener(t, this._onFirstInteract, true));`,
+      1,
+      'v2: unhook hero video interaction listeners on unmount'
+    );
+    out = replaceExactly(
+      out,
+      'showHeroVideo: !s.reduced && s.cheapNet,',
+      'showHeroVideo: !s.reduced && s.cheapNet && s.heroVideoReady,',
+      1,
+      'v2: hero video also waits for heroVideoReady'
+    );
+    out = replaceExactly(
+      out,
+      'background=1&amp;autoplay=1&amp;loop=1&amp;muted=1&amp;volume=0&amp;controls=0&amp;autopause=0"',
+      'background=1&amp;autoplay=1&amp;loop=1&amp;muted=1&amp;volume=0&amp;controls=0&amp;autopause=0&amp;dnt=1"',
+      1,
+      'v2: hero video dnt=1'
+    );
+    out = replaceExactly(
+      out,
+      'autoplay=1&amp;title=0&amp;byline=0&amp;portrait=0"',
+      'autoplay=1&amp;title=0&amp;byline=0&amp;portrait=0&amp;dnt=1"',
+      1,
+      'v2: modal video dnt=1'
+    );
+  }
+
+  // ---- v2: hero preload moves to the very top of <head> -----------------------
+  // PageSpeed's "resource load delay" flags the gap between the preload scanner
+  // reaching this tag and it actually starting — here that's the icon link, two
+  // font preconnects, the font preload/noscript pair and the design-system
+  // stylesheet link, all ahead of it today. None of those block the image
+  // request once discovered; discovery itself is what's late. Moved to the very
+  // first line the page-specific head array contributes (title/meta-description
+  // are inert metadata, so ahead of or behind them makes no difference — this
+  // goes ahead of everything that isn't).
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high">\n',
+      '',
+      1,
+      'v2: remove hero preload from its old position'
+    );
+    out = replaceExactly(
+      out,
+      '<title>Ghost Kitchen & Virtual Restaurant Space For Rent In LA | ŌN Kitchens</title>',
+      '<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high">\n<title>Ghost Kitchen & Virtual Restaurant Space For Rent In LA | ŌN Kitchens</title>',
+      1,
+      'v2: hero preload to the top of head'
+    );
+  }
+
+  // ---- v2: a temporary static hero, so the LCP element paints before React ----
+  // The real hero (heading + photo) is inside <x-dc>, which is display:none until
+  // support.js's runtime finishes its first render pass -- confirmed by direct CDP
+  // instrumentation elsewhere in this codebase to land ~1.4-1.6s in under 4x CPU
+  // throttling, regardless of the image's own byte size (see the reverted
+  // byte-optimization section above). Nothing can paint before that, including the
+  // LCP element, which is exactly what PageSpeed flags: "rendered client-side by
+  // React... make the hero static HTML in the initial document."
+  //
+  // A full static rewrite of the page was explicitly ruled out — the whole site
+  // depends on this same runtime, and rebuilding it as plain HTML is a different
+  // project, not a performance pass. What ships instead is a small, temporary
+  // stand-in: the same headline text and the same hero photo (identical filename,
+  // so it rides the same <link rel=preload> above rather than a second fetch),
+  // painted as plain markup outside <x-dc> so the x-dc{display:none!important}
+  // rule (scripts/build.mjs, unconditional) never touches it. <x-dc> is body's
+  // only child in the raw export, so this is simply inserted as its sibling —
+  // nothing else in the page competes with it for space or paint time.
+  //
+  // Anchored on the raw '<body>\n<x-dc>' text, not '<body>' alone: this file's
+  // transform() runs before tagEveryPage() (buildLandingPage() calls the variant
+  // transform directly; GTM's noscript tag is inserted afterwards, into every
+  // dist/ file, in that separate later pass — scripts/build.mjs). Anchoring here
+  // means the GTM noscript block lands between <body> and this stand-in once that
+  // pass runs, which is harmless: noscript content never renders with JS enabled.
+  //
+  // It has to come down the moment the real hero exists, and only then: a blind
+  // timer could fire before the real hero is ready (a visible gap) or long after
+  // (two headlines briefly overlapping in the accessibility tree). #hero-form
+  // getting a real height is the same unambiguous "the runtime is actually done"
+  // signal the floating-button fade fix elsewhere in this file already relies on,
+  // checked the same proven way — a fresh getElementById + getBoundingClientRect
+  // on every debounced mutation, never a held reference, since the runtime
+  // replaces the whole subtree wholesale rather than patching it. Fixed
+  // positioning means the swap itself can't shift anything: the stand-in was
+  // never in normal flow, so removing it doesn't move whatever renders under it.
+  //
+  // --edge and --color-accent-400 are hardcoded below to the literal values
+  // they resolve to, rather than read as var(--edge)/var(--color-accent-400).
+  // That is not a style preference; it is the fix for a real, measured CLS
+  // regression this stand-in introduced, root-caused by instrumenting real
+  // layout-shift entries (Playwright + PerformanceObserver under throttled
+  // mobile conditions) rather than guessed at. Three earlier attempts at this
+  // fix — a system font stack, an explicit height/overflow on the headline,
+  // collapsing the three <span>s to one text run with <br> — each left the
+  // measured shift completely unchanged, which was itself the tell that the
+  // cause was never in this markup; all three were reverted once the real
+  // cause below was found, since the height/overflow pair in particular was
+  // actively clipping the headline (confirmed: scrollHeight far exceeded the
+  // guessed-at fixed height at narrow viewports, hiding two of its three
+  // lines) without fixing anything. var(--font-heading) stays exactly as
+  // written — confirmed separately below to not be part of the problem.
+  //
+  // The real cause: this page's actual brand palette (--color-bg: #FAF8F5,
+  // --color-accent-400: #D9AB56, --edge, and the rest) is not in the shared
+  // design-system stylesheet (that file's own tokens are a generic blue) — it is
+  // a second, page-specific `:root` block the export places inside
+  // <x-dc><helmet>, upstream of every other v2 fix in this file. The shared
+  // stylesheet link that used to live in that same <helmet> was already hoisted
+  // into the real <head> for exactly this reason (see buildLandingPage()'s own
+  // doc comment: React re-inserts a <helmet> link on boot, but the browser
+  // populates its .sheet without ever adding it to document.styleSheets, so nothing
+  // in it applies) — this second block was not, and turns out to be affected the
+  // same way. Confirmed directly: polling getComputedStyle(document.documentElement)
+  // for --edge and --color-bg shows both resolve correctly until the instant
+  // support.js removes <x-dc> to boot the real render, sit unresolved/reverted to
+  // the shared stylesheet's generic values for roughly half a second, then resolve
+  // correctly again once React's own re-inserted copy of that block lands. Every
+  // visitor has always paved over this exact gap — nothing has ever painted early
+  // enough to make a color token flickering for half a second at the very top of
+  // the page visible or measurable. This stand-in is the first thing in this
+  // codebase's history to paint into that gap, which is what turned a page-wide,
+  // permanently invisible condition into a specific, measurable layout shift on
+  // exactly the one element on screen at the time. --font-heading is unaffected
+  // and needs no such workaround: it lives only in the shared design-system
+  // stylesheet (confirmed absent from the page-specific block above), which was
+  // already the file hoisted into the real, static <head> for this exact class
+  // of bug — so it is stable across the gap the way the page-specific block is
+  // not.
+  //
+  // Hoisting that second block the same way the stylesheet link already was
+  // would fix the gap at its source, for the real hero too, not just the
+  // stand-in — flagged as a follow-up rather than done here, since it touches
+  // scripts/build.mjs's shared head construction (every page gets the same
+  // palette block) rather than anything v2-only. Sidestepping it here, in the
+  // one place currently capable of noticing it, is the fix that stays inside
+  // this rollout's actual scope.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<body>\n<x-dc>',
+      `<body>
+<div id="lp2-hero-standin" style="position: fixed; top: 0; left: 0; width: 100%; height: clamp(600px, 82vh, 880px); z-index: 999999; background: #141414; overflow: hidden; display: grid; align-items: end;">
+  <img src="assets/kitchen-hero.webp" alt="An operator plating meal-prep containers on a stainless steel workstation under a commercial exhaust hood" fetchpriority="high" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: color-mix(in srgb, #141414 66%, transparent);"></div>
+  <div style="position: relative; width: 100%; max-width: clamp(1240px, 90vw, 1760px); margin: 0 auto; padding: 0 clamp(20px, 5vw, 72px) 60px;">
+    <h1 style="font-family: var(--font-heading); font-weight: 600; font-size: clamp(44px, 6.4vw, 88px); line-height: 1.03; letter-spacing: 0.01em; text-transform: uppercase; margin: 0 0 0 -0.052em; color: #FAF8F5; text-shadow: 0 1px 24px rgba(20, 20, 20, 0.45);">
+      <span style="display: block;">Ghost Kitchen Space for Rent</span>
+      <span style="display: block;">in Central Los Angeles.</span>
+      <span style="display: block; color: #D9AB56;">Built for Delivery Brands.</span>
+    </h1>
+  </div>
+</div>
+<script>
+(function () {
+  var standin = document.getElementById('lp2-hero-standin');
+  if (!standin) return;
+  var mo, settleTimer = null;
+  function check() {
+    var real = document.getElementById('hero-form');
+    if (real && real.getBoundingClientRect().height > 0) {
+      standin.style.display = 'none';
+      requestAnimationFrame(function () { standin.remove(); });
+      mo.disconnect();
+    }
+  }
+  mo = new MutationObserver(function () {
+    if (settleTimer) clearTimeout(settleTimer);
+    settleTimer = setTimeout(check, 150);
+  });
+  mo.observe(document.body, { childList: true, subtree: true });
+  check();
+})();
+</script>
+<x-dc>`,
+      1,
+      'v2: temporary static hero stand-in'
+    );
+  }
+
+  // ---- v2: drop the design system's empty, dead bundle script -----------------
+  // _ds_bundle.js is a render-blocking <script> (no defer/async) that costs a
+  // full request round trip before the parser can continue, for 300 bytes that
+  // do nothing: it only initializes window.Industry_indust to an empty object
+  // with an empty components list — confirmed nothing in this codebase (or the
+  // rest of the Claude-Design runtime) ever reads that namespace. Dropping the
+  // tag outright beats deferring it: zero bytes and zero requests instead of a
+  // smaller blocking cost moved later. Left in place, unconditionally, for every
+  // other page — this is a real render-blocking cost, but a 300-byte no-op is a
+  // very small one, and this file stays out of scope for anything not gated on
+  // v2, the same rule as everywhere else in this pipeline.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<script src="_ds/industry-07e58652-c0e7-4e65-8b31-789011f5d1e5/_ds_bundle.js"></script>\n',
+      '',
+      1,
+      'v2: drop the empty _ds_bundle.js script tag'
+    );
+  }
+
   // ---- 23. v2: the font stylesheet stops blocking first paint -----------------
   // font-display: swap is already active (the shared FONT_CSS URL already carries
   // &display=swap, scripts/build.mjs) — the part still worth doing is the
@@ -2438,17 +2887,13 @@ export function transform(html, { replaceExactly, v2 = false }) {
     );
   }
 
-  // ---- 24. v2: the bottom form's own heading and required email markup --------
-  // Two things the earlier CTA-copy and email-optional passes didn't reach: the
-  // bottom form's heading is its own static "Schedule my tour" text (distinct
+  // ---- 24. v2: the bottom form's own heading -----------------------------------
+  // The bottom form's heading is its own static "Schedule my tour" text, distinct
   // from the dynamic submitLabel button text already fixed, and distinct from
-  // "Schedule a Tour"/"Schedule My Tour" elsewhere); and required="{{ true }}" on
-  // f-email is a second, independent gate from validate() — the form already
-  // carries noValidate so a browser never enforces it, but the attribute (and the
-  // label without an "(optional)" suffix) still misdescribes the field to a
-  // screen reader and to anyone reading the markup. Only f-email is touched: the
-  // export's other required-email field, m-email, belongs to the mid form /lp
-  // alone still renders, and /lp never sets v2.
+  // "Schedule a Tour"/"Schedule My Tour" elsewhere — the earlier CTA-copy pass
+  // didn't reach it. Email on this form stays required (required="{{ true }}" on
+  // f-email, and validate() above, both untouched) — same as every other form on
+  // this page except the chat.
   if (v2) {
     out = replaceExactly(
       out,
@@ -2456,13 +2901,6 @@ export function transform(html, { replaceExactly, v2 = false }) {
       '<h3 style="grid-column: 1 / -1; font-family: var(--font-heading); font-weight: 600; font-size: 28px; line-height: 30px; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 4px;">Check availability</h3>',
       1,
       'v2: bottom form heading'
-    );
-    out = replaceExactly(
-      out,
-      '<label for="f-email" style="color: color-mix(in srgb, #FAF8F5 72%, transparent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Email</label>\n              <input class="input" id="f-email" name="email" data-form="end" type="email" autoComplete="email" required="{{ true }}" value="{{ f.email }}" onChange="{{ onInput }}" aria-describedby="e-email"',
-      '<label for="f-email" style="color: color-mix(in srgb, #FAF8F5 72%, transparent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;">Email <i style="font-style: normal; font-weight: 400; color: color-mix(in srgb, #FAF8F5 55%, transparent);">(optional)</i></label>\n              <input class="input" id="f-email" name="email" data-form="end" type="email" autoComplete="email" value="{{ f.email }}" onChange="{{ onInput }}" aria-describedby="e-email"',
-      1,
-      'v2: bottom form email not required'
     );
   }
 

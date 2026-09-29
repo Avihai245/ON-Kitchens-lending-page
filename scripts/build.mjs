@@ -12,8 +12,9 @@
 import { CHAT_STEPS, CHAT_CSS, CHAT_JS } from './chat-widget.mjs';
 import { cp, mkdir, rm, readFile, writeFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'palette-and-photography-decisions', 'project');
@@ -190,6 +191,51 @@ function gtmHead() {
     `j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n` +
     `'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n` +
     `})(window,document,'script','dataLayer','${GTM_ID}');</script>\n` +
+    `<!-- End Google Tag Manager -->`
+  );
+}
+
+/** Same container snippet as gtmHead(), timing-gated for one page — see DEFER_GTM
+ *  below tagEveryPage() for which page and why.
+ *
+ *  window.dataLayer and the gtm.start marker are still created immediately, exactly
+ *  like the eager version: this site's own dataLayer.push() event tracking
+ *  (chat_open, generate_lead, etc. — see variants/shortened.mjs) pushes onto that
+ *  array long before GTM itself loads either way, the array just queues them, and
+ *  GTM's own page-load timing stays accurate since gtm.start still reflects the
+ *  real navigation. Only the actual gtm.js fetch is held back — the ~469KB and the
+ *  long main-thread tasks PageSpeed measured competing with first paint — until the
+ *  browser has room for it: first idle moment after `load`, first scroll/tap/
+ *  keypress (whichever comes first), or 4s no matter what, so a visitor who never
+ *  does anything but read the page still eventually gets tagged. Unlike the Vimeo
+ *  facade elsewhere in this rollout, this keeps the unconditional timeout — GTM is
+ *  conversion tracking, not decoration, so it has to fire even for a visitor who
+ *  never scrolls. */
+function gtmHeadDeferred() {
+  return (
+    `<!-- Google Tag Manager -->\n` +
+    `<script>\n` +
+    `window.dataLayer = window.dataLayer || [];\n` +
+    `window.dataLayer.push({'gtm.start': new Date().getTime(), event: 'gtm.js'});\n` +
+    `(function () {\n` +
+    `  var loaded = false;\n` +
+    `  function loadGtm() {\n` +
+    `    if (loaded) return;\n` +
+    `    loaded = true;\n` +
+    `    var d = document, s = 'script', l = 'dataLayer', i = '${GTM_ID}';\n` +
+    `    var f = d.getElementsByTagName(s)[0], j = d.createElement(s);\n` +
+    `    var dl = l != 'dataLayer' ? '&l=' + l : '';\n` +
+    `    j.async = true;\n` +
+    `    j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;\n` +
+    `    f.parentNode.insertBefore(j, f);\n` +
+    `    ['scroll', 'pointerdown', 'keydown'].forEach(function (t) { window.removeEventListener(t, loadGtm, true); });\n` +
+    `  }\n` +
+    `  var ric = window.requestIdleCallback || function (cb) { setTimeout(cb, 200); };\n` +
+    `  window.addEventListener('load', function () { ric(loadGtm, { timeout: 4000 }); });\n` +
+    `  ['scroll', 'pointerdown', 'keydown'].forEach(function (t) { window.addEventListener(t, loadGtm, { capture: true, passive: true }); });\n` +
+    `  setTimeout(loadGtm, 4000);\n` +
+    `})();\n` +
+    `</script>\n` +
     `<!-- End Google Tag Manager -->`
   );
 }
@@ -2185,6 +2231,15 @@ function assertNoindexed(html, label) {
  *    to the parent's dataLayer rather than put a second container in the frame. */
 const UNTAGGED = new Set(['lp2.html', 'map.html']);
 
+/** Pages that get gtmHeadDeferred() instead of gtmHead() — see that function for
+ *  what changes and why. Its own PageSpeed Insights run flagged GTM's ~469KB and
+ *  its long main-thread tasks as the page's #2 problem after Vimeo, competing with
+ *  first paint on a page this rollout is otherwise explicitly performance-tuning;
+ *  every other page keeps the eager, synchronous-injection snippet exactly as
+ *  before — this is a page-output decision, same shape as UNTAGGED above, not a
+ *  change to how GTM behaves generally. */
+const DEFER_GTM = new Set(['ghost-kitchen.html']);
+
 /** Top-level directories under dist/ the sweep does not descend into. All three are
  *  verbatim copies — two from the read-only design export, one from vendor/ — so any
  *  HTML inside them would be design-tool debris or library documentation, not a page
@@ -2473,7 +2528,8 @@ async function tagEveryPage() {
         '<meta charset="utf-8">',
         '<head>',
       ],
-      `<link rel="preconnect" href="https://www.googletagmanager.com">\n` + gtmHead(),
+      `<link rel="preconnect" href="https://www.googletagmanager.com">\n` +
+        (DEFER_GTM.has(page) ? gtmHeadDeferred() : gtmHead()),
       page,
       'gtm container script'
     );
@@ -2498,6 +2554,254 @@ async function tagEveryPage() {
     `  google tag manager <- ${GTM_ID} on ${pages.length - skipped.length} page(s); ` +
       `${skipped.length} deliberately untagged (${skipped.join(', ') || 'none'})`
   );
+}
+
+/** Long-cached file groups: every reference to one of these, on every page, gets a
+ *  content-hash query string appended (assets/foo.webp -> assets/foo.webp?v=xxxx),
+ *  and customHttp.yml then caches these patterns for a year — see the comment on
+ *  that pattern list for why the two changes only work together. vendor/ already
+ *  carries its version in the path (react-18.3.1.production.min.js) and needs
+ *  none of this. Fonts are not included: nothing under them is self-hosted, they
+ *  load from fonts.gstatic.com, whose own cache headers are not this repo's to set. */
+const FINGERPRINTED_DIRS = ['assets', '_ds'];
+const FINGERPRINTED_FILES = ['support.js'];
+
+/** Recursively lists every file under `dir`, as paths relative to OUT using forward
+ *  slashes — the same separator the HTML always uses, regardless of the OS running
+ *  the build. */
+async function listFilesRelative(dir) {
+  const found = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...(await listFilesRelative(full)));
+    } else {
+      found.push(relative(OUT, full).split(sep).join('/'));
+    }
+  }
+  return found;
+}
+
+/** Appends a content-hash query string to every reference to a long-cached file, on
+ *  every page in dist/ — plain src/href attributes and each individual URL inside a
+ *  srcset list alike, since both need the same busting. Run once, last, over the
+ *  fully finished dist/: the hash has to match what actually ships, so this has to
+ *  run after every other rewrite (the copy pass, tagEveryPage()) has already landed.
+ *
+ *  Deliberately sitewide rather than v2-gated: cache headers are a hosting-level
+ *  setting in customHttp.yml, matched by URL pattern, with no per-page mechanism to
+ *  gate on the way HTML/CSS/JS can be — so unlike everything else in this rollout,
+ *  there is no way to raise cache lifetimes for /ghost-kitchen alone. Explicit,
+ *  scoped exception, not a precedent for touching shared output more broadly. */
+async function fingerprintAssets() {
+  const targets = [];
+  for (const dir of FINGERPRINTED_DIRS) {
+    if (existsSync(join(OUT, dir))) targets.push(...(await listFilesRelative(join(OUT, dir))));
+  }
+  for (const file of FINGERPRINTED_FILES) {
+    if (existsSync(join(OUT, file))) targets.push(file);
+  }
+
+  const hashes = new Map();
+  for (const relPath of targets) {
+    const buf = await readFile(join(OUT, relPath));
+    hashes.set(relPath, createHash('sha256').update(buf).digest('hex').slice(0, 10));
+  }
+
+  // Longest path first, so a shorter name can never accidentally match inside a
+  // longer one that happens to start the same way (assets/could-be-you.webp is not
+  // a prefix of assets/could-be-you-480.webp, but nothing here should depend on
+  // that kind of coincidence holding for every current and future filename).
+  const paths = [...hashes.keys()].sort((a, b) => b.length - a.length);
+
+  const pages = await htmlPages();
+  for (const page of pages) {
+    const file = join(OUT, page);
+    let html = await readFile(file, 'utf8');
+    const before = html;
+    for (const relPath of paths) {
+      const hash = hashes.get(relPath);
+      // Matches a bare reference — in a quoted src/href, or as one entry in a
+      // comma-separated srcset — never a reference that already carries ?v= (an
+      // idempotency guard, though this function only ever runs once per build) and
+      // never a longer filename that merely starts with this one.
+      const re = new RegExp(
+        relPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\?v=)(?=["\\s,])',
+        'g'
+      );
+      html = html.replace(re, `${relPath}?v=${hash}`);
+    }
+    if (html !== before) await writeFile(file, html);
+  }
+
+  // Proven, not trusted: every occurrence of every fingerprinted path, across every
+  // page, now carries ?v=<its own hash> — none left bare, none doubled.
+  const allHtml = (await Promise.all(pages.map((p) => readFile(join(OUT, p), 'utf8')))).join('\n');
+  for (const relPath of paths) {
+    const hash = hashes.get(relPath);
+    const escaped = relPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const bare = (allHtml.match(new RegExp(escaped + '(?!\\?v=)(?=["\\s,])', 'g')) || []).length;
+    const versioned = (allHtml.match(new RegExp(escaped + '\\?v=' + hash + '(?=["\\s,])', 'g')) || []).length;
+    if (bare !== 0) {
+      throw new Error(`[build] fingerprintAssets: ${relPath} still has ${bare} unversioned reference(s).`);
+    }
+    if (versioned === 0 && targets.includes(relPath)) {
+      // Not an error — plenty of generated files (every extra srcset width, the
+      // partner logos, review photos) are only reachable from ghost-kitchen or not
+      // referenced by <img>/<source> at all yet, and that's fine; this only checks
+      // that whichever references DO exist are all correctly versioned, above.
+      continue;
+    }
+  }
+
+  console.log(`  cache busting  <- ?v=<hash> on ${hashes.size} fingerprinted file(s) across ${pages.length} page(s)`);
+}
+
+/** Origins ghost-kitchen.html actually loads from, beyond 'self' — each one traced
+ *  to a real reference in the built page rather than copied from a generic list:
+ *  googletagmanager.com is the deferred GTM bootstrap's own script fetch (see
+ *  variants/shortened.mjs's Vimeo/GTM sections) and its <noscript> iframe;
+ *  connect.facebook.net and the two facebook.com hosts cover the Facebook Pixel,
+ *  which this repo's own code never loads directly (confirmed: no fbevents.js
+ *  reference anywhere in this codebase) but which a tag inside the GTM container
+ *  very likely does, per the PageSpeed brief that flagged it running; google-
+ *  analytics.com the same way, for a GA4 tag GTM may fire; player.vimeo.com and
+ *  vimeocdn.com are the click-to-load facade's iframes and their thumbnails;
+ *  fonts.googleapis.com/gstatic.com are the page's Google Fonts stylesheet and
+ *  woff2 files. LEAD_WEBHOOK_URL's own origin is added separately, below, straight
+ *  from the real build-time value rather than a hardcoded guess. */
+const CSP_THIRD_PARTY = {
+  script: ['https://www.googletagmanager.com', 'https://connect.facebook.net'],
+  style: ['https://fonts.googleapis.com'],
+  font: ['https://fonts.gstatic.com'],
+  img: [
+    'https://www.googletagmanager.com',
+    'https://www.facebook.com',
+    'https://*.vimeocdn.com',
+  ],
+  connect: [
+    'https://www.googletagmanager.com',
+    'https://www.google-analytics.com',
+    'https://www.facebook.com',
+  ],
+  frame: ['https://player.vimeo.com', 'https://www.googletagmanager.com'],
+};
+
+/** Hashes every inline <script> actually shipped on dist/ghost-kitchen.html (after
+ *  every other build step, so the hash always matches what a browser receives) and
+ *  builds the full policy string around them. Run once, last — see the call site.
+ *
+ *  script-src carries 'unsafe-eval', confirmed necessary by testing this exact
+ *  policy under real enforcement (a Playwright run with the header actually
+ *  applied, not just read back) rather than trusting the static analysis that
+ *  produced everything else here: support.js's own runtime — support.js:842,
+ *  evalDcLogic() — compiles the page's entire <script data-dc-script> body (the
+ *  whole `class Component extends DCLogic { ... }`, holding every piece of this
+ *  rollout's own logic along with the rest of the export's) via `new Function(...)`
+ *  every time the DC runtime boots or re-renders, not once at parse time. Without
+ *  it, support.js's own catch block still runs — "the template renders with props
+ *  only" — but every custom behavior on the page silently stops working with no
+ *  thrown error a visitor would ever see. That's a materially different, much
+ *  narrower relaxation than 'unsafe-inline': an attacker who found an injection
+ *  point could still not run a new <script> tag of their own (no matching hash),
+ *  only strings already reaching this specific eval — and it is not this
+ *  rollout's to remove, since it comes from support.js, which is PASS_THROUGH,
+ *  never patched, for the reasons given elsewhere in this file.
+ *
+ *  The hashes exist anyway, rather than leaning on 'unsafe-eval' alone to cover
+ *  everything: they still name every inline <script> exactly, so a future
+ *  injection landing in a literal new <script> tag remains blocked even though
+ *  eval'd strings are not.
+ *
+ *  script-src hashes rather than 'unsafe-inline' for the tags themselves: every
+ *  inline script on this page is authored in this repo (variants/shortened.mjs or
+ *  the raw export), so each one can be named exactly instead of trusting the whole
+ *  category. style-src
+ *  keeps 'unsafe-inline' — this page sets inline style="" on most elements, and
+ *  React itself writes more of it at runtime, which no build-time hash could ever
+ *  cover — matching the sitewide draft policy in customHttp.yml's own comment. */
+async function computeGhostKitchenCsp() {
+  const html = await readFile(join(OUT, 'ghost-kitchen.html'), 'utf8');
+  const matches = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
+  // [^>]* inside an opening tag stops at the first literal '>', including one
+  // buried in an attribute value (data-props carries an escaped JSON blob today,
+  // with none, but nothing guarantees that forever) — which would silently split
+  // one <script> tag into a bogus pair and hash the wrong bytes for both. Counting
+  // real opening tags the regex can't misparse (a bare substring count) and
+  // comparing against how many the regex actually matched turns that failure mode
+  // loud instead of silent.
+  const trueScriptTagCount = (html.match(/<script[\s>]/g) || []).length;
+  if (matches.length !== trueScriptTagCount) {
+    throw new Error(
+      `[build] computeGhostKitchenCsp: found ${trueScriptTagCount} <script> tags but only matched ` +
+        `${matches.length} — a '>' inside some attribute value is confusing the parser. Fix the regex.`
+    );
+  }
+  const inlineScripts = matches
+    .filter((m) => !/\bsrc=/.test(m[0].slice(0, m[0].indexOf('>') + 1)))
+    .map((m) => m[1]);
+  if (inlineScripts.length === 0) {
+    throw new Error('[build] computeGhostKitchenCsp: found 0 inline <script> blocks — the page or the regex has changed.');
+  }
+  const hashes = inlineScripts.map(
+    (body) => `'sha256-${createHash('sha256').update(body, 'utf8').digest('base64')}'`
+  );
+
+  const connect = [...CSP_THIRD_PARTY.connect];
+  if (LEAD_WEBHOOK_URL) {
+    try {
+      connect.push(new URL(LEAD_WEBHOOK_URL).origin);
+    } catch {
+      throw new Error('[build] computeGhostKitchenCsp: LEAD_WEBHOOK_URL is set but is not a valid URL.');
+    }
+  }
+
+  const directives = [
+    `default-src 'self'`,
+    `script-src 'self' 'unsafe-eval' ${hashes.join(' ')} ${CSP_THIRD_PARTY.script.join(' ')}`,
+    `style-src 'self' 'unsafe-inline' ${CSP_THIRD_PARTY.style.join(' ')}`,
+    `font-src 'self' ${CSP_THIRD_PARTY.font.join(' ')}`,
+    `img-src 'self' data: ${CSP_THIRD_PARTY.img.join(' ')}`,
+    `connect-src 'self' ${connect.join(' ')}`,
+    `frame-src 'self' ${CSP_THIRD_PARTY.frame.join(' ')}`,
+    `object-src 'none'`,
+    `base-uri 'self'`,
+    `frame-ancestors 'self'`,
+  ];
+  return directives.join('; ') + ';';
+}
+
+/** Writes the freshly computed CSP into the two GENERATED_CSP_PLACEHOLDER slots in
+ *  the repo-root customHttp.yml (Amplify reads that file directly from the repo,
+ *  never from dist/ — see its own header comment — so this has to edit it in
+ *  place rather than emit it alongside the build output). Proven, not trusted:
+ *  fails loudly if the markers are gone (a hand-edit that removed them) or if the
+ *  count is anything but exactly 2 (one for '/ghost-kitchen', one for
+ *  '/ghost-kitchen.html' — see the comment there for why both exist), the same
+ *  contract replaceExactly already holds every other rewrite in this codebase to. */
+async function writeCspToCustomHttpYml(csp) {
+  const file = join(ROOT, 'customHttp.yml');
+  const yaml = await readFile(file, 'utf8');
+  // Anchored on the BEGIN/END marker comments, not a placeholder string -- a
+  // placeholder only ever matches on the very first build, since it's gone the
+  // moment this function replaces it. The markers, unlike the value between them,
+  // are never rewritten, so every build afterward can find the same two spots
+  // again. The value is re-quoted from scratch each time rather than assumed to
+  // still be exactly one quoted string, so a hand-edit that broke the quoting
+  // fails the count check below instead of silently matching the wrong span.
+  const re =
+    /(# BEGIN GENERATED CSP\n(?:[ \t]*\r?\n)?[ \t]*- key: 'Content-Security-Policy-Report-Only'\n[ \t]*value: )"[^"]*"(\n[ \t]*# END GENERATED CSP)/g;
+  const count = (yaml.match(re) || []).length;
+  if (count !== 2) {
+    throw new Error(
+      `[build] writeCspToCustomHttpYml: expected 2 GENERATED CSP block(s) in customHttp.yml, found ${count}. ` +
+        `A hand-edit likely moved or removed the BEGIN/END markers or the key/value shape between them.`
+    );
+  }
+  const escaped = csp.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const updated = yaml.replace(re, (_m, before, after) => `${before}"${escaped}"${after}`);
+  await writeFile(file, updated);
+  console.log(`  content-security-policy  <- Report-Only, /ghost-kitchen, generated fresh (customHttp.yml)`);
 }
 
 async function buildThankYou() {
@@ -2707,6 +3011,8 @@ async function main() {
   await assertChatCopy();
   await removeCopyDashes();
   await tagEveryPage();
+  await fingerprintAssets();
+  await writeCspToCustomHttpYml(await computeGhostKitchenCsp());
 
   // Loud when unset, because the failure is silent everywhere else: the forms validate,
   // the visitor reaches /thank-you, and GTM reports a conversion — for a lead that was

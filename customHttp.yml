@@ -7,7 +7,7 @@ customHeaders:
   - pattern: '**'
     headers:
       - key: 'Strict-Transport-Security'
-        value: 'max-age=31536000'
+        value: 'max-age=63072000; includeSubDomains; preload'
       - key: 'X-Content-Type-Options'
         value: 'nosniff'
       # SAMEORIGIN, not DENY: the landing page embeds map.html in an iframe from
@@ -19,11 +19,17 @@ customHeaders:
       - key: 'Permissions-Policy'
         value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()'
 
-  # A Content-Security-Policy is deliberately not set. The design export styles
-  # every element with inline style attributes and ships its logic in an inline
-  # script, so any workable policy needs 'unsafe-inline' for both script-src and
-  # style-src, which removes most of the benefit. If you want one anyway, this is
-  # the accurate origin list for the page as it stands:
+  # A Content-Security-Policy is deliberately not set here, for every page except
+  # /ghost-kitchen (see its own CSP further down). The design export styles every
+  # element with inline style attributes and ships its logic in an inline script,
+  # so any workable policy needs 'unsafe-inline' for both script-src and style-src,
+  # which removes most of the benefit. /ghost-kitchen gets one anyway because its
+  # own build step can name every inline script by hash instead of trusting the
+  # whole category — see computeGhostKitchenCsp() in scripts/build.mjs. Extending
+  # that same treatment to the rest of the site would need the same build-time
+  # hashing wired up for each page in turn; nothing about the mechanism is
+  # ghost-kitchen-specific, there simply hasn't been a reason to yet. Until then,
+  # this is the accurate origin list for every other page as it stands:
   #
   #   default-src 'self';
   #   script-src 'self' 'unsafe-inline' https://www.googletagmanager.com;
@@ -49,23 +55,29 @@ customHeaders:
   # otherwise break the live site with no deploy and no code review.
 
   # ---- Caching -----------------------------------------------------------------
-  # Nothing in the design export has a content hash in its filename, so cache
-  # lifetimes are kept short enough that a redeploy is picked up promptly. Raise
-  # these once filenames are fingerprinted.
-
-  # Images, support.js and the design-system CSS: one day.
+  # Filenames themselves still are not fingerprinted (the design export's own
+  # references would all need rewriting too, everywhere, for that), but every
+  # reference to one of these three patterns, on every page, now carries a
+  # content-hash query string appended at build time (scripts/build.mjs,
+  # fingerprintAssets() — assets/foo.webp?v=<sha256 of foo.webp, truncated>).
+  # A query string busts a cache exactly like a new filename does, so a year is
+  # safe: change the file, the build produces a new hash, the new page HTML asks
+  # for a new URL, and only visitors who already had the OLD bytes cached keep
+  # them — which is correct, since those bytes did not change. HTML itself is
+  # never fingerprinted (see below), so every visitor's next navigation always
+  # picks up whatever ?v= that build produced.
   - pattern: '/assets/**'
     headers:
       - key: 'Cache-Control'
-        value: 'public, max-age=86400'
+        value: 'public, max-age=31536000, immutable'
   - pattern: '/_ds/**'
     headers:
       - key: 'Cache-Control'
-        value: 'public, max-age=86400'
+        value: 'public, max-age=31536000, immutable'
   - pattern: '/support.js'
     headers:
       - key: 'Cache-Control'
-        value: 'public, max-age=86400'
+        value: 'public, max-age=31536000, immutable'
 
   # Vendored libraries carry their version in the path, so they are immutable.
   - pattern: '/vendor/**'
@@ -84,3 +96,54 @@ customHeaders:
     headers:
       - key: 'Cache-Control'
         value: 'public, max-age=0, must-revalidate'
+
+  # ---- /ghost-kitchen only: Content-Security-Policy -----------------------------
+  # Everywhere else on the site keeps no CSP, for the reason given above (inline
+  # style="" on every element, no way to hash or nonce that away without breaking
+  # the export). /ghost-kitchen is different: every inline SCRIPT on it is one this
+  # repo authors and controls (see variants/shortened.mjs and the raw export), so
+  # each one can be hashed instead of needing 'unsafe-inline' for script-src. Style
+  # still can't be hashed the same way — inline style attributes are far too many
+  # and some are set at runtime by React itself, which no build-time hash could
+  # ever cover — so style-src keeps 'unsafe-inline', same as the sitewide draft.
+  #
+  # Both patterns exist because it is not documented anywhere reliable whether
+  # Amplify's custom-headers matcher runs before or after clean-URL resolution
+  # (see scripts/build.mjs's note on THANK_YOU_PATH for that resolution) — belt and
+  # suspenders, same reasoning as '**/*.html' plus '/index.html' above.
+  #
+  # Shipped as Report-Only, not enforcing, on purpose: this has been checked as
+  # thoroughly as a local build allows (every inline script hash verified against
+  # the real built output; every third-party origin traced to an actual iframe,
+  # GTM's own bootstrap fetch, or the real LEAD_WEBHOOK_URL host), but a GTM
+  # container is editable from the GTM console with no deploy and no code review —
+  # a tag added there tomorrow, needing an origin not listed below, would break
+  # under enforcement with no warning. Report-Only surfaces exactly that case (each
+  # visitor's own browser console, under Issues -> Content Security Policy) without
+  # ever blocking anything. Once you've watched it for real traffic and seen no
+  # unexpected violations, flip both keys below from
+  # 'Content-Security-Policy-Report-Only' to 'Content-Security-Policy' to enforce.
+  #
+  # The value itself is generated, not hand-written — scripts/build.mjs,
+  # computeGhostKitchenCsp(), hashes every inline <script> straight out of the
+  # built dist/ghost-kitchen.html and rewrites the two lines between the markers
+  # below on every build, so the policy can never drift out of sync with the
+  # scripts it's supposed to cover. Do not hand-edit the value between the
+  # markers; edit the origin list or the reasoning in computeGhostKitchenCsp()
+  # instead and let the next build regenerate it.
+  - pattern: '/ghost-kitchen'
+    headers:
+      - key: 'Cross-Origin-Opener-Policy'
+        value: 'same-origin-allow-popups'
+      # BEGIN GENERATED CSP
+      - key: 'Content-Security-Policy-Report-Only'
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-q3DIyZo2Gaqw+Ifu+bKmnd7XAEx9eNzLbwO7vV1qFks=' 'sha256-ViDt8N7WsAjU7WjSlq6R6+PeQLA3n2JZfMJ0qJCdE+8=' 'sha256-t/pSmL5RzLxGXb0pFwfmuBC880U8lixYrCjDpNamglY=' 'sha256-q0PvztS1YEhB6VkizxWzbKj4H1DTdwvcDyuIMOSzjLU=' 'sha256-u1jr6gSjj5S00JKWZwJcVHwvkwUQsVOc9s92mMleIZo=' 'sha256-hB4WUo7GLySAUU5BwU+kcWGggUUIbt1URzwu26ftkUU=' 'sha256-bWjouFpJjGaZhAm1zvIsjiorwia3BoOh9mjLNlBRk8o=' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.facebook.com https://*.vimeocdn.com; connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://www.facebook.com https://hooks.example-test-receiver.com; frame-src 'self' https://player.vimeo.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
+      # END GENERATED CSP
+  - pattern: '/ghost-kitchen.html'
+    headers:
+      - key: 'Cross-Origin-Opener-Policy'
+        value: 'same-origin-allow-popups'
+      # BEGIN GENERATED CSP
+      - key: 'Content-Security-Policy-Report-Only'
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'sha256-q3DIyZo2Gaqw+Ifu+bKmnd7XAEx9eNzLbwO7vV1qFks=' 'sha256-ViDt8N7WsAjU7WjSlq6R6+PeQLA3n2JZfMJ0qJCdE+8=' 'sha256-t/pSmL5RzLxGXb0pFwfmuBC880U8lixYrCjDpNamglY=' 'sha256-q0PvztS1YEhB6VkizxWzbKj4H1DTdwvcDyuIMOSzjLU=' 'sha256-u1jr6gSjj5S00JKWZwJcVHwvkwUQsVOc9s92mMleIZo=' 'sha256-hB4WUo7GLySAUU5BwU+kcWGggUUIbt1URzwu26ftkUU=' 'sha256-bWjouFpJjGaZhAm1zvIsjiorwia3BoOh9mjLNlBRk8o=' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://www.facebook.com https://*.vimeocdn.com; connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://www.facebook.com https://hooks.example-test-receiver.com; frame-src 'self' https://player.vimeo.com https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
+      # END GENERATED CSP
