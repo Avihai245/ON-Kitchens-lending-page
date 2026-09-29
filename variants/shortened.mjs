@@ -2437,6 +2437,53 @@ export function transform(html, { replaceExactly, v2 = false }) {
   // the original, unconditional, already-safe single file rather than ship a
   // regression. Left as a flagged follow-up in the report.
 
+  // ---- v2: hero preload moves to the very top of <head> -----------------------
+  // PageSpeed's "resource load delay" flags the gap between the preload scanner
+  // reaching this tag and it actually starting — here that's the icon link, two
+  // font preconnects, the font preload/noscript pair and the design-system
+  // stylesheet link, all ahead of it today. None of those block the image
+  // request once discovered; discovery itself is what's late. Moved to the very
+  // first line the page-specific head array contributes (title/meta-description
+  // are inert metadata, so ahead of or behind them makes no difference — this
+  // goes ahead of everything that isn't).
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high">\n',
+      '',
+      1,
+      'v2: remove hero preload from its old position'
+    );
+    out = replaceExactly(
+      out,
+      '<title>Ghost Kitchen & Virtual Restaurant Space For Rent In LA | ŌN Kitchens</title>',
+      '<link rel="preload" as="image" href="assets/kitchen-hero.webp" fetchpriority="high">\n<title>Ghost Kitchen & Virtual Restaurant Space For Rent In LA | ŌN Kitchens</title>',
+      1,
+      'v2: hero preload to the top of head'
+    );
+  }
+
+  // ---- v2: drop the design system's empty, dead bundle script -----------------
+  // _ds_bundle.js is a render-blocking <script> (no defer/async) that costs a
+  // full request round trip before the parser can continue, for 300 bytes that
+  // do nothing: it only initializes window.Industry_indust to an empty object
+  // with an empty components list — confirmed nothing in this codebase (or the
+  // rest of the Claude-Design runtime) ever reads that namespace. Dropping the
+  // tag outright beats deferring it: zero bytes and zero requests instead of a
+  // smaller blocking cost moved later. Left in place, unconditionally, for every
+  // other page — this is a real render-blocking cost, but a 300-byte no-op is a
+  // very small one, and this file stays out of scope for anything not gated on
+  // v2, the same rule as everywhere else in this pipeline.
+  if (v2) {
+    out = replaceExactly(
+      out,
+      '<script src="_ds/industry-07e58652-c0e7-4e65-8b31-789011f5d1e5/_ds_bundle.js"></script>\n',
+      '',
+      1,
+      'v2: drop the empty _ds_bundle.js script tag'
+    );
+  }
+
   // ---- 23. v2: the font stylesheet stops blocking first paint -----------------
   // font-display: swap is already active (the shared FONT_CSS URL already carries
   // &display=swap, scripts/build.mjs) — the part still worth doing is the
